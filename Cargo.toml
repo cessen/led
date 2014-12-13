@@ -1,0 +1,15 @@
+[package]
+
+name = "Led"
+version = "0.0.1"
+authors = ["Nathan Vegdahl <cessen@cessen.com>"]
+
+[[bin]]
+name = "led"
+path = "src/main.rs"
+
+[dependencies.docopt]
+git = "https://github.com/docopt/docopt.rs.git"
+
+[dependencies.rustbox]
+git = "https://github.com/gchp/rustbox.git"
