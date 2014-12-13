@@ -32,11 +32,14 @@ fn main() {
     
     let mut tb = TextBlock::new();
 
-    for _ in range(0i, 50) {
+    for _ in range(0i, 1000) {
         tb.insert_text("Hello", 0);
         tb.insert_text("Goodbye", 0);
         tb.insert_text(args.arg_file.as_slice(), 0);
+        if tb.len() > 1024 {
+            tb.remove_text(0, 12 + args.arg_file.len());
+        }
     }
     
-    println!("{}", std::str::from_utf8(tb.data.as_slice()).unwrap());
+    println!("{}", tb.as_str());
 }
