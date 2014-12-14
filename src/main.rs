@@ -32,14 +32,17 @@ fn main() {
     
     let mut tb = TextBuffer::new();
 
-    for _ in range(0i, 1000) {
+    for _ in range(0i, 100) {
         tb.insert_text(args.arg_file.as_slice(), 0);
-        if tb.len() > 1024 {
-            tb.remove_text(27, 27+3);
-        }
     }
     
     tb.remove_text(3, 6);
+    tb.remove_text(8, 9);
+    tb.remove_text(40, 43);
+    
+    if tb.len() > 300 {
+        tb.remove_text(67, 285);
+    }
     
     println!("{}", tb);
 }

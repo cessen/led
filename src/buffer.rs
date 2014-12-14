@@ -156,13 +156,14 @@ impl TextNode {
         }
     }
 
-    /// Splits a leaf node into two roughly equal-sized children
-    pub fn split(&mut self) {
+    /// Recursively splits a leaf node into roughly equal-sized children,
+    /// being no larger than 'max_size'.
+    pub fn split(&mut self, max_size: uint) {
         if let TextNodeData::Branch(_, _) = self.data {
             panic!("TextNode::split(): attempt to split a non-leaf node.");
         }
         
-        if self.byte_count > 1 {
+        if self.byte_count > max_size {
             // Split data into two new text blocks
             let mut tn1 = box TextNode::new();
             let mut tn2 = box TextNode::new();
@@ -171,6 +172,9 @@ impl TextNode {
                 tn1 = box TextNode::new_from_str(tb.as_str().slice(0, pos));
                 tn2 = box TextNode::new_from_str(tb.as_str().slice(pos, tb.len()));
             }
+            
+            tn1.split(max_size);
+            tn2.split(max_size);
             
             // Swap the old and new data
             let mut new_data = TextNodeData::Branch(tn1, tn2);
@@ -218,7 +222,7 @@ impl TextNode {
                 }
                 
                 if self.byte_count > MAX_LEAF_SIZE {
-                    self.split();
+                    self.split(MAX_LEAF_SIZE);
                 }
             },
             
