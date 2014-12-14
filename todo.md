@@ -1,0 +1,1 @@
+- Implement useful iterators for the Text Rope.
