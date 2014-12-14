@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::mem;
 use std::fmt;
 
@@ -134,7 +135,7 @@ pub enum TextNodeData {
     Branch(Box<TextNode>, Box<TextNode>)
 }
 
-const MIN_LEAF_SIZE: uint = 512;
+const MIN_LEAF_SIZE: uint = 64;
 const MAX_LEAF_SIZE: uint = MIN_LEAF_SIZE * 2;
 
 
@@ -155,8 +156,7 @@ impl TextNode {
         }
     }
 
-    /// Splits a leaf node into equal-sized pieces until all children are
-    /// less than 'max_size'.
+    /// Splits a leaf node into two roughly equal-sized children
     pub fn split(&mut self) {
         if let TextNodeData::Branch(_, _) = self.data {
             panic!("TextNode::split(): attempt to split a non-leaf node.");
@@ -212,9 +212,10 @@ impl TextNode {
             TextNodeData::Leaf(_) => {
                 if let TextNodeData::Leaf(ref mut tb) = self.data {
                     tb.insert_text(text, pos);
+                    
+                    self.newline_count += newline_count(text);
+                    self.byte_count = tb.len();
                 }
-                self.newline_count += newline_count(text);
-                self.byte_count += text.len();
                 
                 if self.byte_count > MAX_LEAF_SIZE {
                     self.split();
@@ -232,6 +233,45 @@ impl TextNode {
                 self.newline_count = left.newline_count + right.newline_count;
                 self.byte_count = left.byte_count + right.byte_count;
             }
+        }
+    }
+    
+    /// Remove the text between byte positions 'pos_a' and 'pos_b'.
+    pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
+        // Bounds checks
+        if pos_a > pos_b {
+            panic!("TextNode::remove_text(): pos_a must be less than or equal to pos_b.");
+        }
+        if pos_b > self.byte_count {
+            panic!("TextNode::remove_text(): attempt to remove text after end of node text.");
+        }
+        
+        match self.data {
+            TextNodeData::Leaf(ref mut tb) => {
+                tb.remove_text(pos_a, pos_b);
+                
+                self.newline_count = newline_count(tb.as_str());
+                self.byte_count = tb.len();
+            },
+            
+            TextNodeData::Branch(ref mut left, ref mut right) => {
+                let lbc = left.byte_count;
+                
+                if pos_a < lbc {
+                    left.remove_text(pos_a, min(pos_b, lbc));
+                }
+                
+                if pos_b > lbc {
+                    right.remove_text(pos_a - min(pos_a, lbc), pos_b - lbc);
+                }
+                
+                self.newline_count = left.newline_count + right.newline_count;
+                self.byte_count = left.byte_count + right.byte_count;
+            }
+        }
+        
+        if self.byte_count < MIN_LEAF_SIZE {
+            self.merge();
         }
     }
 }
@@ -277,14 +317,7 @@ impl TextBuffer {
     
     /// Remove the text between byte positions 'pos_a' and 'pos_b'.
     pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
-        match self.root.data {
-            TextNodeData::Leaf(ref mut tb) => {
-                tb.remove_text(pos_a, pos_b);
-                self.root.byte_count = tb.len();
-            },
-            
-            TextNodeData::Branch(_, _) => {}
-        }
+        self.root.remove_text(pos_a, pos_b);
     }
 }
 
