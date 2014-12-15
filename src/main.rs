@@ -12,7 +12,7 @@ mod buffer;
 
 // Usage documentation string
 static USAGE: &'static str = "
-Usage: led <file>
+Usage: led [<file>]
        led --help
 
 Options:
@@ -23,7 +23,7 @@ Options:
 // Struct for storing command-line arguments
 #[deriving(Decodable, Show)]
     struct Args {
-    arg_file: String,
+    arg_file: Option<String>,
     flag_help: bool,
 }
 
@@ -54,7 +54,7 @@ fn main() {
                         column = 0;
                         continue;
                     }
-                    rustbox::print(column, line, Style::Bold, Color::White, Color::Black, c.to_string());
+                    rustbox::print(column, line, Style::Normal, Color::White, Color::Black, c.to_string());
                     column += 1;
                 }
                 else {
@@ -76,21 +76,20 @@ fn main() {
         
         // Handle events
         match rustbox::poll_event() {
-            rustbox::Event::KeyEvent(_, _, ch) => {
-                match char::from_u32(ch) {
-                    Some('q') => { break; },
-                    
-                    Some('w') => {
-                        let p = tb.len();
-                        tb.insert_text("\n", p);
-                    },
-                    
-                    Some(c) => {
-                        let p = tb.len();
-                        tb.insert_text(c.to_string().as_slice(), p);
-                    },
-                    
-                    _ => {}
+            rustbox::Event::KeyEvent(modifier, key, character) => {
+                // Return
+                if key == 13 {
+                    let p = tb.len();
+                    tb.insert_text("\n", p);
+                }
+                // Esc
+                else if key == 27 {
+                    break;
+                }
+                // Some key
+                else if let Option::Some(c) = char::from_u32(character) {
+                    let p = tb.len();
+                    tb.insert_text(c.to_string().as_slice(), p);
                 }
             },
             

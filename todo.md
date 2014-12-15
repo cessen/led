@@ -1,1 +1,3 @@
-- Implement useful iterators for the Text Rope.
+- "Editor" class that has cursors.
+- Some way of scrolling the view...?
+- File loading.
