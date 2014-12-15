@@ -36,13 +36,13 @@ fn main() {
         tb.insert_text(args.arg_file.as_slice(), 0);
     }
     
-    tb.remove_text(3, 6);
-    tb.remove_text(8, 9);
-    tb.remove_text(40, 43);
+    let mut iterz = tb.root_iter();
     
-    if tb.len() > 300 {
-        tb.remove_text(67, 285);
+    iterz.skip_chars(3);
+    
+    for c in iterz {
+        print!("{}", c);
     }
+    println!("");
     
-    println!("{}", tb);
 }

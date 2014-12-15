@@ -1,6 +1,9 @@
+#![allow(dead_code)]
+
 use std::cmp::min;
 use std::mem;
 use std::fmt;
+use std;
 
 
 fn newline_count(text: &str) -> uint {
@@ -11,6 +14,40 @@ fn newline_count(text: &str) -> uint {
         }
     }
     return count;
+}
+
+fn char_count(text: &str) -> uint {
+    let mut count = 0;
+    for _ in text.chars() {
+        count += 1;
+    }
+    return count;
+}
+
+fn char_and_newline_count(text: &str) -> (uint, uint) {
+    let mut char_count = 0;
+    let mut newline_count = 0;
+    
+    for c in text.chars() {
+        char_count += 1;
+        if c == '\n' {
+            newline_count += 1;
+        }
+    }
+    
+    return (char_count, newline_count);
+}
+
+fn char_pos_to_byte_pos(text: &str, pos: uint) -> uint {
+    let mut i: uint = 0;
+    for (offset, _) in text.char_indices() {
+        if i == pos {
+            return offset;
+        }
+        i += 1;
+    }
+    
+    panic!("char_pos_to_byte_pos(): char position off the end of the string.");
 }
 
 
@@ -45,15 +82,10 @@ impl TextBlock {
         self.data.len()
     }
     
-    /// Insert 'text' at byte position 'pos'.
-    /// NOTE: this makes no attempt to preserve utf8 validity, and may
-    /// insert text in the middle of multi-byte code points.
-    // TODO: Do checks to prevent invalidating utf8 sequences
+    /// Insert 'text' at char position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
-        // Bounds check
-        if pos > self.data.len() {
-            panic!("TextBlock::insert_text(): attempt to insert text beyond end of text block.");
-        }
+        // Find insertion position in bytes
+        let byte_pos = char_pos_to_byte_pos(text, pos);
 
         // Grow data size		
         self.data.grow(text.len(), 0);
@@ -61,7 +93,7 @@ impl TextBlock {
         // Move old bytes forward
         let mut from = self.data.len() - text.len();
         let mut to = self.data.len();
-        while from > pos {
+        while from > byte_pos {
             from -= 1;
             to -= 1;
             
@@ -69,29 +101,27 @@ impl TextBlock {
         }
         
         // Copy new bytes in
-        let mut i = pos;
+        let mut i = byte_pos;
         for b in text.bytes() {
             self.data[i] = b;
             i += 1
         }
     }
     
-    /// Remove the text between byte positions 'pos_a' and 'pos_b'.
-    /// NOTE: this makes no attempt to preserve utf8 validity, and may
-    /// remove parts of multi-byte code points.
-    // TODO: Do checks to prevent invalidating utf8 sequences
+    /// Remove the text between char positions 'pos_a' and 'pos_b'.
     pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
         // Bounds checks
         if pos_a > pos_b {
             panic!("TextBlock::remove_text(): pos_a must be less than or equal to pos_b.");
         }
-        if pos_b > self.data.len() {
-            panic!("TextBlock::remove_text(): attempt to remove text beyond the end of text block.");
-        }
+        
+        // Find removal positions in bytes
+        let byte_pos_a = char_pos_to_byte_pos(self.as_str(), pos_a);
+        let byte_pos_b = char_pos_to_byte_pos(self.as_str(), pos_b);
         
         // Move bytes to fill in the gap left by the removed bytes
-        let mut from = pos_b;
-        let mut to = pos_a;
+        let mut from = byte_pos_b;
+        let mut to = byte_pos_a;
         while from < self.data.len() {
             self.data[to] = self.data[from];
             
@@ -100,7 +130,7 @@ impl TextBlock {
         }
         
         // Remove data from the end
-        let final_size = self.data.len() + pos_a - pos_b;
+        let final_size = self.data.len() + byte_pos_a - byte_pos_b;
         self.data.truncate(final_size);
     }
     
@@ -126,8 +156,8 @@ impl fmt::Show for TextBlock {
 // TODO: record number of graphines as well, to support utf8 properly
 pub struct TextNode {
     pub data: TextNodeData,
+    pub char_count: uint,
     pub newline_count: uint,
-    pub byte_count: uint,
 }
 
 pub enum TextNodeData {
@@ -143,16 +173,16 @@ impl TextNode {
     pub fn new() -> TextNode {
         TextNode {
             data: TextNodeData::Leaf(TextBlock::new()),
+            char_count: 0,
             newline_count: 0,
-            byte_count: 0
         }
     }
     
     pub fn new_from_str(text: &str) -> TextNode {
         TextNode {
             data: TextNodeData::Leaf(TextBlock::new_from_str(text)),
+            char_count: char_count(text),
             newline_count: newline_count(text),
-            byte_count: text.len()
         }
     }
 
@@ -163,7 +193,7 @@ impl TextNode {
             panic!("TextNode::split(): attempt to split a non-leaf node.");
         }
         
-        if self.byte_count > max_size {
+        if self.char_count > max_size {
             // Split data into two new text blocks
             let mut tn1 = box TextNode::new();
             let mut tn2 = box TextNode::new();
@@ -208,7 +238,7 @@ impl TextNode {
     
     /// Insert 'text' at position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
-        if pos > self.byte_count {
+        if pos > self.char_count {
             panic!("TextNode::insert_text(): attempt to insert text after end of node text.");
         }
         
@@ -217,25 +247,26 @@ impl TextNode {
                 if let TextNodeData::Leaf(ref mut tb) = self.data {
                     tb.insert_text(text, pos);
                     
-                    self.newline_count += newline_count(text);
-                    self.byte_count = tb.len();
+                    let (cc, nlc) = char_and_newline_count(text);
+                    self.char_count += cc;
+                    self.newline_count += nlc;
                 }
                 
-                if self.byte_count > MAX_LEAF_SIZE {
+                if self.char_count > MAX_LEAF_SIZE {
                     self.split(MAX_LEAF_SIZE);
                 }
             },
             
             TextNodeData::Branch(ref mut left, ref mut right) => {
-                if pos <= left.byte_count {
+                if pos <= left.char_count {
                     left.insert_text(text, pos);
                 }
                 else {
-                    right.insert_text(text, pos - left.byte_count);
+                    right.insert_text(text, pos - left.char_count);
                 }
                 
+                self.char_count = left.char_count + right.char_count;
                 self.newline_count = left.newline_count + right.newline_count;
-                self.byte_count = left.byte_count + right.byte_count;
             }
         }
     }
@@ -246,7 +277,7 @@ impl TextNode {
         if pos_a > pos_b {
             panic!("TextNode::remove_text(): pos_a must be less than or equal to pos_b.");
         }
-        if pos_b > self.byte_count {
+        if pos_b > self.char_count {
             panic!("TextNode::remove_text(): attempt to remove text after end of node text.");
         }
         
@@ -254,12 +285,13 @@ impl TextNode {
             TextNodeData::Leaf(ref mut tb) => {
                 tb.remove_text(pos_a, pos_b);
                 
-                self.newline_count = newline_count(tb.as_str());
-                self.byte_count = tb.len();
+                let (cc, nlc) = char_and_newline_count(tb.as_str());
+                self.char_count = cc;
+                self.newline_count = nlc;
             },
             
             TextNodeData::Branch(ref mut left, ref mut right) => {
-                let lbc = left.byte_count;
+                let lbc = left.char_count;
                 
                 if pos_a < lbc {
                     left.remove_text(pos_a, min(pos_b, lbc));
@@ -269,12 +301,12 @@ impl TextNode {
                     right.remove_text(pos_a - min(pos_a, lbc), pos_b - lbc);
                 }
                 
+                self.char_count = left.char_count + right.char_count;
                 self.newline_count = left.newline_count + right.newline_count;
-                self.byte_count = left.byte_count + right.byte_count;
             }
         }
         
-        if self.byte_count < MIN_LEAF_SIZE {
+        if self.char_count < MIN_LEAF_SIZE {
             self.merge();
         }
     }
@@ -311,22 +343,120 @@ impl TextBuffer {
     }
     
     pub fn len(&self) -> uint {
-        self.root.byte_count
+        self.root.char_count
     }
     
-    /// Insert 'text' at byte position 'pos'.
+    /// Insert 'text' at char position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
         self.root.insert_text(text, pos);
     }
     
-    /// Remove the text between byte positions 'pos_a' and 'pos_b'.
+    /// Remove the text between char positions 'pos_a' and 'pos_b'.
     pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
         self.root.remove_text(pos_a, pos_b);
+    }
+    
+    pub fn root_iter<'a>(&'a self) -> TextBufferIter<'a> {
+        let mut node_stack: Vec<&'a TextNode> = Vec::new();
+        let mut cur_node = &self.root;
+        
+        loop {
+            match cur_node.data {
+                TextNodeData::Leaf(_) => {
+                    break;
+                },
+                
+                TextNodeData::Branch(ref left, ref right) => {
+                    node_stack.push(&(**right));
+                    cur_node = &(**left);
+                }
+            }
+        }
+        
+        TextBufferIter {
+            node_stack: node_stack,
+            cur_block: match cur_node.data {
+                TextNodeData::Leaf(ref tb) => tb.as_str().chars(),
+                _ => panic!("This should never happen.")
+            }
+        }
     }
 }
 
 impl fmt::Show for TextBuffer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.root.fmt(f)
+    }
+}
+
+
+
+
+/// An iterator over a text buffer
+pub struct TextBufferIter<'a> {
+    node_stack: Vec<&'a TextNode>,
+    cur_block: std::str::Chars<'a>,
+}
+
+
+impl<'a> TextBufferIter<'a> {
+    // Puts the iterator on the next line
+    pub fn next_line(&mut self) -> Option<char> {
+        // TODO: more efficient implementation, taking advantage of rope
+        // structure.
+        for c in *self {
+            if c == '\n' {
+                return Option::Some(c);
+            }
+        }
+        
+        return Option::None;
+    }
+    
+    
+    // Skips the iterator n characters ahead
+    pub fn skip_chars(&mut self, n: uint) {
+        // TODO: more efficient implementation, taking advantage of rope
+        // structure.
+        for _ in range(0, n) {
+            if let Option::None = self.next() {
+                break;
+            }
+        }
+    }
+}
+
+
+impl<'a> Iterator<char> for TextBufferIter<'a> {
+    fn next(&mut self) -> Option<char> {
+        if let Option::Some(c) = self.cur_block.next() {
+            return Option::Some(c);
+        }
+      
+        loop {
+            if let Option::Some(node) = self.node_stack.pop() {
+                match node.data {
+                    TextNodeData::Leaf(ref tb) => {
+                        self.cur_block = tb.as_str().chars();
+                      
+                        if let Option::Some(c) = self.cur_block.next() {
+                            return Option::Some(c);
+                        }
+                        else {
+                            continue;
+                        }
+                    },
+                  
+                    TextNodeData::Branch(ref left, ref right) => {
+                        self.node_stack.push(&(**right));
+                        self.node_stack.push(&(**left));
+                        continue;
+                    }
+                }
+            }
+            else {
+                return Option::None;
+            }
+        }
     }
 }
