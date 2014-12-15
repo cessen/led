@@ -40,11 +40,16 @@ fn char_and_newline_count(text: &str) -> (uint, uint) {
 
 fn char_pos_to_byte_pos(text: &str, pos: uint) -> uint {
     let mut i: uint = 0;
+    
     for (offset, _) in text.char_indices() {
         if i == pos {
             return offset;
         }
         i += 1;
+    }
+    
+    if i == pos {
+        return text.len();
     }
     
     panic!("char_pos_to_byte_pos(): char position off the end of the string.");
@@ -85,7 +90,7 @@ impl TextBlock {
     /// Insert 'text' at char position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
         // Find insertion position in bytes
-        let byte_pos = char_pos_to_byte_pos(text, pos);
+        let byte_pos = char_pos_to_byte_pos(self.as_str(), pos);
 
         // Grow data size		
         self.data.grow(text.len(), 0);
