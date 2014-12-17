@@ -102,4 +102,6 @@ fn main() {
         }
     }
     rustbox::shutdown();
+    
+    println!("{}", tb.root.tree_height);
 }

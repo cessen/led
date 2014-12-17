@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::cmp::min;
+use std::cmp::{min, max};
 use std::mem;
 use std::fmt;
 use std;
@@ -161,6 +161,7 @@ impl fmt::Show for TextBlock {
 // TODO: record number of graphines as well, to support utf8 properly
 pub struct TextNode {
     pub data: TextNodeData,
+    pub tree_height: uint,
     pub char_count: uint,
     pub newline_count: uint,
 }
@@ -178,6 +179,7 @@ impl TextNode {
     pub fn new() -> TextNode {
         TextNode {
             data: TextNodeData::Leaf(TextBlock::new()),
+            tree_height: 1,
             char_count: 0,
             newline_count: 0,
         }
@@ -186,8 +188,118 @@ impl TextNode {
     pub fn new_from_str(text: &str) -> TextNode {
         TextNode {
             data: TextNodeData::Leaf(TextBlock::new_from_str(text)),
+            tree_height: 1,
             char_count: char_count(text),
             newline_count: newline_count(text),
+        }
+    }
+    
+    pub fn update_height(&mut self) {
+        match self.data {
+            TextNodeData::Leaf(_) => {
+                self.tree_height = 1;
+            },
+            
+            TextNodeData::Branch(ref left, ref right) => {
+                self.tree_height = max(left.tree_height, right.tree_height) + 1;
+            }
+        }
+    }
+    
+    pub fn rotate_left(&mut self) {
+        let mut temp = TextNode::new();
+        
+        if let TextNodeData::Branch(_, ref mut right) = self.data {
+            mem::swap(&mut temp, &mut (**right));
+            
+            if let TextNodeData::Branch(ref mut left, _) = temp.data {   
+                mem::swap(left, right);
+            }
+        }
+        
+        if let TextNodeData::Branch(ref mut left, _) = temp.data {
+            mem::swap(&mut (**left), self);
+            left.update_height();
+        }
+        
+        self.update_height();
+    }
+    
+    pub fn rotate_right(&mut self) {
+        let mut temp = TextNode::new();
+        
+        if let TextNodeData::Branch(ref mut left, _) = self.data {
+            mem::swap(&mut temp, &mut (**left));
+            
+            if let TextNodeData::Branch(_, ref mut right) = temp.data {   
+                mem::swap(right, left);
+            }
+        }
+        
+        if let TextNodeData::Branch(_, ref mut right) = temp.data {
+            mem::swap(&mut (**right), self);
+            right.update_height();
+        }
+        
+        self.update_height();
+    }
+    
+    pub fn rebalance(&mut self) {
+        loop {
+            let mut rot: int = 0;
+            
+            if let TextNodeData::Branch(ref mut left, ref mut right) = self.data {
+                let height_diff = (left.tree_height as int) - (right.tree_height as int);
+
+                // Left side higher than right side
+                if height_diff > 1 {
+                    let mut child_rot = false;
+                    if let TextNodeData::Branch(ref lc, ref rc) = left.data {
+                        if lc.tree_height < rc.tree_height {
+                            child_rot = true;
+                        }
+                    }
+                    
+                    if child_rot {
+                        if let TextNodeData::Branch(_, ref mut rc) = right.data {
+                            rc.rotate_right();
+                        }
+                    }
+                    
+                    rot = 1;
+                }
+                // Right side higher then left side
+                else if height_diff < -1 {
+                    let mut child_rot = false;
+                    if let TextNodeData::Branch(ref lc, ref rc) = right.data {
+                        if lc.tree_height > rc.tree_height {
+                            child_rot = true;
+                        }
+                    }
+                    
+                    if child_rot {
+                        if let TextNodeData::Branch(ref mut lc, _) = right.data {
+                            lc.rotate_right();
+                        }
+                    }
+                    
+                    rot = -1;
+                }
+                // Balanced, stop
+                else {
+                    break;
+                }
+            }
+            else {
+                break;
+            }
+            
+            if rot == 1 {
+                self.rotate_right();
+            }
+            else if rot == 1 {
+                self.rotate_left();
+            }
         }
     }
 
@@ -214,7 +326,11 @@ impl TextNode {
             // Swap the old and new data
             let mut new_data = TextNodeData::Branch(tn1, tn2);
             mem::swap(&mut self.data, &mut new_data);
+            
         }
+        
+        self.rebalance();
+        self.update_height();
     }
     
     /// Merges the data of a non-leaf node to make it a leaf node    
@@ -238,6 +354,8 @@ impl TextNode {
             }
         
             self.data = TextNodeData::Leaf(TextBlock::new_from_str(s.as_slice()));
+            self.rebalance();
+            self.update_height();
         }
     }
     
@@ -274,6 +392,9 @@ impl TextNode {
                 self.newline_count = left.newline_count + right.newline_count;
             }
         }
+        
+        self.rebalance();
+        self.update_height();
     }
     
     /// Remove the text between byte positions 'pos_a' and 'pos_b'.
@@ -311,8 +432,13 @@ impl TextNode {
             }
         }
         
+        self.rebalance();
+        self.update_height();
+        
         if self.char_count < MIN_LEAF_SIZE {
             self.merge();
+            self.rebalance();
+            self.update_height();
         }
     }
 }
@@ -337,7 +463,7 @@ impl fmt::Show for TextNode {
 
 /// A text buffer
 pub struct TextBuffer {
-    root: TextNode
+    pub root: TextNode
 }
 
 impl TextBuffer {
