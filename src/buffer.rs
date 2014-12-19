@@ -206,6 +206,23 @@ impl TextNode {
         }
     }
     
+    pub fn update_stats(&mut self) {
+        match self.data {
+            TextNodeData::Leaf(ref tb) => {
+                self.tree_height = 1;
+                let (cc, nlc) = char_and_newline_count(tb.as_str());
+                self.char_count = cc;
+                self.newline_count = nlc;
+            },
+            
+            TextNodeData::Branch(ref left, ref right) => {
+                self.tree_height = max(left.tree_height, right.tree_height) + 1;
+                self.char_count = left.char_count + right.char_count;
+                self.newline_count = left.newline_count + right.newline_count;
+            }
+        }
+    }
+    
     pub fn rotate_left(&mut self) {
         let mut temp = TextNode::new();
         
@@ -213,16 +230,23 @@ impl TextNode {
             mem::swap(&mut temp, &mut (**right));
             
             if let TextNodeData::Branch(ref mut left, _) = temp.data {   
-                mem::swap(left, right);
+                mem::swap(&mut (**left), &mut (**right));
             }
+            else {
+                panic!("rotate_left(): attempting to rotate node without branching right child.");
+            }
+        }
+        else {
+            panic!("rotate_left(): attempting to rotate leaf node.");
         }
         
         if let TextNodeData::Branch(ref mut left, _) = temp.data {
             mem::swap(&mut (**left), self);
-            left.update_height();
+            left.update_stats();
         }
         
-        self.update_height();
+        mem::swap(&mut temp, self);
+        self.update_stats();
     }
     
     pub fn rotate_right(&mut self) {
@@ -232,21 +256,28 @@ impl TextNode {
             mem::swap(&mut temp, &mut (**left));
             
             if let TextNodeData::Branch(_, ref mut right) = temp.data {   
-                mem::swap(right, left);
+                mem::swap(&mut (**right), &mut (**left));
             }
+            else {
+                panic!("rotate_right(): attempting to rotate node without branching left child.");
+            }
+        }
+        else {
+            panic!("rotate_right(): attempting to rotate leaf node.");
         }
         
         if let TextNodeData::Branch(_, ref mut right) = temp.data {
             mem::swap(&mut (**right), self);
-            right.update_height();
+            right.update_stats();
         }
         
-        self.update_height();
+        mem::swap(&mut temp, self);
+        self.update_stats();
     }
     
     pub fn rebalance(&mut self) {
         loop {
-            let mut rot: int = 0;
+            let mut rot: int;
             
             if let TextNodeData::Branch(ref mut left, ref mut right) = self.data {
                 let height_diff = (left.tree_height as int) - (right.tree_height as int);
@@ -262,7 +293,7 @@ impl TextNode {
                     
                     if child_rot {
                         if let TextNodeData::Branch(_, ref mut rc) = right.data {
-                            rc.rotate_right();
+                            rc.rotate_left();
                         }
                     }
                     
@@ -297,7 +328,7 @@ impl TextNode {
             if rot == 1 {
                 self.rotate_right();
             }
-            else if rot == 1 {
+            else if rot == -1 {
                 self.rotate_left();
             }
         }
