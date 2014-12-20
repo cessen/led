@@ -27,7 +27,7 @@ pub fn save_buffer_to_file(tb: &TextBuffer, path: &Path) -> IoResult<()> {
     let mut f = BufferedWriter::new(try!(File::create(path)));
     
     for c in iter {
-        f.write_char(c);
+        let _ = f.write_char(c);
     }
     
     return Ok(());

@@ -1,7 +1,8 @@
+#![allow(dead_code)]
+
 extern crate rustbox;
 extern crate docopt;
 extern crate serialize;
-
 
 use std::char;
 use std::path::Path;
@@ -36,7 +37,7 @@ Options:
 const K_ENTER: u16 = 13;
 const K_TAB: u16 = 9;
 const K_SPACE: u16 = 32;
-const K_BACKSPACE: u16 = 127;
+//const K_BACKSPACE: u16 = 127;
 //const K_DOWN: u16 = 65516;
 //const K_LEFT: u16 = 65515;
 //const K_RIGHT: u16 = 65514;
@@ -119,7 +120,7 @@ fn main() {
                         },
                         
                         K_CTRL_S => {
-                            save_buffer_to_file(&tb, &Path::new("untitled.txt"));
+                            let _ = save_buffer_to_file(&tb, &Path::new("untitled.txt"));
                         },
                         
                         K_ENTER => {
