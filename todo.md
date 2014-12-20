@@ -1,4 +1,2 @@
 - "Editor" class that has cursors.
 - Some way of scrolling the view...?
-- File loading.
-- Self-balancing tree for rope
