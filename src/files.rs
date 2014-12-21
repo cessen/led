@@ -23,6 +23,7 @@ pub fn load_file_to_buffer(path: &Path) -> IoResult<TextBuffer> {
 }
 
 pub fn save_buffer_to_file(tb: &TextBuffer, path: &Path) -> IoResult<()> {
+    // TODO: make save atomic
     let mut iter = tb.root_iter();
     let mut f = BufferedWriter::new(try!(File::create(path)));
     

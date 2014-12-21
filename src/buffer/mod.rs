@@ -1,6 +1,4 @@
-
-
-
+#![allow(dead_code)]
 
 use std::fmt;
 use std;
@@ -13,7 +11,7 @@ mod text_node;
 
 /// A text buffer
 pub struct TextBuffer {
-    pub root: TextNode
+    pub root: TextNode,
 }
 
 impl TextBuffer {
@@ -25,6 +23,28 @@ impl TextBuffer {
     
     pub fn len(&self) -> uint {
         self.root.char_count
+    }
+    
+    pub fn pos_2d_to_1d(&self, pos: (uint, uint)) -> Option<uint> {
+        // TODO
+        return Option::None;
+    }
+    
+    pub fn pos_2d_to_closest_1d(&self, pos: (uint, uint)) -> uint {
+        match self.root.pos_2d_to_closest_1d(0, pos) {
+            text_node::IndexOrOffset::Index(i) => i,
+            _ => self.len()
+        }
+    }
+    
+    pub fn pos_2d_to_closest_2d(&self, pos: (uint, uint)) -> (uint, uint) {
+        // TODO
+        return (0, 0);
+    }
+    
+    pub fn pos_1d_to_2d(&self, pos: uint) -> Option<(uint, uint)> {
+        // TODO
+        return Option::None;
     }
     
     /// Insert 'text' at char position 'pos'.

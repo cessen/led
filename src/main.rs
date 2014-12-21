@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 extern crate rustbox;
 extern crate docopt;
 extern crate serialize;
@@ -7,12 +5,13 @@ extern crate serialize;
 use std::char;
 use std::path::Path;
 use docopt::Docopt;
-use buffer::TextBuffer; 
-use rustbox::{Style,Color};
-use files::{load_file_to_buffer, save_buffer_to_file};
+use editor::Editor;
+use term_ui::draw_editor;
 
 mod buffer;
 mod files;
+mod editor;
+mod term_ui;
 
 
 // Usage documentation string
@@ -38,10 +37,10 @@ const K_ENTER: u16 = 13;
 const K_TAB: u16 = 9;
 const K_SPACE: u16 = 32;
 //const K_BACKSPACE: u16 = 127;
-//const K_DOWN: u16 = 65516;
-//const K_LEFT: u16 = 65515;
-//const K_RIGHT: u16 = 65514;
-//const K_UP: u16 = 65517;
+const K_DOWN: u16 = 65516;
+const K_LEFT: u16 = 65515;
+const K_RIGHT: u16 = 65514;
+const K_UP: u16 = 65517;
 const K_ESC: u16 = 27;
 const K_CTRL_Q: u16 = 17;
 const K_CTRL_S: u16 = 19;
@@ -59,48 +58,19 @@ fn main() {
     let mut height = rustbox::height();
 
     // Load file, if specified    
-    let mut tb = if let Option::Some(s) = args.arg_file {
-        load_file_to_buffer(&Path::new(s.as_slice())).unwrap()
+    let mut editor = if let Option::Some(s) = args.arg_file {
+        Editor::new_from_file(&Path::new(s.as_slice()))
     }
     else {
-        TextBuffer::new()
+        Editor::new()
     };
     
     rustbox::init();
     
     loop {
-        // Draw the text buffer to screen
+        // Draw the editor to screen
         rustbox::clear();
-        {
-            let mut tb_iter = tb.root_iter();
-            let mut line: uint = 0;
-            let mut column: uint = 0;
-            
-            loop {
-                if let Option::Some(c) = tb_iter.next() {
-                    if c == '\n' {
-                        line += 1;
-                        column = 0;
-                        continue;
-                    }
-                    rustbox::print(column, line, Style::Normal, Color::White, Color::Black, c.to_string());
-                    column += 1;
-                }
-                else {
-                    break;
-                }
-                
-                if line > height {
-                    break;
-                }
-                
-                if column > width {
-                    tb_iter.next_line();
-                    line += 1;
-                    column = 0;
-                }
-            }
-        }
+        draw_editor(&editor, (0, 0), (height-1, width-1));
         rustbox::present();
         
         
@@ -120,29 +90,41 @@ fn main() {
                         },
                         
                         K_CTRL_S => {
-                            let _ = save_buffer_to_file(&tb, &Path::new("untitled.txt"));
+                            editor.save_if_dirty();
+                        },
+                        
+                        K_UP => {
+                            editor.cursor_up();
+                        },
+                        
+                        K_DOWN => {
+                            editor.cursor_down();
+                        },
+                        
+                        K_LEFT => {
+                            editor.cursor_left();
+                        },
+                        
+                        K_RIGHT => {
+                            editor.cursor_right();
                         },
                         
                         K_ENTER => {
-                            let p = tb.len();
-                            tb.insert_text("\n", p);
+                            editor.insert_text_at_cursor("\n");
                         },
                         
                         K_SPACE => {
-                            let p = tb.len();
-                            tb.insert_text(" ", p);
+                            editor.insert_text_at_cursor(" ");
                         },
                         
                         K_TAB => {
-                            let p = tb.len();
-                            tb.insert_text("\t", p);
+                            editor.insert_text_at_cursor("\t");
                         },
                         
                         // Character
                         0 => {
                             if let Option::Some(c) = char::from_u32(character) {
-                                let p = tb.len();
-                                tb.insert_text(c.to_string().as_slice(), p);
+                                editor.insert_text_at_cursor(c.to_string().as_slice());
                             }
                         },
                         
@@ -172,5 +154,5 @@ fn main() {
     
     rustbox::shutdown();
     
-    println!("{}", tb.root.tree_height);
+    //println!("{}", editor.buffer.root.tree_height);
 }

@@ -10,6 +10,11 @@ use super::text_block::TextBlock;
 const MIN_LEAF_SIZE: uint = 64;
 const MAX_LEAF_SIZE: uint = MIN_LEAF_SIZE * 2;
 
+pub enum IndexOrOffset {
+    Index(uint),
+    Offset(uint)
+}
+
 
 /// A text rope node, using TextBlocks for its underlying text
 /// storage.
@@ -25,6 +30,7 @@ pub enum TextNodeData {
     Leaf(TextBlock),
     Branch(Box<TextNode>, Box<TextNode>)
 }
+
 
 
 impl TextNode {
@@ -324,6 +330,83 @@ impl TextNode {
             self.update_height();
         }
     }
+    
+    /// Find the closest 1d text position that represents the given
+    /// 2d position well.
+    pub fn pos_2d_to_closest_1d(&self, offset: uint, pos: (uint, uint)) -> IndexOrOffset {
+        match self.data {
+            TextNodeData::Leaf(ref tb) => {
+                let mut iter = tb.as_str().chars();
+                let mut i = 0;
+                let mut line = 0;
+                let mut col = offset;
+                
+                for c in iter {
+                    // Increment counters
+                    if c == '\n' {
+                        line += 1;
+                        col = 0;
+                    }
+                    else {
+                        col += 1;
+                    }
+                    i += 1;
+                    
+                    // Check if we've hit a relevant character
+                    if line > pos.0 || (line == pos.0 && col > pos.1) {
+                        break;
+                    }
+                }
+            
+                // If we've reached the end of this text block but
+                // haven't reached the target position, return an
+                // offset of the amount of this line already consumed.
+                if pos.0 > line || (pos.0 == line && pos.1 > col) {
+                    return IndexOrOffset::Offset(col);
+                }
+                
+                // Otherwise, we've found it!
+                return IndexOrOffset::Index(i);
+            },
+            
+            TextNodeData::Branch(ref left, ref right) => {
+                // Left child
+                if pos.0 <= left.newline_count {
+                    match left.pos_2d_to_closest_1d(offset, pos) {
+                        IndexOrOffset::Index(il) => {
+                            return IndexOrOffset::Index(il);
+                        },
+                        
+                        IndexOrOffset::Offset(il) => {
+                            match right.pos_2d_to_closest_1d(il, (pos.0 - left.newline_count, pos.1)) {
+                                IndexOrOffset::Index(ir) => {
+                                    return IndexOrOffset::Index(ir + left.char_count);
+                                },
+                                
+                                IndexOrOffset::Offset(ir) => {
+                                    return IndexOrOffset::Offset(ir);
+                                }
+                            }
+                        }
+                    }
+                }
+                // Right child
+                else {
+                    match right.pos_2d_to_closest_1d(0, (pos.0 - left.newline_count, pos.1)) {
+                        IndexOrOffset::Index(ir) => {
+                            return IndexOrOffset::Index(ir);
+                        },
+                        
+                        IndexOrOffset::Offset(ir) => {
+                            return IndexOrOffset::Offset(ir);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    
 }
 
 impl fmt::Show for TextNode {
