@@ -150,9 +150,7 @@ impl TextNode {
                     }
                     
                     if child_rot {
-                        if let TextNodeData::Branch(_, ref mut rc) = right.data {
-                            rc.rotate_left();
-                        }
+                        left.rotate_left();
                     }
                     
                     rot = 1;
@@ -167,9 +165,7 @@ impl TextNode {
                     }
                     
                     if child_rot {
-                        if let TextNodeData::Branch(ref mut lc, _) = right.data {
-                            lc.rotate_right();
-                        }
+                        right.rotate_right();
                     }
                     
                     rot = -1;
@@ -342,6 +338,11 @@ impl TextNode {
                 let mut col = offset;
                 
                 for c in iter {
+                    // Check if we've hit a relevant character
+                    if line > pos.0 || (line == pos.0 && col >= pos.1) {
+                        break;
+                    }
+                    
                     // Increment counters
                     if c == '\n' {
                         line += 1;
@@ -351,11 +352,6 @@ impl TextNode {
                         col += 1;
                     }
                     i += 1;
-                    
-                    // Check if we've hit a relevant character
-                    if line > pos.0 || (line == pos.0 && col > pos.1) {
-                        break;
-                    }
                 }
             
                 // If we've reached the end of this text block but

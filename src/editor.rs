@@ -62,6 +62,14 @@ impl Editor {
         self.buffer.insert_text(text, pos);
         
         self.dirty = true;
+        
+        if text == "\n" {
+            self.cursor.0 += 1;
+            self.cursor.1 = 0;
+        }
+        else {
+            self.cursor.1 += 1;
+        }
     }
     
     pub fn cursor_left(&mut self) {
