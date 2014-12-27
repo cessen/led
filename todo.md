@@ -1,2 +1,6 @@
-- "Editor" class that has cursors.
-- Some way of scrolling the view...?
+- Page up / page down
+- Proper handling of tab characters
+- Line number display
+- Editor info display (filename, current line/column, indentation style, etc.)
+- File opening by entering path
+- UI that wraps editors, for split view.
