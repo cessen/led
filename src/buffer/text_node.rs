@@ -4,7 +4,7 @@ use std::fmt;
 use std::mem;
 use std::cmp::{min, max};
 
-use super::utils::{newline_count, char_count, char_and_newline_count};
+use string_utils::{newline_count, char_count, char_and_newline_count};
 use super::text_block::TextBlock;
 
 const MIN_LEAF_SIZE: uint = 64;
@@ -455,6 +455,96 @@ impl TextNode {
                     col += left.tail_len();
                     
                     return right.pos_1d_to_closest_2d((line, col), pos - left.char_count);
+                }
+            }
+        }
+    }
+    
+    
+    /// Returns the number of newlines contained within the
+    /// character range [pos_a, pos_b)
+    pub fn newlines_in_range(&self, pos_a: uint, pos_b: uint) -> uint {
+        if pos_a > pos_b {
+            panic!("newlines_in_range(): pos_a must be less than or equal to pos_b.");
+        }
+        
+        if pos_a == pos_b {
+            return 0;
+        }
+        
+        match self.data {
+            TextNodeData::Leaf(ref tb) => {
+                let mut iter = tb.as_str().chars();
+                let mut count: uint = 0;
+                let mut i: uint = 0;
+                
+                for c in iter {
+                    if i >= pos_b {
+                        break;
+                    }
+                    
+                    if i >= pos_a && c == '\n' {
+                        count += 1;
+                    }
+                    
+                    i += 1;
+                }
+                
+                return count;
+            },
+            
+            TextNodeData::Branch(ref left, ref right) => {
+                let mut count: uint = 0;
+                
+                // Left
+                if pos_a == 0 && pos_b >= left.char_count {
+                    count += left.newline_count;
+                }
+                else if pos_a < left.char_count {
+                    count += left.newlines_in_range(pos_a, pos_b);
+                }
+                
+                // Right
+                if pos_a <= left.char_count && pos_b >= self.char_count {
+                    count += right.newline_count;
+                }
+                else if pos_a < self.char_count && pos_b >= left.char_count {
+                    let pa = if pos_a > left.char_count {pos_a - left.char_count} else {0};
+                    count += right.newlines_in_range(pa, pos_b - left.char_count);
+                }
+                
+                return count;
+            }
+        }
+    }
+    
+    
+    /// Starting at pos, find the end of the line and return its position
+    pub fn end_of_line(&self, pos: uint) -> uint {
+        match self.data {
+            TextNodeData::Leaf(ref tb) => {
+                let mut iter = tb.as_str().chars();
+                let mut i: uint = 0;
+                
+                for c in iter {
+                    if i >= pos {
+                        if c == '\n' {
+                            break;
+                        }
+                    }
+                    
+                    i += 1;
+                }
+                
+                return i;
+            },
+            
+            TextNodeData::Branch(ref left, ref right) => {
+                if (left.char_count - left.tail_len()) > pos {
+                    return left.end_of_line(pos);
+                }
+                else {
+                    return right.end_of_line(pos - left.char_count);
                 }
             }
         }

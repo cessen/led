@@ -7,6 +7,7 @@ use docopt::Docopt;
 use editor::Editor;
 use term_ui::TermUI;
 
+mod string_utils;
 mod buffer;
 mod files;
 mod editor;

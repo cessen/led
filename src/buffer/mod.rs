@@ -4,7 +4,6 @@ use std::fmt;
 use std;
 use self::text_node::{TextNode, TextNodeData};
 
-mod utils;
 mod text_block;
 mod text_node;
 
@@ -20,19 +19,22 @@ impl TextBuffer {
             root: TextNode::new()
         }
     }
+
     
     pub fn len(&self) -> uint {
         self.root.char_count
     }
+
     
     pub fn newline_count(&self) -> uint {
         self.root.newline_count
     }
+
     
-    //pub fn pos_2d_to_1d(&self, pos: (uint, uint)) -> Option<uint> {
-    //    // TODO
-    //    return Option::None;
-    //}
+    pub fn end_of_line(&self, pos: uint) -> uint {
+        self.root.end_of_line(pos)
+    }
+
     
     pub fn pos_2d_to_closest_1d(&self, pos: (uint, uint)) -> uint {
         match self.root.pos_2d_to_closest_1d(0, pos) {
@@ -40,30 +42,24 @@ impl TextBuffer {
             _ => self.len()
         }
     }
-    
-    //pub fn pos_2d_to_closest_2d(&self, pos: (uint, uint)) -> (uint, uint) {
-    //    // TODO
-    //    return (0, 0);
-    //}
-    
-    //pub fn pos_1d_to_2d(&self, pos: uint) -> Option<(uint, uint)> {
-    //    // TODO
-    //    return Option::None;
-    //}
+
     
     pub fn pos_1d_to_closest_2d(&self, pos: uint) -> (uint, uint) {
         self.root.pos_1d_to_closest_2d((0,0), pos)
     }
+
     
     /// Insert 'text' at char position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
         self.root.insert_text(text, pos);
     }
+
     
     /// Remove the text between char positions 'pos_a' and 'pos_b'.
     pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
         self.root.remove_text(pos_a, pos_b);
     }
+
     
     pub fn root_iter<'a>(&'a self) -> TextBufferIter<'a> {
         let mut node_stack: Vec<&'a TextNode> = Vec::new();

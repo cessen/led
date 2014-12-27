@@ -2,7 +2,7 @@
 
 use std::mem;
 use std::fmt;
-use super::utils::char_pos_to_byte_pos;
+use string_utils::char_pos_to_byte_pos;
 
 /// A block of text, contiguous in memory
 pub struct TextBlock {
