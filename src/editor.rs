@@ -57,6 +57,26 @@ impl Editor {
         self.view_dim = (h, w);
     }
     
+    
+    /// Moves the editor's view the minimum amount to show the cursor
+    pub fn move_view_to_cursor(&mut self) {
+        // Horizontal
+        if self.cursor.1 < self.view_pos.1 {
+            self.view_pos.1 = self.cursor.1;
+        }
+        else if self.cursor.1 >= (self.view_pos.1 + self.view_dim.1) {
+            self.view_pos.1 = 1 + self.cursor.1 - self.view_dim.1;
+        }
+        
+        // Vertical
+        if self.cursor.0 < self.view_pos.0 {
+            self.view_pos.0 = self.cursor.0;
+        }
+        else if self.cursor.0 >= (self.view_pos.0 + self.view_dim.0) {
+            self.view_pos.0 = 1 + self.cursor.0 - self.view_dim.0;
+        }
+    }
+    
     pub fn insert_text_at_cursor(&mut self, text: &str) {
         let pos = self.buffer.pos_2d_to_closest_1d(self.cursor);
         let str_len = char_count(text);
@@ -68,6 +88,8 @@ impl Editor {
         
         // Move cursor
         self.cursor = self.buffer.pos_1d_to_closest_2d(p + str_len);
+        
+        self.move_view_to_cursor();
     }
     
     pub fn insert_text_at_char(&mut self, text: &str, pos: uint) {
@@ -87,6 +109,8 @@ impl Editor {
         self.buffer.remove_text(pos_a, pos_b);
         
         self.dirty = true;
+        
+        self.move_view_to_cursor();
     }
     
     pub fn cursor_left(&mut self) {
@@ -98,22 +122,30 @@ impl Editor {
         else {
             self.cursor = self.buffer.pos_1d_to_closest_2d(0);
         }
+        
+        self.move_view_to_cursor();
     }
     
     pub fn cursor_right(&mut self) {
         let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
         self.cursor = self.buffer.pos_1d_to_closest_2d(p + 1);
+        
+        self.move_view_to_cursor();
     }
     
     pub fn cursor_up(&mut self) {
         if self.cursor.0 > 0 {
             self.cursor.0 -= 1;
         }
+        
+        self.move_view_to_cursor();
     }
     
     pub fn cursor_down(&mut self) {
         if self.cursor.0 < self.buffer.newline_count() {
             self.cursor.0 += 1;
         }
+        
+        self.move_view_to_cursor();
     }
 }

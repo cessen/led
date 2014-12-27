@@ -61,6 +61,7 @@ impl TextBuffer {
     }
 
     
+    /// Creates an iterator at the first character
     pub fn root_iter<'a>(&'a self) -> TextBufferIter<'a> {
         let mut node_stack: Vec<&'a TextNode> = Vec::new();
         let mut cur_node = &self.root;
@@ -86,6 +87,49 @@ impl TextBuffer {
             }
         }
     }
+    
+    
+    /// Creates an iterator starting at the specified character index.
+    /// If the index is past the end of the text, then the iterator will
+    /// return None on next().
+    pub fn iter_at_char<'a>(&'a self, index: uint) -> TextBufferIter<'a> {
+        let mut node_stack: Vec<&'a TextNode> = Vec::new();
+        let mut cur_node = &self.root;
+        let mut char_i = index;
+        
+        loop {
+            match cur_node.data {
+                TextNodeData::Leaf(_) => {
+                    let mut char_iter = match cur_node.data {
+                        TextNodeData::Leaf(ref tb) => tb.as_str().chars(),
+                        _ => panic!("This should never happen.")
+                    };
+                    
+                    while char_i > 0 {
+                        char_iter.next();
+                        char_i -= 1;
+                    }
+                
+                    return TextBufferIter {
+                        node_stack: node_stack,
+                        cur_block: char_iter,
+                    };
+                },
+                
+                TextNodeData::Branch(ref left, ref right) => {
+                    if left.char_count > char_i {
+                        node_stack.push(&(**right));
+                        cur_node = &(**left);
+                    }
+                    else {
+                        cur_node = &(**right);
+                        char_i -= left.char_count;
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 impl fmt::Show for TextBuffer {
@@ -128,6 +172,30 @@ impl<'a> TextBufferIter<'a> {
                 break;
             }
         }
+    }
+    
+    
+    // Skips the iterator n characters ahead, unless it hits a newline
+    // character.  If it hits a newline character, returns true, otherwise,
+    // false.
+    pub fn skip_non_newline_chars(&mut self, n: uint) -> bool {
+        // TODO: more efficient implementation, taking advantage of rope
+        // structure.
+        for _ in range(0, n) {
+            match self.next() {
+                Option::Some(c) => {
+                    if c == '\n' {
+                        return true;
+                    }
+                },
+                
+                Option::None => {
+                    break;
+                }
+            }
+        }
+        
+        return false;
     }
 }
 

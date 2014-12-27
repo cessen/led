@@ -48,6 +48,7 @@ impl TermUI {
     
         let mut width = self.rb.width();
         let mut height = self.rb.height();
+        self.editor.update_dim(height, width);
     
         loop {
             // Draw the editor to screen
@@ -121,6 +122,7 @@ impl TermUI {
                     Ok(rustbox::Event::ResizeEvent(w, h)) => {
                         width = w as uint;
                         height = h as uint;
+                        self.editor.update_dim(height, width);
                     }
                     
                     _ => {
@@ -140,12 +142,14 @@ impl TermUI {
     }
 
     pub fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
-        let mut tb_iter = editor.buffer.root_iter();
-        let mut line: uint = 0;
-        let mut column: uint = 0;
-        let mut pos: uint = 0;
-        let height = c2.0 - c1.0;
-        let width = c2.1 - c1.1;
+        let mut tb_iter = editor.buffer.iter_at_char(editor.buffer.pos_2d_to_closest_1d(editor.view_pos));
+        let mut pline = c1.0;
+        let mut pcol = c1.1;
+        let mut line = editor.view_pos.0;
+        let mut column = editor.view_pos.1;
+        let mut pos = editor.buffer.pos_2d_to_closest_1d(editor.view_pos);
+        let max_line = line + (c2.0 - c1.0);
+        let max_col = column + (c2.1 - c1.1);
         
         let cursor_pos = editor.buffer.pos_2d_to_closest_1d(editor.cursor);
         
@@ -153,20 +157,23 @@ impl TermUI {
             if let Option::Some(c) = tb_iter.next() {
                 if c == '\n' {
                     if pos == cursor_pos {
-                        self.rb.print(column, line, rustbox::RB_NORMAL, Color::Black, Color::White, " ".to_string().as_slice());
+                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, " ".to_string().as_slice());
                     }
                     
+                    pline += 1;
+                    pcol = c1.1;
                     line += 1;
                     column = 0;
                 }
                 else {
                     if pos == cursor_pos  {
-                        self.rb.print(column, line, rustbox::RB_NORMAL, Color::Black, Color::White, c.to_string().as_slice());
+                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, c.to_string().as_slice());
                     }
                     else {
-                        self.rb.print(column, line, rustbox::RB_NORMAL, Color::White, Color::Black, c.to_string().as_slice());
+                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::White, Color::Black, c.to_string().as_slice());
                     }
                     
+                    pcol += 1;
                     column += 1;
                 }
             }
@@ -174,24 +181,57 @@ impl TermUI {
                 // Show cursor at end of document if it's past the end of
                 // the document
                 if cursor_pos >= pos {
-                    self.rb.print(column, line, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                    self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                 }
                 
-                break;
+                return;
             }
 
-            pos += 1;
-
-            if line > height {
-                break;
+            if line > max_line {
+                return;
             }
             
-            if column > width {
+            // If we're past the edge of the display, go to the next line
+            if column > max_col {
                 tb_iter.next_line();
+                
+                pline += 1;
+                pcol = c1.1;
                 line += 1;
                 column = 0;
-                pos = editor.buffer.pos_2d_to_closest_1d((line, column));
-            }            
+                
+                if line > max_line {
+                    return;
+                }
+            }
+            
+            // If we're before the edge of the display, move forward to get
+            // to it.
+            loop {
+                if column < editor.view_pos.1 {
+                    let nl = tb_iter.skip_non_newline_chars(editor.view_pos.1);
+                    if !nl {
+                        column = editor.view_pos.1;
+                        break;
+                    }
+                    else {
+                        pline += 1;
+                        line += 1;
+                    }
+                    
+                    if line > max_line {
+                        return;
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+            
+            // Get the 1d position of the char to be printed next
+            pos = editor.buffer.pos_2d_to_closest_1d((line, column));
         }
     }
+    
+    
 }
