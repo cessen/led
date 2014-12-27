@@ -33,7 +33,7 @@ impl Editor {
     }
     
     pub fn new_from_file(path: &Path) -> Editor {
-        let mut buf = load_file_to_buffer(path).unwrap();
+        let buf = load_file_to_buffer(path).unwrap();
         
         Editor {
             buffer: buf,
@@ -63,12 +63,36 @@ impl Editor {
         
         self.dirty = true;
         
+        // TODO: handle multi-character strings properly
         if text == "\n" {
             self.cursor.0 += 1;
             self.cursor.1 = 0;
         }
         else {
             self.cursor.1 += 1;
+        }
+    }
+    
+    pub fn insert_text_at_char(&mut self, text: &str, pos: uint) {
+        self.dirty = true;
+        let buf_len = self.buffer.len();
+        self.buffer.insert_text(text, if pos < buf_len {pos} else {buf_len});
+    }
+    
+    pub fn remove_text_behind_cursor(&mut self, char_count: uint) {
+        let pos_b = self.buffer.pos_2d_to_closest_1d(self.cursor);
+        let pos_a = if pos_b >= char_count {pos_b - char_count} else {0};
+        
+        self.buffer.remove_text(pos_a, pos_b);
+        
+        self.dirty = true;
+        
+        // TODO: handle multi-character removal properly
+        if self.cursor.1 == 0 && self.cursor.0 > 0 {
+            self.cursor.0 -= 1;
+        }
+        else if self.cursor.1 > 0{
+            self.cursor.1 -= 1;
         }
     }
     
