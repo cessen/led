@@ -25,10 +25,14 @@ impl TextBuffer {
         self.root.char_count
     }
     
-    pub fn pos_2d_to_1d(&self, pos: (uint, uint)) -> Option<uint> {
-        // TODO
-        return Option::None;
+    pub fn newline_count(&self) -> uint {
+        self.root.newline_count
     }
+    
+    //pub fn pos_2d_to_1d(&self, pos: (uint, uint)) -> Option<uint> {
+    //    // TODO
+    //    return Option::None;
+    //}
     
     pub fn pos_2d_to_closest_1d(&self, pos: (uint, uint)) -> uint {
         match self.root.pos_2d_to_closest_1d(0, pos) {
@@ -37,14 +41,18 @@ impl TextBuffer {
         }
     }
     
-    pub fn pos_2d_to_closest_2d(&self, pos: (uint, uint)) -> (uint, uint) {
-        // TODO
-        return (0, 0);
-    }
+    //pub fn pos_2d_to_closest_2d(&self, pos: (uint, uint)) -> (uint, uint) {
+    //    // TODO
+    //    return (0, 0);
+    //}
     
-    pub fn pos_1d_to_2d(&self, pos: uint) -> Option<(uint, uint)> {
-        // TODO
-        return Option::None;
+    //pub fn pos_1d_to_2d(&self, pos: uint) -> Option<(uint, uint)> {
+    //    // TODO
+    //    return Option::None;
+    //}
+    
+    pub fn pos_1d_to_closest_2d(&self, pos: uint) -> (uint, uint) {
+        self.root.pos_1d_to_closest_2d((0,0), pos)
     }
     
     /// Insert 'text' at char position 'pos'.

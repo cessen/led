@@ -104,6 +104,8 @@ impl Editor {
     
     pub fn cursor_right(&mut self) {
         self.cursor.1 += 1;
+        let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
+        self.cursor = self.buffer.pos_1d_to_closest_2d(p);
     }
     
     pub fn cursor_up(&mut self) {
@@ -113,6 +115,8 @@ impl Editor {
     }
     
     pub fn cursor_down(&mut self) {
-        self.cursor.0 += 1;
+        if self.cursor.0 < self.buffer.newline_count() {
+            self.cursor.0 += 1;
+        }
     }
 }

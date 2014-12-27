@@ -190,7 +190,7 @@ impl TermUI {
                 tb_iter.next_line();
                 line += 1;
                 column = 0;
-                // TODO: handle pos incrementing here
+                pos = editor.buffer.pos_2d_to_closest_1d((line, column));
             }            
         }
     }

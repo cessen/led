@@ -338,8 +338,9 @@ impl TextNode {
                 let mut col = offset;
                 
                 for c in iter {
-                    // Check if we've hit a relevant character
-                    if line > pos.0 || (line == pos.0 && col >= pos.1) {
+                    // Check if we've hit or passed the target column on
+                    // the target line.
+                    if line == pos.0 && col >= pos.1 {
                         break;
                     }
                     
@@ -347,10 +348,16 @@ impl TextNode {
                     if c == '\n' {
                         line += 1;
                         col = 0;
+                        
+                        // Check if we've passed the target line
+                        if line > pos.0 {
+                            break;
+                        }
                     }
                     else {
                         col += 1;
                     }
+                    
                     i += 1;
                 }
             
@@ -397,6 +404,89 @@ impl TextNode {
                             return IndexOrOffset::Offset(ir);
                         }
                     }
+                }
+            }
+        }
+    }
+    
+    
+    /// Find the closest 2d text position that represents the given
+    /// 1d position well.
+    pub fn pos_1d_to_closest_2d(&self, offset_pos: (uint, uint), pos: uint) -> (uint, uint) {
+        match self.data {
+            TextNodeData::Leaf(ref tb) => {
+                let mut iter = tb.as_str().chars();
+                let mut line = offset_pos.0;
+                let mut col = offset_pos.1;
+                let mut i: uint = 0;
+                
+                for c in iter {
+                    if i == pos {
+                        break;
+                    }
+                    
+                    if c == '\n' {
+                        line += 1;
+                        col = 0;
+                    }
+                    else {
+                        col += 1;
+                    }
+                    
+                    i += 1;
+                }
+                
+                return (line, col);
+            },
+            
+            TextNodeData::Branch(ref left, ref right) => {
+                if left.char_count > pos {
+                    return left.pos_1d_to_closest_2d(offset_pos, pos);
+                }
+                else {
+                    let mut line = offset_pos.0;
+                    let mut col = offset_pos.1;
+                    
+                    if left.newline_count > 0 {
+                        line += left.newline_count;
+                        col = 0;
+                    }
+                    
+                    col += left.tail_len();
+                    
+                    return right.pos_1d_to_closest_2d((line, col), pos - left.char_count);
+                }
+            }
+        }
+    }
+    
+    
+    /// Returns the number of characters after the last newline in the node,
+    /// or the total character length of the node if there are no newlines.
+    pub fn tail_len(&self) -> uint {
+        match self.data {
+            TextNodeData::Leaf(ref tb) => {
+                let mut iter = tb.as_str().chars();
+                let mut tlen = 0;
+                
+                for c in iter {
+                    if c == '\n' {
+                        tlen = 0;
+                    }
+                    else {
+                        tlen += 1;
+                    }
+                }
+                
+                return tlen;
+            },
+            
+            TextNodeData::Branch(ref left, ref right) => {
+                if right.newline_count > 0 {
+                    return right.tail_len();
+                }
+                else {
+                    return left.tail_len() + right.char_count;
                 }
             }
         }
