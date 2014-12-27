@@ -390,7 +390,7 @@ impl TextNode {
                 else {
                     match right.pos_2d_to_closest_1d(0, (pos.0 - left.newline_count, pos.1)) {
                         IndexOrOffset::Index(ir) => {
-                            return IndexOrOffset::Index(ir);
+                            return IndexOrOffset::Index(ir + left.char_count);
                         },
                         
                         IndexOrOffset::Offset(ir) => {
