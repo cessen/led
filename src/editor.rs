@@ -97,6 +97,8 @@ impl Editor {
     }
     
     pub fn cursor_left(&mut self) {
+        let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
+        self.cursor = self.buffer.pos_1d_to_closest_2d(p);
         if self.cursor.1 > 0 {
             self.cursor.1 -= 1;
         }
