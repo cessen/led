@@ -143,33 +143,45 @@ impl TermUI {
         let mut tb_iter = editor.buffer.root_iter();
         let mut line: uint = 0;
         let mut column: uint = 0;
+        let mut pos: uint = 0;
         let height = c2.0 - c1.0;
         let width = c2.1 - c1.1;
+        
+        let cursor_pos = editor.buffer.pos_2d_to_closest_1d(editor.cursor);
         
         loop {
             if let Option::Some(c) = tb_iter.next() {
                 if c == '\n' {
-                    if editor.cursor.0 == line && editor.cursor.1 >= column && editor.cursor.1 <= width {
-                        self.rb.print(editor.cursor.1, line, rustbox::RB_NORMAL, Color::Black, Color::White, " ".to_string().as_slice());
+                    if pos == cursor_pos {
+                        self.rb.print(column, line, rustbox::RB_NORMAL, Color::Black, Color::White, " ".to_string().as_slice());
                     }
                     
                     line += 1;
                     column = 0;
-                    continue;
-                }
-                
-                if editor.cursor.0 == line && editor.cursor.1 == column  {
-                    self.rb.print(column, line, rustbox::RB_NORMAL, Color::Black, Color::White, c.to_string().as_slice());
                 }
                 else {
-                    self.rb.print(column, line, rustbox::RB_NORMAL, Color::White, Color::Black, c.to_string().as_slice());
+                    if pos == cursor_pos  {
+                        self.rb.print(column, line, rustbox::RB_NORMAL, Color::Black, Color::White, c.to_string().as_slice());
+                    }
+                    else {
+                        self.rb.print(column, line, rustbox::RB_NORMAL, Color::White, Color::Black, c.to_string().as_slice());
+                    }
+                    
+                    column += 1;
                 }
-                column += 1;
             }
             else {
+                // Show cursor at end of document if it's past the end of
+                // the document
+                if cursor_pos >= pos {
+                    self.rb.print(column, line, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                }
+                
                 break;
             }
-            
+
+            pos += 1;
+
             if line > height {
                 break;
             }
@@ -178,14 +190,8 @@ impl TermUI {
                 tb_iter.next_line();
                 line += 1;
                 column = 0;
-            }
-        }
-        
-        if editor.cursor.0 == line && editor.cursor.1 >= column && editor.cursor.1 <= width {
-            self.rb.print(editor.cursor.1, line, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-        }
-        else if editor.cursor.0 > line && editor.cursor.0 <= height && editor.cursor.1 <= width {
-            self.rb.print(editor.cursor.1, editor.cursor.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                // TODO: handle pos incrementing here
+            }            
         }
     }
 }
