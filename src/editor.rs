@@ -113,6 +113,14 @@ impl Editor {
         self.move_view_to_cursor();
     }
     
+    pub fn cursor_to_beginning_of_buffer(&mut self) {
+        self.cursor = (0, 0);
+    }
+    
+    pub fn cursor_to_end_of_buffer(&mut self) {
+        self.cursor = self.buffer.pos_1d_to_closest_2d(self.buffer.len()+1);
+    }
+    
     pub fn cursor_left(&mut self) {
         let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
 
@@ -137,6 +145,9 @@ impl Editor {
         if self.cursor.0 > 0 {
             self.cursor.0 -= 1;
         }
+        else {
+            self.cursor_to_beginning_of_buffer();
+        }
         
         self.move_view_to_cursor();
     }
@@ -144,6 +155,9 @@ impl Editor {
     pub fn cursor_down(&mut self) {
         if self.cursor.0 < self.buffer.newline_count() {
             self.cursor.0 += 1;
+        }
+        else {
+            self.cursor_to_end_of_buffer();
         }
         
         self.move_view_to_cursor();
@@ -163,14 +177,16 @@ impl Editor {
                     self.cursor.0 -= self.view_pos.0;
                 }
                 else {
-                    self.cursor = (0, 0);
+                    self.cursor_to_beginning_of_buffer();
                 }
                 self.view_pos.0 = 0;
             }   
         }
         else {
-            self.cursor = (0, 0);
+            self.cursor_to_beginning_of_buffer();
         }
+        
+        self.move_view_to_cursor();
     }
     
     pub fn page_down(&mut self) {
@@ -192,8 +208,10 @@ impl Editor {
                 self.cursor.0 += move_amount;
             }
             else {
-                self.cursor = self.buffer.pos_1d_to_closest_2d(self.buffer.len()+1);
+                self.cursor_to_end_of_buffer();
             }
-        } 
+        }
+        
+        self.move_view_to_cursor();
     }
 }
