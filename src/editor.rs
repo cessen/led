@@ -148,4 +148,52 @@ impl Editor {
         
         self.move_view_to_cursor();
     }
+    
+    pub fn page_up(&mut self) {
+        if self.view_pos.0 > 0 {
+            let move_amount = self.view_dim.0 - (self.view_dim.0 / 8);
+            if self.view_pos.0 >= move_amount {
+                if self.cursor.0 >= move_amount {
+                    self.cursor.0 -= move_amount;
+                }
+                self.view_pos.0 -= move_amount;
+            }
+            else {
+                if self.cursor.0 >= self.view_pos.0 {
+                    self.cursor.0 -= self.view_pos.0;
+                }
+                else {
+                    self.cursor = (0, 0);
+                }
+                self.view_pos.0 = 0;
+            }   
+        }
+        else {
+            self.cursor = (0, 0);
+        }
+    }
+    
+    pub fn page_down(&mut self) {
+        let nlc = self.buffer.newline_count();
+        
+        if self.view_pos.0 < nlc {
+            let move_amount = self.view_dim.0 - (self.view_dim.0 / 8);
+            let max_move = nlc - self.view_pos.0;
+            let cursor_max_move = nlc - self.cursor.0;
+            
+            if max_move >= move_amount {
+                self.view_pos.0 += move_amount;
+            }
+            else {
+                self.view_pos.0 += max_move;
+            }
+            
+            if cursor_max_move >= move_amount {
+                self.cursor.0 += move_amount;
+            }
+            else {
+                self.cursor = self.buffer.pos_1d_to_closest_2d(self.buffer.len()+1);
+            }
+        } 
+    }
 }

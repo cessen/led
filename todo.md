@@ -1,4 +1,3 @@
-- Page up / page down
 - Proper handling of tab characters
 - Line number display
 - Editor info display (filename, current line/column, indentation style, etc.)

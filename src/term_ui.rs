@@ -12,10 +12,12 @@ const K_ENTER: u16 = 13;
 const K_TAB: u16 = 9;
 const K_SPACE: u16 = 32;
 const K_BACKSPACE: u16 = 127;
+const K_PAGEUP: u16 = 65519;
+const K_PAGEDOWN: u16 = 65518;
+const K_UP: u16 = 65517;
 const K_DOWN: u16 = 65516;
 const K_LEFT: u16 = 65515;
 const K_RIGHT: u16 = 65514;
-const K_UP: u16 = 65517;
 const K_ESC: u16 = 27;
 const K_CTRL_Q: u16 = 17;
 const K_CTRL_S: u16 = 19;
@@ -64,7 +66,7 @@ impl TermUI {
             let mut e = self.rb.poll_event(); // Block until we get an event
             loop {
                 match e {
-                    Ok(rustbox::Event::KeyEvent(_, key, character)) => {
+                    Ok(rustbox::Event::KeyEvent(modifier, key, character)) => {
                         //println!("      {} {} {}", modifier, key, character);
                         match key {
                             K_CTRL_Q | K_ESC => {
@@ -74,6 +76,14 @@ impl TermUI {
                             
                             K_CTRL_S => {
                                 self.editor.save_if_dirty();
+                            },
+                            
+                            K_PAGEUP => {
+                                self.editor.page_up();
+                            },
+                            
+                            K_PAGEDOWN => {
+                                self.editor.page_down();
                             },
                             
                             K_UP => {
