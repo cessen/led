@@ -6,6 +6,7 @@ use self::text_node::{TextNode, TextNodeData};
 
 mod text_block;
 mod text_node;
+mod text_line;
 
 
 /// A text buffer

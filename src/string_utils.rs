@@ -1,6 +1,21 @@
 #![allow(dead_code)]
 //! Misc helpful utility functions for TextBuffer related stuff.
 
+pub fn is_line_ending(text: &str) -> bool {
+    match text {
+        "\u{000D}\u{000A}"
+        | "\u{000A}"
+        | "\u{000B}"
+        | "\u{000C}"
+        | "\u{000D}"
+        | "\u{0085}"
+        | "\u{2028}"
+        | "\u{2029}" => true,
+        
+        _ => false
+    }
+}
+
 pub fn newline_count(text: &str) -> uint {
     let mut count = 0;
     for c in text.chars() {
@@ -48,4 +63,21 @@ pub fn char_pos_to_byte_pos(text: &str, pos: uint) -> uint {
     }
     
     panic!("char_pos_to_byte_pos(): char position off the end of the string.");
+}
+
+pub fn grapheme_pos_to_byte_pos(text: &str, pos: uint) -> uint {
+    let mut i: uint = 0;
+    
+    for (offset, _) in text.grapheme_indices(true) {
+        if i == pos {
+            return offset;
+        }
+        i += 1;
+    }
+    
+    if i == pos {
+        return text.len();
+    }
+    
+    panic!("grapheme_pos_to_byte_pos(): char position off the end of the string.");
 }

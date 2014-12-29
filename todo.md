@@ -7,3 +7,9 @@
 - UI that wraps editors, for split view.
 - Unit testing for text block, text node, and text buffer.  They must
   be reliable!
+
+- Change text data structure to store lines explicitly.  Still use a tree
+  structure to hold the lines, but just store the lines themselves as
+  straight vectors for now.  Be mindful to keep the API's clean enough
+  that you can substitute another internal storage approach for lines
+  later on.

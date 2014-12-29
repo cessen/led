@@ -22,6 +22,7 @@ pub enum IndexOrOffset {
 pub struct TextNode {
     pub data: TextNodeData,
     pub tree_height: uint,
+    
     pub char_count: uint,
     pub newline_count: uint,
 }
