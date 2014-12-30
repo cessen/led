@@ -4,14 +4,14 @@ extern crate "rustc-serialize" as rustc_serialize;
 
 use std::path::Path;
 use docopt::Docopt;
-use editor::Editor;
-use term_ui::TermUI;
+//use editor::Editor;
+//use term_ui::TermUI;
 
 mod string_utils;
 mod buffer;
-mod files;
-mod editor;
-mod term_ui;
+//mod files;
+//mod editor;
+//mod term_ui;
 
 
 
@@ -40,17 +40,17 @@ fn main() {
     // Get command-line arguments
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
     
-    // Load file, if specified    
-    let editor = if let Option::Some(s) = args.arg_file {
-        Editor::new_from_file(&Path::new(s.as_slice()))
-    }
-    else {
-        Editor::new()
-    };
-    
-    // Initialize and start UI
-    let mut ui = TermUI::new_from_editor(editor);
-    ui.ui_loop();
+    // // Load file, if specified    
+    // let editor = if let Option::Some(s) = args.arg_file {
+    //     Editor::new_from_file(&Path::new(s.as_slice()))
+    // }
+    // else {
+    //     Editor::new()
+    // };
+    // 
+    // // Initialize and start UI
+    // let mut ui = TermUI::new_from_editor(editor);
+    // ui.ui_loop();
     
     //println!("{}", editor.buffer.root.tree_height);
 }

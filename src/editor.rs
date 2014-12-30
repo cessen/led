@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use buffer::TextBuffer;
+use buffer::Buffer;
 use std::path::Path;
 use files::{load_file_to_buffer, save_buffer_to_file};
 use string_utils::char_count;

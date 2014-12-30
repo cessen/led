@@ -2,30 +2,30 @@
 
 use std::mem;
 use std::str::Graphemes;
-use string_utils::{grapheme_pos_to_byte_pos, is_line_ending};
+use string_utils::{grapheme_count, grapheme_pos_to_byte_pos, is_line_ending};
 
 
 /// A single line of text
-pub struct TextLine {
+pub struct Line {
     text: Vec<u8>, // The text data, stored as UTF8
-    ending: LineEnding, // The type of line ending, if any
+    pub ending: LineEnding, // The type of line ending, if any
 }
 
 
-impl TextLine {
-    /// Creates a new empty TextLine
-    pub fn new() -> TextLine {
-        TextLine {
+impl Line {
+    /// Creates a new empty Line
+    pub fn new() -> Line {
+        Line {
             text: Vec::new(),
             ending: LineEnding::None,
         }
     }
     
     
-    /// Creates a new TextLine from a str.
-    pub fn new_from_str(text: &str) -> TextLine {
-        // Initialize TextLine
-        let mut tl = TextLine {
+    /// Creates a new Line from a str.
+    pub fn new_from_str(text: &str) -> Line {
+        // Initialize Line
+        let mut tl = Line {
             text: Vec::with_capacity(text.len()),
             ending: LineEnding::None,
         };
@@ -102,6 +102,24 @@ impl TextLine {
     }
     
     
+    /// Returns the total number of unicode graphemes in the line
+    pub fn grapheme_count(&self) -> uint {
+        let mut count = grapheme_count(self.as_str());
+        match self.ending {
+            LineEnding::None => {},
+            _ => {count += 1;}
+        }
+        return count;
+    }
+    
+    
+    /// Returns the total number of unicode graphemes in the line,
+    /// not counting the line ending grapheme, if any.
+    pub fn grapheme_count_sans_line_ending(&self) -> uint {
+        grapheme_count(self.as_str())
+    }
+    
+    
     /// Returns an immutable string slice into the text block's memory
     pub fn as_str<'a>(&'a self) -> &'a str {
         unsafe {
@@ -133,7 +151,7 @@ impl TextLine {
         let mut i = byte_pos;
         for g in text.graphemes(true) {
             if is_line_ending(g) {
-                panic!("TextLine::insert_text(): line ending in inserted text.");
+                panic!("Line::insert_text(): line ending in inserted text.");
             }
             
             for b in g.bytes() {
@@ -144,9 +162,36 @@ impl TextLine {
     }
     
     
+    /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
+    pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
+        // Bounds checks
+        if pos_a > pos_b {
+            panic!("Line::remove_text(): pos_a must be less than or equal to pos_b.");
+        }
+        
+        // Find removal positions in bytes
+        let byte_pos_a = grapheme_pos_to_byte_pos(self.as_str(), pos_a);
+        let byte_pos_b = grapheme_pos_to_byte_pos(self.as_str(), pos_b);
+        
+        // Move bytes to fill in the gap left by the removed bytes
+        let mut from = byte_pos_b;
+        let mut to = byte_pos_a;
+        while from < self.text.len() {
+            self.text[to] = self.text[from];
+            
+            from += 1;
+            to += 1;
+        }
+        
+        // Remove data from the end
+        let final_text_size = self.text.len() + byte_pos_a - byte_pos_b;
+        self.text.truncate(final_text_size);
+    }
+    
+    
     /// Returns an iterator over the graphemes of the line
-    pub fn grapheme_iter<'a>(&'a self) -> TextLineIter<'a> {
-        TextLineIter {
+    pub fn grapheme_iter<'a>(&'a self) -> LineGraphemeIter<'a> {
+        LineGraphemeIter {
             graphemes: self.as_str().graphemes(true),
             ending: self.ending,
             done: false,
@@ -155,10 +200,10 @@ impl TextLine {
     
     
     /// Returns an iterator over the graphemes of the line
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> TextLineIter<'a> {
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> LineGraphemeIter<'a> {
         let temp: &str = unsafe{mem::transmute(self.text.as_slice())};
         
-        let mut iter = TextLineIter {
+        let mut iter = LineGraphemeIter {
             graphemes: temp.graphemes(true),
             ending: self.ending,
             done: false,
@@ -202,14 +247,14 @@ pub const LINE_ENDINGS: [&'static str, ..9] = ["",
 ];
 
 
-/// An iterator over the graphemes of a TextLine
-pub struct TextLineIter<'a> {
+/// An iterator over the graphemes of a Line
+pub struct LineGraphemeIter<'a> {
     graphemes: Graphemes<'a>,
     ending: LineEnding,
     done: bool,
 }
 
-impl<'a> Iterator<&'a str> for TextLineIter<'a> {
+impl<'a> Iterator<&'a str> for LineGraphemeIter<'a> {
     fn next(&mut self) -> Option<&'a str> {
         if self.done {
             return None;
@@ -237,12 +282,12 @@ impl<'a> Iterator<&'a str> for TextLineIter<'a> {
 
 
 //=========================================================================
-// TextLine tests
+// Line tests
 //=========================================================================
 
 #[test]
 fn new_text_line() {
-    let tl = TextLine::new();
+    let tl = Line::new();
     
     assert!(tl.text.len() == 0);
     assert!(tl.ending == LineEnding::None);
@@ -250,7 +295,7 @@ fn new_text_line() {
 
 #[test]
 fn new_text_line_from_str() {
-    let tl = TextLine::new_from_str("Hello!");
+    let tl = Line::new_from_str("Hello!");
     
     assert!(tl.text.len() == 6);
     assert!(tl.text[0] == ('H' as u8));
@@ -264,7 +309,7 @@ fn new_text_line_from_str() {
 
 #[test]
 fn new_text_line_from_empty_str() {
-    let tl = TextLine::new_from_str("");
+    let tl = Line::new_from_str("");
     
     assert!(tl.text.len() == 0);
     assert!(tl.ending == LineEnding::None);
@@ -272,7 +317,7 @@ fn new_text_line_from_empty_str() {
 
 #[test]
 fn new_text_line_from_str_with_lf() {
-    let tl = TextLine::new_from_str("Hello!\n");
+    let tl = Line::new_from_str("Hello!\n");
     
     assert!(tl.text.len() == 6);
     assert!(tl.text[0] == ('H' as u8));
@@ -286,7 +331,7 @@ fn new_text_line_from_str_with_lf() {
 
 #[test]
 fn new_text_line_from_str_with_crlf() {
-    let tl = TextLine::new_from_str("Hello!\r\n");
+    let tl = Line::new_from_str("Hello!\r\n");
     
     assert!(tl.text.len() == 6);
     assert!(tl.text[0] == ('H' as u8));
@@ -300,7 +345,7 @@ fn new_text_line_from_str_with_crlf() {
 
 #[test]
 fn new_text_line_from_str_with_crlf_and_too_long() {
-    let tl = TextLine::new_from_str("Hello!\r\nLa la la la");
+    let tl = Line::new_from_str("Hello!\r\nLa la la la");
     
     assert!(tl.text.len() == 6);
     assert!(tl.text[0] == ('H' as u8));
@@ -314,7 +359,7 @@ fn new_text_line_from_str_with_crlf_and_too_long() {
 
 #[test]
 fn text_line_insert_text() {
-    let mut tl = TextLine::new_from_str("Hello!\r\n");
+    let mut tl = Line::new_from_str("Hello!\r\n");
     
     tl.insert_text(" world", 5);
     
@@ -334,14 +379,30 @@ fn text_line_insert_text() {
     assert!(tl.ending == LineEnding::CRLF);
 }
 
+#[test]
+fn text_line_remove_text() {
+    let mut tl = Line::new_from_str("Hello world!\r\n");
+    
+    tl.remove_text(5, 11);
+    
+    assert!(tl.text.len() == 6);
+    assert!(tl.text[0] == ('H' as u8));
+    assert!(tl.text[1] == ('e' as u8));
+    assert!(tl.text[2] == ('l' as u8));
+    assert!(tl.text[3] == ('l' as u8));
+    assert!(tl.text[4] == ('o' as u8));
+    assert!(tl.text[5] == ('!' as u8));
+    assert!(tl.ending == LineEnding::CRLF);
+}
+
 
 //=========================================================================
-// TextLineIter tests
+// LineGraphemeIter tests
 //=========================================================================
 
 #[test]
 fn text_line_grapheme_iter() {
-    let tl = TextLine::new_from_str("Hello!");
+    let tl = Line::new_from_str("Hello!");
     let mut iter = tl.grapheme_iter();
     
     assert!(iter.next() == Some("H"));
@@ -355,7 +416,7 @@ fn text_line_grapheme_iter() {
 
 #[test]
 fn text_line_grapheme_iter_with_lf() {
-    let tl = TextLine::new_from_str("Hello!\n");
+    let tl = Line::new_from_str("Hello!\n");
     let mut iter = tl.grapheme_iter();
     
     assert!(iter.next() == Some("H"));
@@ -370,7 +431,7 @@ fn text_line_grapheme_iter_with_lf() {
 
 #[test]
 fn text_line_grapheme_iter_with_crlf() {
-    let tl = TextLine::new_from_str("Hello!\r\n");
+    let tl = Line::new_from_str("Hello!\r\n");
     let mut iter = tl.grapheme_iter();
     
     assert!(iter.next() == Some("H"));
@@ -385,7 +446,7 @@ fn text_line_grapheme_iter_with_crlf() {
 
 #[test]
 fn text_line_grapheme_iter_at_index() {
-    let tl = TextLine::new_from_str("Hello!");
+    let tl = Line::new_from_str("Hello!");
     let mut iter = tl.grapheme_iter_at_index(2);
     
     assert!(iter.next() == Some("l"));
@@ -397,7 +458,7 @@ fn text_line_grapheme_iter_at_index() {
 
 #[test]
 fn text_line_grapheme_iter_at_index_past_end() {
-    let tl = TextLine::new_from_str("Hello!");
+    let tl = Line::new_from_str("Hello!");
     let mut iter = tl.grapheme_iter_at_index(10);
     
     assert!(iter.next() == None);
@@ -405,7 +466,7 @@ fn text_line_grapheme_iter_at_index_past_end() {
 
 #[test]
 fn text_line_grapheme_iter_at_index_at_lf() {
-    let tl = TextLine::new_from_str("Hello!\n");
+    let tl = Line::new_from_str("Hello!\n");
     let mut iter = tl.grapheme_iter_at_index(6);
     
     assert!(iter.next() == Some("\n"));

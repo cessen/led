@@ -34,6 +34,14 @@ pub fn char_count(text: &str) -> uint {
     return count;
 }
 
+pub fn grapheme_count(text: &str) -> uint {
+    let mut count = 0;
+    for _ in text.graphemes(true) {
+        count += 1;
+    }
+    return count;
+}
+
 pub fn char_and_newline_count(text: &str) -> (uint, uint) {
     let mut char_count = 0;
     let mut newline_count = 0;
