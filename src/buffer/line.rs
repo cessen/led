@@ -189,6 +189,37 @@ impl Line {
     }
     
     
+    /// Insert a line break into the line, splitting it into two.
+    /// This line stays as the first part of the split.  The second
+    /// part is returned.
+    pub fn split(&mut self, ending: LineEnding, pos: uint) -> Line {
+        let mut other = Line::new();
+        
+        // Inserting at very beginning: special cased for efficiency
+        if pos == 0 {
+            mem::swap(self, &mut other);
+            self.ending = ending;
+        }
+        // Otherwise, general case
+        else {
+            // Find the byte index to split at
+            let byte_pos = grapheme_pos_to_byte_pos(self.as_str(), pos);
+            
+            // Copy the elements after the split index to the second line
+            other.text.push_all(self.text.slice_from_or_fail(&byte_pos));
+            
+            // Truncate the first line
+            self.text.truncate(byte_pos);
+            
+            // Set the line endings appropriately
+            other.ending = self.ending;
+            self.ending = ending;
+        }
+        
+        return other;
+    }
+    
+    
     /// Returns an iterator over the graphemes of the line
     pub fn grapheme_iter<'a>(&'a self) -> LineGraphemeIter<'a> {
         LineGraphemeIter {
@@ -231,6 +262,59 @@ pub enum LineEnding {
     NEL = 6,   // U+0085 -- NextLine
     LS = 7,    // U+2028 -- Line Separator
     PS = 8,    // U+2029 -- ParagraphSeparator
+}
+
+pub fn str_to_line_ending(g: &str) -> LineEnding {
+    match g {
+        //==============
+        // Line endings
+        //==============
+        
+        // CRLF
+        "\u{000D}\u{000A}" => {
+            return LineEnding::CRLF;
+        },
+        
+        // LF
+        "\u{000A}" => {
+            return LineEnding::LF;
+        },
+        
+        // VT
+        "\u{000B}" => {
+            return LineEnding::VT;
+        },
+        
+        // FF
+        "\u{000C}" => {
+            return LineEnding::FF;
+        },
+        
+        // CR
+        "\u{000D}" => {
+            return LineEnding::CR;
+        },
+        
+        // NEL
+        "\u{0085}" => {
+            return LineEnding::NEL;
+        },
+        
+        // LS
+        "\u{2028}" => {
+            return LineEnding::LS;
+        },
+        
+        // PS
+        "\u{2029}" => {
+            return LineEnding::PS;
+        },
+        
+        // Not a line ending
+        _ => {
+            return LineEnding::None;
+        }
+    }
 }
 
 /// An array of string literals corresponding to the possible
@@ -393,6 +477,50 @@ fn text_line_remove_text() {
     assert!(tl.text[4] == ('o' as u8));
     assert!(tl.text[5] == ('!' as u8));
     assert!(tl.ending == LineEnding::CRLF);
+}
+
+#[test]
+fn text_line_split() {
+    let mut tl1 = Line::new_from_str("Hello world!\r\n");
+    
+    let tl2 = tl1.split(LineEnding::LF, 5);
+    
+    assert!(tl1.text.len() == 5);
+    assert!(tl1.text[0] == ('H' as u8));
+    assert!(tl1.text[1] == ('e' as u8));
+    assert!(tl1.text[2] == ('l' as u8));
+    assert!(tl1.text[3] == ('l' as u8));
+    assert!(tl1.text[4] == ('o' as u8));
+    assert!(tl1.ending == LineEnding::LF);
+    
+    assert!(tl2.text.len() == 7);
+    assert!(tl2.text[0] == (' ' as u8));
+    assert!(tl2.text[1] == ('w' as u8));
+    assert!(tl2.text[2] == ('o' as u8));
+    assert!(tl2.text[3] == ('r' as u8));
+    assert!(tl2.text[4] == ('l' as u8));
+    assert!(tl2.text[5] == ('d' as u8));
+    assert!(tl2.text[6] == ('!' as u8));
+    assert!(tl2.ending == LineEnding::CRLF);
+}
+
+#[test]
+fn text_line_split_beginning() {
+    let mut tl1 = Line::new_from_str("Hello!\r\n");
+    
+    let tl2 = tl1.split(LineEnding::LF, 0);
+    
+    assert!(tl1.text.len() == 0);
+    assert!(tl1.ending == LineEnding::LF);
+    
+    assert!(tl2.text.len() == 6);
+    assert!(tl2.text[0] == ('H' as u8));
+    assert!(tl2.text[1] == ('e' as u8));
+    assert!(tl2.text[2] == ('l' as u8));
+    assert!(tl2.text[3] == ('l' as u8));
+    assert!(tl2.text[4] == ('o' as u8));
+    assert!(tl2.text[5] == ('!' as u8));
+    assert!(tl2.ending == LineEnding::CRLF);
 }
 
 

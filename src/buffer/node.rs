@@ -3,7 +3,7 @@ use std::fmt;
 use std::mem;
 use std::cmp::{min, max};
 
-use super::line::{Line, LineGraphemeIter};
+use super::line::{Line, LineEnding, LineGraphemeIter};
 
 pub enum BufferNodeData {
     Leaf(Line),
@@ -24,6 +24,18 @@ impl BufferNode {
             data: BufferNodeData::Leaf(Line::new()),
             tree_height: 1,
             grapheme_count: 0,
+            line_count: 1,
+        }
+    }
+    
+    
+    pub fn new_from_line(line: Line) -> BufferNode {
+        let gc = line.grapheme_count();
+    
+        BufferNode {
+            data: BufferNodeData::Leaf(line),
+            tree_height: 1,
+            grapheme_count: gc,
             line_count: 1,
         }
     }
@@ -230,6 +242,77 @@ impl BufferNode {
                     return (v + left.line_count, h);
                 }
             }
+        }
+    }
+    
+
+    /// Inserts the given text string at the given grapheme position.
+    /// Note: this assumes the given text has no newline graphemes.
+    pub fn insert_text_recursive(&mut self, text: &str, pos: uint) {
+        match self.data {
+            // Find node for text to be inserted into
+            BufferNodeData::Branch(ref mut left, ref mut right) => {
+                if pos < left.grapheme_count {
+                    left.insert_text_recursive(text, pos);
+                }
+                else {
+                    right.insert_text_recursive(text, pos - left.grapheme_count);
+                }
+                
+            },
+            
+            // Insert the text
+            BufferNodeData::Leaf(ref mut line) => {
+                line.insert_text(text, pos);
+            },
+        }
+        
+        self.update_stats();
+    }
+    
+    
+    /// Inserts a line break at the given grapheme position
+    pub fn insert_line_break_recursive(&mut self, ending: LineEnding, pos: uint) {
+        if ending == LineEnding::None {
+            return;
+        }
+    
+        let mut old_line = Line::new();
+        let mut do_split: bool;
+        
+        match self.data {
+            // Find node for the line break to be inserted into
+            BufferNodeData::Branch(ref mut left, ref mut right) => {
+                if pos < left.grapheme_count {
+                    left.insert_line_break_recursive(ending, pos);
+                }
+                else {
+                    right.insert_line_break_recursive(ending, pos - left.grapheme_count);
+                }
+                do_split = false;
+            },
+            
+            // We need to insert the line break, so get the data we
+            // need for that (can't do it here because of borrow checker).
+            BufferNodeData::Leaf(ref mut line) => {
+                mem::swap(&mut old_line, line);
+                do_split = true;
+            },
+        }
+        
+        if do_split {
+            // Insert line break
+            let new_line = old_line.split(ending, pos);
+            let new_node_a = box BufferNode::new_from_line(old_line);
+            let new_node_b = box BufferNode::new_from_line(new_line);
+            
+            self.data = BufferNodeData::Branch(new_node_a, new_node_b);
+            
+            self.update_stats();
+        }
+        else {
+            self.update_stats();
+            self.rebalance();
         }
     }
     
