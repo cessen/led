@@ -90,7 +90,7 @@ impl Buffer {
     }
 
     
-    /// Insert 'text' at char position 'pos'.
+    /// Insert 'text' at grapheme position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
         // Byte indices
         let mut b1: uint = 0;
@@ -128,11 +128,32 @@ impl Buffer {
         }
     }
 
-    // 
-    // /// Remove the text between char positions 'pos_a' and 'pos_b'.
-    // pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
-    //     self.root.remove_text(pos_a, pos_b);
-    // }
+    
+    /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
+    pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
+        // Nothing to do
+        if pos_a == pos_b {
+            return;
+        }
+        // Bounds error
+        else if pos_a > pos_b {
+            panic!("Buffer::remove_text(): pos_a must be less than or equal to pos_b.");
+        }
+        // Bounds error
+        else if pos_b > self.len() {
+            panic!("Buffer::remove_text(): attempt to remove text past the end of buffer.");
+        }
+        // Complete removal of all text
+        else if pos_a == 0 && pos_b == self.root.grapheme_count {
+            let mut temp_node = BufferNode::new();
+            mem::swap(&mut (self.root), &mut temp_node);
+        }
+        // All other cases
+        else {
+            self.root.remove_text_recursive(pos_a, pos_b);
+            self.root.set_last_line_ending_recursive();
+        }
+    }
 
     
     /// Creates an iterator at the first character

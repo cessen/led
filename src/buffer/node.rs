@@ -317,6 +317,72 @@ impl BufferNode {
     }
     
     
+    /// Removes text between grapheme positions pos_a and pos_b
+    pub fn remove_text_recursive(&mut self, pos_a: uint, pos_b: uint) {
+        let mut temp_node = BufferNode::new();
+        let mut total_side_removal = false;
+        
+        match self.data {
+            BufferNodeData::Branch(ref mut left, ref mut right) => {
+                let mut right_line: Option<Line> = None;
+            
+                // Check for complete removal of both sides, which
+                // should never happen here
+                if pos_a == 0 && pos_b == self.grapheme_count {
+                    panic!("remove_text_recursive(): attempting to remove entirety of self, which cannot be done from inside self.");
+                }
+                // Complete removal of left side
+                else if pos_a == 0 && pos_b >= left.grapheme_count {
+                    total_side_removal = true;
+                    if pos_b > left.grapheme_count {
+                        let a = 0;
+                        let b = pos_b - left.grapheme_count;
+                        right.remove_text_recursive(a, b);
+                    }
+                    mem::swap(&mut temp_node, &mut (**right));
+                }
+                // Complete removal of right side
+                else if pos_a <= left.grapheme_count && pos_b == self.grapheme_count {
+                    total_side_removal = true;
+                    if pos_a < left.grapheme_count {
+                        let a = pos_a;
+                        let b = left.grapheme_count;
+                        left.remove_text_recursive(a, b);
+                    }
+                    mem::swap(&mut temp_node, &mut (**left));
+                }
+                // Partial removal of only left side
+                else if pos_b < left.grapheme_count {
+                    left.remove_text_recursive(pos_a, pos_b);
+                }
+                // Partial removal of only right side
+                else if pos_a > left.grapheme_count {
+                    right.remove_text_recursive(pos_a - left.grapheme_count, pos_b - left.grapheme_count);
+                }
+                // Partial removal of both sides
+                else {
+                    // TODO
+                }
+            },
+            
+            
+            BufferNodeData::Leaf(ref mut line) => {
+                // TODO
+            },
+        }
+        
+        // If one of the sides was completely removed, replace self with the
+        // remaining side.
+        if total_side_removal {
+            mem::swap(&mut temp_node, self);
+        }
+        
+        self.update_stats();
+        self.rebalance();
+    }
+    
+    
+    /// Removes lines in line number range [line_a, line_b)
     pub fn remove_lines_recursive(&mut self, line_a: uint, line_b: uint) {
         let mut remove_left = false;
         let mut remove_right = false;
