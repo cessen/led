@@ -323,17 +323,6 @@ impl BufferNode {
         let mut temp_node = BufferNode::new();
         
         if let BufferNodeData::Branch(ref mut left, ref mut right) = self.data {
-            // Left node completely removed
-            if line_a == 0 && line_b >= left.line_count {
-                remove_left = true;
-            }
-            // Left node partially removed
-            else if line_a < left.line_count {
-                let a = line_a;
-                let b = min(left.line_count, line_b);
-                left.remove_lines_recursive(a, b);
-            }
-            
             // Right node completely removed
             if line_a <= left.line_count && line_b >= (left.line_count + right.line_count) {
                 remove_right = true;
@@ -343,6 +332,17 @@ impl BufferNode {
                 let a = if line_a > left.line_count {line_a - left.line_count} else {0};
                 let b = line_b - left.line_count;
                 right.remove_lines_recursive(a, b);
+            }
+            
+            // Left node completely removed
+            if line_a == 0 && line_b >= left.line_count {
+                remove_left = true;
+            }
+            // Left node partially removed
+            else if line_a < left.line_count {
+                let a = line_a;
+                let b = min(left.line_count, line_b);
+                left.remove_lines_recursive(a, b);
             }
             
             // Set up for node removal
@@ -367,6 +367,23 @@ impl BufferNode {
         
         self.update_stats();
         self.rebalance();
+    }
+    
+    
+    /// Ensures that the last line in the node tree has no
+    /// ending line break.
+    pub fn set_last_line_ending_recursive(&mut self) {
+        match self.data {
+            BufferNodeData::Branch(_, ref mut right) => {
+               right.set_last_line_ending_recursive();
+            },
+            
+            BufferNodeData::Leaf(ref mut line) => {
+                line.ending = LineEnding::None;
+            },
+        }
+        
+        self.update_stats();
     }
 
 
