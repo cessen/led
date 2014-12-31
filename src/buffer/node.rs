@@ -317,15 +317,18 @@ impl BufferNode {
     }
     
     
-    /// Removes text between grapheme positions pos_a and pos_b
-    pub fn remove_text_recursive(&mut self, pos_a: uint, pos_b: uint) {
+    /// Removes text between grapheme positions pos_a and pos_b.
+    /// Returns true if a dangling left side remains from the removal.
+    /// Returns false otherwise.
+    pub fn remove_text_recursive(&mut self, pos_a: uint, pos_b: uint) -> bool {
         let mut temp_node = BufferNode::new();
         let mut total_side_removal = false;
+        let mut dangling_line = false;
+        let mut do_merge_fix = false;
+        let mut merge_line_number: uint = 0;
         
         match self.data {
             BufferNodeData::Branch(ref mut left, ref mut right) => {
-                let mut right_line: Option<Line> = None;
-            
                 // Check for complete removal of both sides, which
                 // should never happen here
                 if pos_a == 0 && pos_b == self.grapheme_count {
@@ -347,38 +350,50 @@ impl BufferNode {
                     if pos_a < left.grapheme_count {
                         let a = pos_a;
                         let b = left.grapheme_count;
-                        left.remove_text_recursive(a, b);
+                        dangling_line = left.remove_text_recursive(a, b);
                     }
                     mem::swap(&mut temp_node, &mut (**left));
                 }
-                // Partial removal of only left side
-                else if pos_b < left.grapheme_count {
-                    left.remove_text_recursive(pos_a, pos_b);
-                }
-                // Partial removal of only right side
-                else if pos_a > left.grapheme_count {
-                    right.remove_text_recursive(pos_a - left.grapheme_count, pos_b - left.grapheme_count);
-                }
-                // Partial removal of both sides
+                // Partial removal of one or both sides
                 else {
-                    // TODO
+                    // Right side
+                    if pos_b > left.grapheme_count {
+                        let a = if pos_a > left.grapheme_count {pos_a - left.grapheme_count} else {0};
+                        let b = pos_b - left.grapheme_count;
+                        right.remove_text_recursive(a, b);
+                    }
+                    
+                    // Left side
+                    if pos_a < left.grapheme_count {
+                        let a = pos_a;
+                        let b = min(pos_b, left.grapheme_count);
+                        do_merge_fix = left.remove_text_recursive(a, b);
+                        merge_line_number = left.line_count - 1;
+                    }
                 }
             },
             
             
             BufferNodeData::Leaf(ref mut line) => {
-                // TODO
+                line.remove_text(pos_a, pos_b);
+                dangling_line = line.ending == LineEnding::None;
             },
         }
         
+        // Do the merge fix if necessary
+        if do_merge_fix {
+            self.merge_line_with_next_recursive(merge_line_number, None);
+        }
         // If one of the sides was completely removed, replace self with the
         // remaining side.
-        if total_side_removal {
+        else if total_side_removal {
             mem::swap(&mut temp_node, self);
         }
         
         self.update_stats();
         self.rebalance();
+        
+        return dangling_line;
     }
     
     
@@ -433,6 +448,89 @@ impl BufferNode {
         
         self.update_stats();
         self.rebalance();
+    }
+    
+    
+    pub fn merge_line_with_next_recursive(&mut self, line_number: uint, fetched_line: Option<&Line>) {
+        match fetched_line {
+            None => {
+                let mut line: Option<Line> = self.pull_out_line_recursive(line_number + 1);
+                if let Some(ref l) = line {
+                    self.merge_line_with_next_recursive(line_number, Some(l));
+                }
+            },
+            
+            Some(line) => {
+                match self.data {
+                    BufferNodeData::Branch(ref mut left, ref mut right) => {
+                        if line_number < left.line_count {
+                            left.merge_line_with_next_recursive(line_number, Some(line));
+                        }
+                        else {
+                            right.merge_line_with_next_recursive(line_number - left.line_count, Some(line));
+                        }
+                    },
+                    
+                    BufferNodeData::Leaf(ref mut line2) => {
+                        line2.append_text(line.as_str());
+                        line2.ending = line.ending;
+                    }
+                }
+            }
+        }
+        
+        self.update_stats();
+        self.rebalance();
+    }
+    
+    
+    /// Removes a single line out of the text and returns it.
+    pub fn pull_out_line_recursive(&mut self, line_number: uint) -> Option<Line> {
+        let mut pulled_line = Line::new();
+        let mut temp_node = BufferNode::new();
+        let mut side_removal = false;
+        
+        match self.data {
+            BufferNodeData::Branch(ref mut left, ref mut right) => {
+                if line_number < left.line_count {
+                    if let BufferNodeData::Leaf(ref mut line) = left.data {
+                        mem::swap(&mut pulled_line, line);
+                        mem::swap(&mut temp_node, &mut (**right));
+                        side_removal = true;
+                    }
+                    else {
+                        pulled_line = left.pull_out_line_recursive(line_number).unwrap();
+                    }
+                }
+                else if line_number < self.line_count {
+                    if let BufferNodeData::Leaf(ref mut line) = right.data {
+                        mem::swap(&mut pulled_line, line);
+                        mem::swap(&mut temp_node, &mut (**left));
+                        side_removal = true;
+                    }
+                    else {
+                        pulled_line = right.pull_out_line_recursive(line_number - left.line_count).unwrap();
+                    }
+                }
+                else {
+                    return None;
+                }
+            },
+            
+            
+            BufferNodeData::Leaf(ref mut line) => {
+                panic!("pull_out_line_recursive(): inside leaf node.  This should never happen!");
+            },
+        }
+        
+        if side_removal {
+            mem::swap(&mut temp_node, self);
+        }
+        
+        self.update_stats();
+        self.rebalance();
+        
+        return Some(pulled_line);
     }
     
     

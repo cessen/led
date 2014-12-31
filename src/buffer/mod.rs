@@ -150,7 +150,9 @@ impl Buffer {
         }
         // All other cases
         else {
-            self.root.remove_text_recursive(pos_a, pos_b);
+            if self.root.remove_text_recursive(pos_a, pos_b) {
+                panic!("Buffer::remove_text(): dangling left side remains.  This should never happen!");
+            }
             self.root.set_last_line_ending_recursive();
         }
     }
@@ -589,6 +591,120 @@ fn insert_text_in_non_empty_buffer_7() {
     assert!(Some("\r\n") == iter.next());
     assert!(Some("!") == iter.next());
     
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_1() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    assert!(buf.len() == 29);
+    assert!(buf.root.line_count == 6);
+    
+    buf.remove_text(0, 3);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 26);
+    assert!(buf.root.line_count == 5);
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("r") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("p") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("p") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("f") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("w") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("r") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("d") == iter.next());
+    assert!(Some("!") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_2() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    assert!(buf.len() == 29);
+    assert!(buf.root.line_count == 6);
+    
+    buf.remove_text(6, 18);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 17);
+    assert!(buf.root.line_count == 4);
+    assert!(Some("H") == iter.next());
+    assert!(Some("i") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("f") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("w") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("r") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("d") == iter.next());
+    assert!(Some("!") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_3() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    assert!(buf.len() == 29);
+    assert!(buf.root.line_count == 6);
+    
+    buf.remove_text(17, 29);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 17);
+    assert!(buf.root.line_count == 4);
+    assert!(Some("H") == iter.next());
+    assert!(Some("i") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("r") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("p") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("p") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("o") == iter.next());
     assert!(None == iter.next());
 }
 

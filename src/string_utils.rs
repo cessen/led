@@ -87,5 +87,5 @@ pub fn grapheme_pos_to_byte_pos(text: &str, pos: uint) -> uint {
         return text.len();
     }
     
-    panic!("grapheme_pos_to_byte_pos(): char position off the end of the string.");
+    panic!("grapheme_pos_to_byte_pos(): grapheme position off the end of the string.");
 }

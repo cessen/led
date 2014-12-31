@@ -162,6 +162,29 @@ impl Line {
     }
     
     
+    /// Appends `text` to the end of line, just before the line ending (if
+    /// any).
+    /// NOTE: panics if it encounters a line ending in the text.
+    pub fn append_text(&mut self, text: &str) {
+        let mut i = self.text.len();
+    
+        // Grow data size        
+        self.text.grow(text.len(), 0);
+        
+        // Copy new bytes in
+        for g in text.graphemes(true) {
+            if is_line_ending(g) {
+                panic!("Line::append_text(): line ending in inserted text.");
+            }
+            
+            for b in g.bytes() {
+                self.text[i] = b;
+                i += 1
+            }
+        }
+    }
+    
+    
     /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
     pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
         // Bounds checks
@@ -446,6 +469,28 @@ fn text_line_insert_text() {
     let mut tl = Line::new_from_str("Hello!\r\n");
     
     tl.insert_text(" world", 5);
+    
+    assert!(tl.text.len() == 12);
+    assert!(tl.text[0] == ('H' as u8));
+    assert!(tl.text[1] == ('e' as u8));
+    assert!(tl.text[2] == ('l' as u8));
+    assert!(tl.text[3] == ('l' as u8));
+    assert!(tl.text[4] == ('o' as u8));
+    assert!(tl.text[5] == (' ' as u8));
+    assert!(tl.text[6] == ('w' as u8));
+    assert!(tl.text[7] == ('o' as u8));
+    assert!(tl.text[8] == ('r' as u8));
+    assert!(tl.text[9] == ('l' as u8));
+    assert!(tl.text[10] == ('d' as u8));
+    assert!(tl.text[11] == ('!' as u8));
+    assert!(tl.ending == LineEnding::CRLF);
+}
+
+#[test]
+fn text_line_append_text() {
+    let mut tl = Line::new_from_str("Hello\r\n");
+    
+    tl.append_text(" world!");
     
     assert!(tl.text.len() == 12);
     assert!(tl.text[0] == ('H' as u8));
