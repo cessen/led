@@ -5,7 +5,7 @@ use rustbox::Color;
 use editor::Editor;
 use std::char;
 use std::time::duration::Duration;
-
+use string_utils::{is_line_ending};
 
 // Key codes
 const K_ENTER: u16 = 13;
@@ -74,9 +74,9 @@ impl TermUI {
                                 break;
                             },
                             
-                            K_CTRL_S => {
-                                self.editor.save_if_dirty();
-                            },
+                            // K_CTRL_S => {
+                            //     self.editor.save_if_dirty();
+                            // },
                             
                             K_PAGEUP => {
                                 self.editor.page_up();
@@ -152,7 +152,7 @@ impl TermUI {
     }
 
     pub fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
-        let mut tb_iter = editor.buffer.iter_at_char(editor.buffer.pos_2d_to_closest_1d(editor.view_pos));
+        let mut tb_iter = editor.buffer.grapheme_iter_at_index(editor.buffer.pos_2d_to_closest_1d(editor.view_pos));
         let mut pline = c1.0;
         let mut pcol = c1.1;
         let mut line = editor.view_pos.0;
@@ -164,10 +164,10 @@ impl TermUI {
         let cursor_pos = editor.buffer.pos_2d_to_closest_1d(editor.cursor);
         
         loop {
-            if let Option::Some(c) = tb_iter.next() {
-                if c == '\n' {
+            if let Some(g) = tb_iter.next() {
+                if is_line_ending(g) {
                     if pos == cursor_pos {
-                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, " ".to_string().as_slice());
+                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                     }
                     
                     pline += 1;
@@ -177,10 +177,10 @@ impl TermUI {
                 }
                 else {
                     if pos == cursor_pos  {
-                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, c.to_string().as_slice());
+                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, g);
                     }
                     else {
-                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::White, Color::Black, c.to_string().as_slice());
+                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::White, Color::Black, g);
                     }
                     
                     pcol += 1;
@@ -219,7 +219,7 @@ impl TermUI {
             // to it.
             loop {
                 if column < editor.view_pos.1 {
-                    let nl = tb_iter.skip_non_newline_chars(editor.view_pos.1);
+                    let nl = tb_iter.skip_non_newline_graphemes(editor.view_pos.1);
                     if !nl {
                         column = editor.view_pos.1;
                         break;

@@ -4,6 +4,7 @@ use std::mem;
 
 use self::node::{BufferNode, BufferNodeGraphemeIter};
 use self::line::{Line};
+use string_utils::{is_line_ending};
 
 mod line;
 mod node;
@@ -170,7 +171,22 @@ impl<'a> BufferGraphemeIter<'a> {
         self.gi.skip_graphemes(n)
     }
     
-    
+    pub fn skip_non_newline_graphemes(&mut self, n: uint) -> bool {
+        let mut i: uint = 0;
+        
+        for g in self.gi {
+            if is_line_ending(g) {
+                return true;
+            }
+            
+            i += 1;
+            if i >= n {
+                break;
+            }
+        }
+        
+        return false;
+    }
 }
 
 

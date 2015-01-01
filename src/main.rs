@@ -4,14 +4,14 @@ extern crate "rustc-serialize" as rustc_serialize;
 
 use std::path::Path;
 use docopt::Docopt;
-//use editor::Editor;
-//use term_ui::TermUI;
+use editor::Editor;
+use term_ui::TermUI;
 
 mod string_utils;
 mod buffer;
 //mod files;
-//mod editor;
-//mod term_ui;
+mod editor;
+mod term_ui;
 
 
 
@@ -47,10 +47,13 @@ fn main() {
     // else {
     //     Editor::new()
     // };
-    // 
-    // // Initialize and start UI
-    // let mut ui = TermUI::new_from_editor(editor);
-    // ui.ui_loop();
+    //
+    
+    let editor = Editor::new();
+    
+    // Initialize and start UI
+    let mut ui = TermUI::new_from_editor(editor);
+    ui.ui_loop();
     
     //println!("{}", editor.buffer.root.tree_height);
 }

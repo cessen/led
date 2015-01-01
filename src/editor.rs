@@ -2,12 +2,12 @@
 
 use buffer::Buffer;
 use std::path::Path;
-use files::{load_file_to_buffer, save_buffer_to_file};
-use string_utils::char_count;
+//use files::{load_file_to_buffer, save_buffer_to_file};
+use string_utils::grapheme_count;
 
 
 pub struct Editor {
-    pub buffer: TextBuffer,
+    pub buffer: Buffer,
     pub file_path: Path,
     pub dirty: bool,
     
@@ -24,7 +24,7 @@ impl Editor {
     /// Create a new blank editor
     pub fn new() -> Editor {
         Editor {
-            buffer: TextBuffer::new(),
+            buffer: Buffer::new(),
             file_path: Path::new(""),
             dirty: false,
             view_dim: (0, 0),
@@ -33,25 +33,25 @@ impl Editor {
         }
     }
     
-    pub fn new_from_file(path: &Path) -> Editor {
-        let buf = load_file_to_buffer(path).unwrap();
-        
-        Editor {
-            buffer: buf,
-            file_path: path.clone(),
-            dirty: false,
-            view_dim: (0, 0),
-            view_pos: (0, 0),
-            cursor: (0, 0),
-        }
-    }
+    // pub fn new_from_file(path: &Path) -> Editor {
+    //     let buf = load_file_to_buffer(path).unwrap();
+    //     
+    //     Editor {
+    //         buffer: buf,
+    //         file_path: path.clone(),
+    //         dirty: false,
+    //         view_dim: (0, 0),
+    //         view_pos: (0, 0),
+    //         cursor: (0, 0),
+    //     }
+    // }
     
-    pub fn save_if_dirty(&mut self) {
-        if self.dirty && self.file_path != Path::new("") {
-            let _ = save_buffer_to_file(&self.buffer, &self.file_path);
-            self.dirty = false;
-        }
-    }
+    // pub fn save_if_dirty(&mut self) {
+    //     if self.dirty && self.file_path != Path::new("") {
+    //         let _ = save_buffer_to_file(&self.buffer, &self.file_path);
+    //         self.dirty = false;
+    //     }
+    // }
     
     pub fn update_dim(&mut self, h: uint, w: uint) {
         self.view_dim = (h, w);
@@ -79,7 +79,7 @@ impl Editor {
     
     pub fn insert_text_at_cursor(&mut self, text: &str) {
         let pos = self.buffer.pos_2d_to_closest_1d(self.cursor);
-        let str_len = char_count(text);
+        let str_len = grapheme_count(text);
         let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
         
         // Insert text
@@ -92,15 +92,15 @@ impl Editor {
         self.move_view_to_cursor();
     }
     
-    pub fn insert_text_at_char(&mut self, text: &str, pos: uint) {
+    pub fn insert_text_at_grapheme(&mut self, text: &str, pos: uint) {
         self.dirty = true;
         let buf_len = self.buffer.len();
         self.buffer.insert_text(text, if pos < buf_len {pos} else {buf_len});
     }
     
-    pub fn remove_text_behind_cursor(&mut self, char_count: uint) {
+    pub fn remove_text_behind_cursor(&mut self, grapheme_count: uint) {
         let pos_b = self.buffer.pos_2d_to_closest_1d(self.cursor);
-        let pos_a = if pos_b >= char_count {pos_b - char_count} else {0};
+        let pos_a = if pos_b >= grapheme_count {pos_b - grapheme_count} else {0};
         
         // Move cursor
         self.cursor = self.buffer.pos_1d_to_closest_2d(pos_a);
@@ -153,7 +153,7 @@ impl Editor {
     }
     
     pub fn cursor_down(&mut self) {
-        if self.cursor.0 < self.buffer.newline_count() {
+        if self.cursor.0 < (self.buffer.line_count() - 1) {
             self.cursor.0 += 1;
         }
         else {
@@ -190,7 +190,7 @@ impl Editor {
     }
     
     pub fn page_down(&mut self) {
-        let nlc = self.buffer.newline_count();
+        let nlc = self.buffer.line_count() - 1;
         
         if self.view_pos.0 < nlc {
             let move_amount = self.view_dim.0 - (self.view_dim.0 / 8);
