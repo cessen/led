@@ -1,13 +1,9 @@
 #![allow(dead_code)]
 
-use std;
-use std::fmt;
 use std::mem;
-use std::cmp::{min, max};
 
-use string_utils::is_line_ending;
-use self::node::{BufferNode, BufferNodeData};
-use self::line::{Line, LineGraphemeIter, str_to_line_ending};
+use self::node::{BufferNode, BufferNodeGraphemeIter};
+use self::line::{Line};
 
 mod line;
 mod node;
@@ -92,40 +88,7 @@ impl Buffer {
     
     /// Insert 'text' at grapheme position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
-        // Byte indices
-        let mut b1: uint = 0;
-        let mut b2: uint = 0;
-        
-        // Grapheme indices
-        let mut g1: uint = 0;
-        let mut g2: uint = 0;
-        
-        // Iterate through graphemes
-        for grapheme in text.grapheme_indices(true) {
-            if is_line_ending(grapheme.1) {
-                if g1 < g2 {
-                    self.root.insert_text_recursive(text.slice(b1, b2), pos + g1);
-                }
-                
-                b1 = b2;
-                g1 = g2;
-                b2 += grapheme.1.len();
-                g2 += 1;
-                
-                self.root.insert_line_break_recursive(str_to_line_ending(grapheme.1), pos + g1);
-                
-                b1 = b2;
-                g1 = g2;
-            }
-            else {
-                b2 += grapheme.1.len();
-                g2 += 1;
-            }
-        }
-        
-        if g1 < g2 {
-            self.root.insert_text_recursive(text.slice(b1, b2), pos + g1);
-        }
+        self.root.insert_text(text, pos);
     }
 
     
@@ -150,7 +113,7 @@ impl Buffer {
         }
         // All other cases
         else {
-            if self.root.remove_text_recursive(pos_a, pos_b) {
+            if self.root.remove_text_recursive(pos_a, pos_b, true) {
                 panic!("Buffer::remove_text(): dangling left side remains.  This should never happen!");
             }
             self.root.set_last_line_ending_recursive();
@@ -160,28 +123,8 @@ impl Buffer {
     
     /// Creates an iterator at the first character
     pub fn grapheme_iter<'a>(&'a self) -> BufferGraphemeIter<'a> {
-        let mut node_stack: Vec<&'a BufferNode> = Vec::new();
-        let mut cur_node = &self.root;
-        
-        loop {
-            match cur_node.data {
-                BufferNodeData::Leaf(_) => {
-                    break;
-                },
-                
-                BufferNodeData::Branch(ref left, ref right) => {
-                    node_stack.push(&(**right));
-                    cur_node = &(**left);
-                }
-            }
-        }
-        
         BufferGraphemeIter {
-            node_stack: node_stack,
-            cur_line: match cur_node.data {
-                BufferNodeData::Leaf(ref line) => line.grapheme_iter(),
-                _ => panic!("This should never happen.")
-            }
+            gi: self.root.grapheme_iter()
         }
     }
     
@@ -246,8 +189,7 @@ impl Buffer {
 
 /// An iterator over a text buffer's graphemes
 pub struct BufferGraphemeIter<'a> {
-    node_stack: Vec<&'a BufferNode>,
-    cur_line: LineGraphemeIter<'a>,
+    gi: BufferNodeGraphemeIter<'a>,
 }
 
 
@@ -256,25 +198,7 @@ impl<'a> BufferGraphemeIter<'a> {
     // Returns true if there was a next line,
     // false if there wasn't.
     pub fn next_line(&mut self) -> bool {
-        loop {
-            if let Option::Some(node) = self.node_stack.pop() {
-                match node.data {
-                    BufferNodeData::Leaf(ref line) => {
-                        self.cur_line = line.grapheme_iter();
-                        return true;
-                    },
-                  
-                    BufferNodeData::Branch(ref left, ref right) => {
-                        self.node_stack.push(&(**right));
-                        self.node_stack.push(&(**left));
-                        continue;
-                    }
-                }
-            }
-            else {
-                return false;
-            }
-        }
+        self.gi.next_line()
     }
     
     
@@ -282,14 +206,7 @@ impl<'a> BufferGraphemeIter<'a> {
     // If it runs out of graphemes before reaching the desired skip count,
     // returns false.  Otherwise returns true.
     pub fn skip_graphemes(&mut self, n: uint) -> bool {
-        // TODO: more efficient implementation
-        for _ in range(0, n) {
-            if let Option::None = self.next() {
-                return false;
-            }
-        }
-        
-        return true;
+        self.gi.skip_graphemes(n)
     }
     
     
@@ -298,21 +215,8 @@ impl<'a> BufferGraphemeIter<'a> {
 
 impl<'a> Iterator<&'a str> for BufferGraphemeIter<'a> {
     fn next(&mut self) -> Option<&'a str> {
-        loop {
-            if let Option::Some(g) = self.cur_line.next() {
-                return Option::Some(g);
-            }
-            
-            if self.next_line() {
-                continue;
-            }
-            else {
-                return Option::None;
-            }
-        }
+        self.gi.next()
     }
-    
-    
 }
 
 
@@ -647,7 +551,42 @@ fn remove_text_2() {
     assert!(buf.len() == 29);
     assert!(buf.root.line_count == 6);
     
-    buf.remove_text(6, 18);
+    buf.remove_text(0, 12);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 17);
+    assert!(buf.root.line_count == 4);
+    assert!(Some("p") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("f") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("w") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("r") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("d") == iter.next());
+    assert!(Some("!") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_3() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    assert!(buf.len() == 29);
+    assert!(buf.root.line_count == 6);
+    
+    buf.remove_text(5, 17);
     
     let mut iter = buf.grapheme_iter();
     
@@ -675,7 +614,48 @@ fn remove_text_2() {
 
 
 #[test]
-fn remove_text_3() {
+fn remove_text_4() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    assert!(buf.len() == 29);
+    assert!(buf.root.line_count == 6);
+    
+    buf.remove_text(23, 29);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 23);
+    assert!(buf.root.line_count == 6);
+    assert!(Some("H") == iter.next());
+    assert!(Some("i") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("r") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("p") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("p") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("f") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_5() {
     let mut buf = Buffer::new();
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
@@ -705,6 +685,120 @@ fn remove_text_3() {
     assert!(Some("e") == iter.next());
     assert!(Some("\n") == iter.next());
     assert!(Some("o") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_6() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hello\nworld!", 0);
+    assert!(buf.len() == 12);
+    assert!(buf.root.line_count == 2);
+    
+    buf.remove_text(3, 12);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 3);
+    assert!(buf.root.line_count == 1);
+    assert!(Some("H") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_7() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hi\nthere\nworld!", 0);
+    assert!(buf.len() == 15);
+    assert!(buf.root.line_count == 3);
+    
+    buf.remove_text(5, 15);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 5);
+    assert!(buf.root.line_count == 2);
+    assert!(Some("H") == iter.next());
+    assert!(Some("i") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_8() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hello\nworld!", 0);
+    assert!(buf.len() == 12);
+    assert!(buf.root.line_count == 2);
+    
+    buf.remove_text(3, 11);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 4);
+    assert!(buf.root.line_count == 1);
+    assert!(Some("H") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("!") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_9() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("Hello\nworld!", 0);
+    assert!(buf.len() == 12);
+    assert!(buf.root.line_count == 2);
+    
+    buf.remove_text(8, 12);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 8);
+    assert!(buf.root.line_count == 2);
+    assert!(Some("H") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("w") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn remove_text_10() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("12\n34\n56\n78", 0);
+    assert!(buf.len() == 11);
+    assert!(buf.root.line_count == 4);
+    
+    buf.remove_text(4, 11);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 4);
+    assert!(buf.root.line_count == 2);
+    assert!(Some("1") == iter.next());
+    assert!(Some("2") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("3") == iter.next());
     assert!(None == iter.next());
 }
 
