@@ -2,7 +2,7 @@
 
 use std::mem;
 
-use self::node::{BufferNode, BufferNodeGraphemeIter};
+use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::line::{Line};
 use string_utils::{is_line_ending};
 
@@ -139,6 +139,20 @@ impl Buffer {
         }
     }
     
+    
+    pub fn line_iter<'a>(&'a self) -> BufferLineIter<'a> {
+        BufferLineIter {
+            li: self.root.line_iter()
+        }
+    }
+    
+    
+    pub fn line_iter_at_index<'a>(&'a self, index: uint) -> BufferLineIter<'a> {
+        BufferLineIter {
+            li: self.root.line_iter_at_index(index)
+        }
+    }
+    
 
 }
 
@@ -195,6 +209,20 @@ impl<'a> Iterator<&'a str> for BufferGraphemeIter<'a> {
         self.gi.next()
     }
 }
+
+
+pub struct BufferLineIter<'a> {
+    li: BufferNodeLineIter<'a>,
+}
+
+
+impl<'a> Iterator<&'a Line> for BufferLineIter<'a> {
+    fn next(&mut self) -> Option<&'a Line> {
+        self.li.next()
+    }
+}
+
+
 
 
 
@@ -781,6 +809,33 @@ fn remove_text_10() {
 
 
 #[test]
+fn remove_text_11() {
+    let mut buf = Buffer::new();
+    
+    buf.insert_text("1234567890", 0);
+    assert!(buf.len() == 10);
+    assert!(buf.root.line_count == 1);
+    
+    buf.remove_text(9, 10);
+    
+    let mut iter = buf.grapheme_iter();
+    
+    assert!(buf.len() == 9);
+    assert!(buf.root.line_count == 1);
+    assert!(Some("1") == iter.next());
+    assert!(Some("2") == iter.next());
+    assert!(Some("3") == iter.next());
+    assert!(Some("4") == iter.next());
+    assert!(Some("5") == iter.next());
+    assert!(Some("6") == iter.next());
+    assert!(Some("7") == iter.next());
+    assert!(Some("8") == iter.next());
+    assert!(Some("9") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
 fn remove_lines_1() {
     let mut buf = Buffer::new();
     
@@ -962,7 +1017,6 @@ fn grapheme_iter_at_index_2() {
     
     assert!(None == iter.next());
 }
-
 
 
 

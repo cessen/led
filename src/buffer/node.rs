@@ -412,8 +412,6 @@ impl BufferNode {
                         total_side_removal = true;
                         mem::swap(&mut temp_node, &mut (**left));
                     }
-                    
-                    
                 }
                 // Partial removal of one or both sides
                 else {
@@ -443,7 +441,7 @@ impl BufferNode {
                 }
                 line.remove_text(pos_a, pos_b2);
                 
-                dangling_line = line.ending == LineEnding::None;
+                dangling_line = line.ending == LineEnding::None && !is_last;
             },
         }
         
@@ -679,6 +677,65 @@ impl BufferNode {
             }
         }
     }
+    
+    
+    /// Creates a line iterator starting at the first line
+    pub fn line_iter<'a>(&'a self) -> BufferNodeLineIter<'a> {
+        let mut node_stack: Vec<&'a BufferNode> = Vec::new();
+        let mut cur_node = self;
+        
+        loop {
+            match cur_node.data {
+                BufferNodeData::Leaf(_) => {
+                    break;
+                },
+                
+                BufferNodeData::Branch(ref left, ref right) => {
+                    node_stack.push(&(**right));
+                    cur_node = &(**left);
+                }
+            }
+        }
+        
+        node_stack.push(cur_node);
+        
+        BufferNodeLineIter {
+            node_stack: node_stack,
+        }
+    }
+    
+    
+    /// Creates a line iterator starting at the given line index
+    pub fn line_iter_at_index<'a>(&'a self, index: uint) -> BufferNodeLineIter<'a> {
+        let mut node_stack: Vec<&'a BufferNode> = Vec::new();
+        let mut cur_node = self;
+        let mut line_i = index;
+        
+        loop {
+            match cur_node.data {
+                BufferNodeData::Leaf(_) => {
+                    break;
+                },
+                
+                BufferNodeData::Branch(ref left, ref right) => {
+                    if line_i < left.line_count { 
+                        node_stack.push(&(**right));
+                        cur_node = &(**left);
+                    }
+                    else {
+                        line_i -= left.line_count;
+                        cur_node = &(**right);
+                    }
+                }
+            }
+        }
+        
+        node_stack.push(cur_node);
+        
+        BufferNodeLineIter {
+            node_stack: node_stack,
+        }
+    }
 
 
 }
@@ -761,6 +818,39 @@ impl<'a> Iterator<&'a str> for BufferNodeGraphemeIter<'a> {
     
 }
 
+
+
+
+/// An iterator over a text buffer's lines
+pub struct BufferNodeLineIter<'a> {
+    node_stack: Vec<&'a BufferNode>,
+}
+
+
+impl<'a> Iterator<&'a Line> for BufferNodeLineIter<'a> {
+    fn next(&mut self) -> Option<&'a Line> {
+        loop {
+            if let Option::Some(node) = self.node_stack.pop() {
+                match node.data {
+                    BufferNodeData::Leaf(ref line) => {
+                        return Some(line);
+                    },
+                  
+                    BufferNodeData::Branch(ref left, ref right) => {
+                        self.node_stack.push(&(**right));
+                        self.node_stack.push(&(**left));
+                        continue;
+                    }
+                }
+            }
+            else {
+                return None;
+            }
+        }
+    }
+    
+    
+}
 
 
 

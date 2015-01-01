@@ -361,6 +361,14 @@ pub struct LineGraphemeIter<'a> {
     done: bool,
 }
 
+impl<'a> LineGraphemeIter<'a> {
+    pub fn skip_graphemes(&mut self, n: uint) {
+        for _ in range(0, n) {
+            self.next();
+        }
+    }
+}
+
 impl<'a> Iterator<&'a str> for LineGraphemeIter<'a> {
     fn next(&mut self) -> Option<&'a str> {
         if self.done {

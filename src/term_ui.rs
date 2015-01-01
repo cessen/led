@@ -32,14 +32,14 @@ pub struct TermUI {
 impl TermUI {
     pub fn new() -> TermUI {
         TermUI {
-            rb: rustbox::RustBox::init(&[None]).unwrap(),
+            rb: rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap(),
             editor: Editor::new(),
         }
     }
     
     pub fn new_from_editor(editor: Editor) -> TermUI {
         TermUI {
-            rb: rustbox::RustBox::init(&[None]).unwrap(),
+            rb: rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap(),
             editor: editor,
         }
     }
@@ -152,94 +152,64 @@ impl TermUI {
     }
 
     pub fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
-        let mut tb_iter = editor.buffer.grapheme_iter_at_index(editor.buffer.pos_2d_to_closest_1d(editor.view_pos));
-        let mut pline = c1.0;
-        let mut pcol = c1.1;
-        let mut line = editor.view_pos.0;
-        let mut column = editor.view_pos.1;
-        let mut pos = editor.buffer.pos_2d_to_closest_1d(editor.view_pos);
-        let max_line = line + (c2.0 - c1.0);
-        let max_col = column + (c2.1 - c1.1);
+        let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
         
-        let cursor_pos = editor.buffer.pos_2d_to_closest_1d(editor.cursor);
+        let mut line_num = editor.view_pos.0;
+        let mut col_num = editor.view_pos.1;
+        
+        let mut print_line_num = c1.0;
+        let mut print_col_num = c1.1;
+        
+        let max_print_line = c2.0 - c1.0;
+        let max_print_col = c2.1 - c1.1;
+        
+        let cursor_pos_1d = editor.buffer.pos_2d_to_closest_1d(editor.cursor);
+        let cursor_pos = editor.buffer.pos_1d_to_closest_2d(cursor_pos_1d);
+        let print_cursor_pos = (cursor_pos.0 + editor.view_pos.0, cursor_pos.1 + editor.view_pos.1);
         
         loop {
-            if let Some(g) = tb_iter.next() {
-                if is_line_ending(g) {
-                    if pos == cursor_pos {
-                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-                    }
-                    
-                    pline += 1;
-                    pcol = c1.1;
-                    line += 1;
-                    column = 0;
-                }
-                else {
-                    if pos == cursor_pos  {
-                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, g);
+            if let Some(line) = line_iter.next() {
+                let mut g_iter = line.grapheme_iter();
+                g_iter.skip_graphemes(editor.view_pos.1);
+                
+                for g in g_iter {
+                    if is_line_ending(g) {
+                        if (line_num, col_num) == cursor_pos {
+                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                        }
                     }
                     else {
-                        self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::White, Color::Black, g);
+                        if (line_num, col_num) == cursor_pos {
+                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, g);
+                        }
+                        else {
+                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::White, Color::Black, g);
+                        }
                     }
                     
-                    pcol += 1;
-                    column += 1;
-                }
-            }
-            else {
-                // Show cursor at end of document if it's past the end of
-                // the document
-                if cursor_pos >= pos {
-                    self.rb.print(pcol, pline, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-                }
-                
-                return;
-            }
-
-            if line > max_line {
-                return;
-            }
-            
-            // If we're past the edge of the display, go to the next line
-            if column > max_col {
-                tb_iter.next_line();
-                
-                pline += 1;
-                pcol = c1.1;
-                line += 1;
-                column = 0;
-                
-                if line > max_line {
-                    return;
-                }
-            }
-            
-            // If we're before the edge of the display, move forward to get
-            // to it.
-            loop {
-                if column < editor.view_pos.1 {
-                    let nl = tb_iter.skip_non_newline_graphemes(editor.view_pos.1);
-                    if !nl {
-                        column = editor.view_pos.1;
+                    col_num += 1;
+                    print_col_num += 1;
+                    
+                    if print_col_num > max_print_col {
                         break;
                     }
-                    else {
-                        pline += 1;
-                        line += 1;
-                    }
-                    
-                    if line > max_line {
-                        return;
-                    }
-                }
-                else {
-                    break;
                 }
             }
+            else if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 < c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 < c2.1 {
+                if cursor_pos_1d >= editor.buffer.len() {
+                    self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                }
+                break;
+            }
             
-            // Get the 1d position of the char to be printed next
-            pos = editor.buffer.pos_2d_to_closest_1d((line, column));
+            line_num += 1;
+            print_line_num += 1;
+            col_num = editor.view_pos.1;
+            print_col_num = c1.1;
+            
+            if print_line_num > max_print_line {
+                break;
+            }
         }
     }
     
