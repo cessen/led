@@ -462,6 +462,27 @@ impl BufferNode {
     }
     
     
+    pub fn append_line_unchecked_recursive(&mut self, line: Line) {
+        let mut other_line = Line::new();
+        
+        if let BufferNodeData::Branch(_, ref mut right) = self.data {
+            right.append_line_unchecked_recursive(line);
+        }
+        else {
+            if let BufferNodeData::Leaf(ref mut this_line) = self.data {
+                mem::swap(this_line, &mut other_line);
+            }
+            
+            let new_node_a = box BufferNode::new_from_line(other_line);
+            let new_node_b = box BufferNode::new_from_line(line);
+            self.data = BufferNodeData::Branch(new_node_a, new_node_b);
+        }
+        
+        self.update_stats();
+        self.rebalance();
+    }
+    
+    
     /// Removes lines in line number range [line_a, line_b)
     pub fn remove_lines_recursive(&mut self, line_a: uint, line_b: uint) {
         let mut remove_left = false;

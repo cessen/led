@@ -102,6 +102,92 @@ impl Line {
     }
     
     
+    /// Creates a new Line from a string.
+    /// Does not check to see if the string has internal newlines.
+    /// This is primarily used for efficient loading of files.
+    pub fn new_from_string_unchecked(text: String) -> Line {
+        // Initialize Line
+        let mut tl = Line {
+            text: text.into_bytes(),
+            ending: LineEnding::None,
+        };
+        
+        // Check for line ending
+        let mut le_size: uint = 0;
+        let text_size = tl.text.len();
+        if tl.text.len() >= 3 {
+            match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-3))} {
+                // LS
+                "\u{2028}" => {
+                    tl.ending = LineEnding::LS;
+                    le_size = 3;
+                },
+                
+                // PS
+                "\u{2029}" => {
+                    tl.ending = LineEnding::PS;
+                    le_size = 3;
+                },
+                
+                _ => {}
+            }
+        }
+        else if le_size == 0 && tl.text.len() >= 2 {
+            match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-2))} {
+                // CRLF
+                "\u{000D}\u{000A}" => {
+                    tl.ending = LineEnding::CRLF;
+                    le_size = 2;
+                },
+                
+                _ => {}
+            }
+        }
+        else if le_size == 0 && tl.text.len() >= 1 {
+            match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-1))} {
+                // LF or CRLF
+                "\u{000A}" => {
+                    tl.ending = LineEnding::LF;
+                    le_size = 1;
+                },
+                
+                // VT
+                "\u{000B}" => {
+                    tl.ending = LineEnding::VT;
+                    le_size = 1;
+                },
+                
+                // FF
+                "\u{000C}" => {
+                    tl.ending = LineEnding::FF;
+                    le_size = 1;
+                },
+                
+                // CR
+                "\u{000D}" => {
+                    tl.ending = LineEnding::CR;
+                    le_size = 1;
+                },
+                
+                // NEL
+                "\u{0085}" => {
+                    tl.ending = LineEnding::NEL;
+                    le_size = 1;
+                },
+                
+                _ => {}
+            }
+        }
+        
+        // Truncate off the line ending, if any
+        let trunc_size = text_size - le_size;
+        tl.text.truncate(trunc_size);
+        
+        // Done!
+        return tl;
+    }
+    
+    
     /// Returns the total number of unicode graphemes in the line
     pub fn grapheme_count(&self) -> uint {
         let mut count = grapheme_count(self.as_str());
@@ -338,6 +424,10 @@ pub fn str_to_line_ending(g: &str) -> LineEnding {
             return LineEnding::None;
         }
     }
+}
+
+pub fn line_ending_to_str(ending: LineEnding) -> &'static str {
+    LINE_ENDINGS[ending as uint]
 }
 
 /// An array of string literals corresponding to the possible

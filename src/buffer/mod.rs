@@ -6,7 +6,7 @@ use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::line::{Line};
 use string_utils::{is_line_ending};
 
-mod line;
+pub mod line;
 mod node;
 
 
@@ -47,6 +47,14 @@ impl Buffer {
         // efficient.  However, it seems likely to require unsafe code
         // if done that way.
         return self.root.get_line_recursive(index);
+    }
+    
+    
+    /// Blindly appends a line to the end of the current text without
+    /// doing any sanity checks.  This is primarily for efficient
+    /// file loading.
+    pub fn append_line_unchecked(&mut self, line: Line) {
+        self.root.append_line_unchecked_recursive(line);
     }
     
     
