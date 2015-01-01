@@ -565,6 +565,70 @@ fn new_text_line_from_str_with_crlf_and_too_long() {
 }
 
 #[test]
+fn new_text_line_from_string_unchecked() {
+    let s = String::from_str("Hello!");
+    
+    let tl = Line::new_from_string_unchecked(s);
+    
+    assert!(tl.text.len() == 6);
+    assert!(tl.text[0] == ('H' as u8));
+    assert!(tl.text[1] == ('e' as u8));
+    assert!(tl.text[2] == ('l' as u8));
+    assert!(tl.text[3] == ('l' as u8));
+    assert!(tl.text[4] == ('o' as u8));
+    assert!(tl.text[5] == ('!' as u8));
+    assert!(tl.ending == LineEnding::None);
+}
+
+#[test]
+fn new_text_line_from_string_unchecked_with_lf() {
+    let s = String::from_str("Hello!\u{000A}");
+    
+    let tl = Line::new_from_string_unchecked(s);
+    
+    assert!(tl.text.len() == 6);
+    assert!(tl.text[0] == ('H' as u8));
+    assert!(tl.text[1] == ('e' as u8));
+    assert!(tl.text[2] == ('l' as u8));
+    assert!(tl.text[3] == ('l' as u8));
+    assert!(tl.text[4] == ('o' as u8));
+    assert!(tl.text[5] == ('!' as u8));
+    assert!(tl.ending == LineEnding::LF);
+}
+
+#[test]
+fn new_text_line_from_string_unchecked_with_crlf() {
+    let s = String::from_str("Hello!\u{000D}\u{000A}");
+    
+    let tl = Line::new_from_string_unchecked(s);
+    
+    assert!(tl.text.len() == 6);
+    assert!(tl.text[0] == ('H' as u8));
+    assert!(tl.text[1] == ('e' as u8));
+    assert!(tl.text[2] == ('l' as u8));
+    assert!(tl.text[3] == ('l' as u8));
+    assert!(tl.text[4] == ('o' as u8));
+    assert!(tl.text[5] == ('!' as u8));
+    assert!(tl.ending == LineEnding::CRLF);
+}
+
+#[test]
+fn new_text_line_from_string_unchecked_with_ls() {
+    let s = String::from_str("Hello!\u{2028}");
+    
+    let tl = Line::new_from_string_unchecked(s);
+    
+    assert!(tl.text.len() == 6);
+    assert!(tl.text[0] == ('H' as u8));
+    assert!(tl.text[1] == ('e' as u8));
+    assert!(tl.text[2] == ('l' as u8));
+    assert!(tl.text[3] == ('l' as u8));
+    assert!(tl.text[4] == ('o' as u8));
+    assert!(tl.text[5] == ('!' as u8));
+    assert!(tl.ending == LineEnding::LS);
+}
+
+#[test]
 fn text_line_insert_text() {
     let mut tl = Line::new_from_str("Hello!\r\n");
     
