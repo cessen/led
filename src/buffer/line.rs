@@ -132,7 +132,8 @@ impl Line {
                 _ => {}
             }
         }
-        else if le_size == 0 && tl.text.len() >= 2 {
+        
+        if le_size == 0 && tl.text.len() >= 2 {
             match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-2))} {
                 // CRLF
                 "\u{000D}\u{000A}" => {
@@ -143,7 +144,8 @@ impl Line {
                 _ => {}
             }
         }
-        else if le_size == 0 && tl.text.len() >= 1 {
+        
+        if le_size == 0 && tl.text.len() >= 1 {
             match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-1))} {
                 // LF or CRLF
                 "\u{000A}" => {
