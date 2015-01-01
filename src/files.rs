@@ -2,7 +2,7 @@ use std::io::{IoResult, BufferedReader, BufferedWriter};
 use std::io::fs::File;
 use std::path::Path;
 
-use buffer::TextBuffer;
+use buffer::Buffer as TextBuffer;
 
 pub fn load_file_to_buffer(path: &Path) -> IoResult<TextBuffer> {
     let mut tb = TextBuffer::new();
@@ -24,11 +24,11 @@ pub fn load_file_to_buffer(path: &Path) -> IoResult<TextBuffer> {
 
 pub fn save_buffer_to_file(tb: &TextBuffer, path: &Path) -> IoResult<()> {
     // TODO: make save atomic
-    let mut iter = tb.root_iter();
+    let mut iter = tb.grapheme_iter();
     let mut f = BufferedWriter::new(try!(File::create(path)));
     
-    for c in iter {
-        let _ = f.write_char(c);
+    for g in iter {
+        let _ = f.write_str(g);
     }
     
     return Ok(());

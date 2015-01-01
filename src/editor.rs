@@ -2,7 +2,7 @@
 
 use buffer::Buffer;
 use std::path::Path;
-//use files::{load_file_to_buffer, save_buffer_to_file};
+use files::{load_file_to_buffer, save_buffer_to_file};
 use string_utils::grapheme_count;
 
 
@@ -33,25 +33,25 @@ impl Editor {
         }
     }
     
-    // pub fn new_from_file(path: &Path) -> Editor {
-    //     let buf = load_file_to_buffer(path).unwrap();
-    //     
-    //     Editor {
-    //         buffer: buf,
-    //         file_path: path.clone(),
-    //         dirty: false,
-    //         view_dim: (0, 0),
-    //         view_pos: (0, 0),
-    //         cursor: (0, 0),
-    //     }
-    // }
+    pub fn new_from_file(path: &Path) -> Editor {
+        let buf = load_file_to_buffer(path).unwrap();
+        
+        Editor {
+            buffer: buf,
+            file_path: path.clone(),
+            dirty: false,
+            view_dim: (0, 0),
+            view_pos: (0, 0),
+            cursor: (0, 0),
+        }
+    }
     
-    // pub fn save_if_dirty(&mut self) {
-    //     if self.dirty && self.file_path != Path::new("") {
-    //         let _ = save_buffer_to_file(&self.buffer, &self.file_path);
-    //         self.dirty = false;
-    //     }
-    // }
+    pub fn save_if_dirty(&mut self) {
+        if self.dirty && self.file_path != Path::new("") {
+            let _ = save_buffer_to_file(&self.buffer, &self.file_path);
+            self.dirty = false;
+        }
+    }
     
     pub fn update_dim(&mut self, h: uint, w: uint) {
         self.view_dim = (h, w);

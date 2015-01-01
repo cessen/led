@@ -74,9 +74,9 @@ impl TermUI {
                                 break;
                             },
                             
-                            // K_CTRL_S => {
-                            //     self.editor.save_if_dirty();
-                            // },
+                            K_CTRL_S => {
+                                self.editor.save_if_dirty();
+                            },
                             
                             K_PAGEUP => {
                                 self.editor.page_up();

@@ -9,7 +9,7 @@ use term_ui::TermUI;
 
 mod string_utils;
 mod buffer;
-//mod files;
+mod files;
 mod editor;
 mod term_ui;
 
@@ -40,17 +40,14 @@ fn main() {
     // Get command-line arguments
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
     
-    // // Load file, if specified    
-    // let editor = if let Option::Some(s) = args.arg_file {
-    //     Editor::new_from_file(&Path::new(s.as_slice()))
-    // }
-    // else {
-    //     Editor::new()
-    // };
-    //
-    
-    let editor = Editor::new();
-    
+    // Load file, if specified    
+    let editor = if let Option::Some(s) = args.arg_file {
+     Editor::new_from_file(&Path::new(s.as_slice()))
+    }
+    else {
+     Editor::new()
+    };
+        
     // Initialize and start UI
     let mut ui = TermUI::new_from_editor(editor);
     ui.ui_loop();
