@@ -129,56 +129,17 @@ impl Buffer {
     }
     
     
-    // /// Creates an iterator starting at the specified grapheme index.
-    // /// If the index is past the end of the text, then the iterator will
-    // /// return None on next().
-    // pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> BufferGraphemeIter<'a> {
-    //     let mut node_stack: Vec<&'a TextNode> = Vec::new();
-    //     let mut cur_node = &self.root;
-    //     let mut char_i = index;
-    //     
-    //     loop {
-    //         match cur_node.data {
-    //             TextNodeData::Leaf(_) => {
-    //                 let mut char_iter = match cur_node.data {
-    //                     TextNodeData::Leaf(ref tb) => tb.as_str().chars(),
-    //                     _ => panic!("This should never happen.")
-    //                 };
-    //                 
-    //                 while char_i > 0 {
-    //                     char_iter.next();
-    //                     char_i -= 1;
-    //                 }
-    //             
-    //                 return TextBufferIter {
-    //                     node_stack: node_stack,
-    //                     cur_block: char_iter,
-    //                 };
-    //             },
-    //             
-    //             TextNodeData::Branch(ref left, ref right) => {
-    //                 if left.char_count > char_i {
-    //                     node_stack.push(&(**right));
-    //                     cur_node = &(**left);
-    //                 }
-    //                 else {
-    //                     cur_node = &(**right);
-    //                     char_i -= left.char_count;
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+    /// Creates an iterator starting at the specified grapheme index.
+    /// If the index is past the end of the text, then the iterator will
+    /// return None on next().
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> BufferGraphemeIter<'a> {
+        BufferGraphemeIter {
+            gi: self.root.grapheme_iter_at_index(index)
+        }
+    }
     
 
 }
-
-// impl fmt::Show for Buffer {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         self.root.fmt(f)
-//     }
-// }
-
 
 
 
@@ -896,3 +857,97 @@ fn remove_lines_3() {
     assert!(Some("e") == iter.next());
     assert!(None == iter.next());
 }
+
+
+#[test]
+fn pos_2d_to_closest_1d_1() {
+    let mut buf = Buffer::new();
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    
+    let pos = buf.pos_2d_to_closest_1d((2, 3));
+    
+    assert!(pos == 12);
+}
+
+
+#[test]
+fn pos_2d_to_closest_1d_2() {
+    let mut buf = Buffer::new();
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    
+    let pos = buf.pos_2d_to_closest_1d((2, 10));
+    
+    assert!(pos == 15);
+}
+
+#[test]
+fn pos_2d_to_closest_1d_3() {
+    let mut buf = Buffer::new();
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    
+    let pos = buf.pos_2d_to_closest_1d((10, 2));
+    
+    assert!(pos == 29);
+}
+
+
+#[test]
+fn pos_1d_to_closest_2d_1() {
+    let mut buf = Buffer::new();
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    
+    let pos = buf.pos_1d_to_closest_2d(5);
+    
+    assert!(pos == (1, 2));
+}
+
+
+#[test]
+fn pos_1d_to_closest_2d_2() {
+    let mut buf = Buffer::new();
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    
+    let pos = buf.pos_1d_to_closest_2d(50);
+    
+    assert!(pos == (5, 6));
+}
+
+
+#[test]
+fn grapheme_iter_at_index_1() {
+    let mut buf = Buffer::new();
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    
+    let mut iter = buf.grapheme_iter_at_index(16);
+    
+    assert!(Some("o") == iter.next());
+    assert!(Some("f") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("t") == iter.next());
+    assert!(Some("h") == iter.next());
+    assert!(Some("e") == iter.next());
+    assert!(Some("\n") == iter.next());
+    assert!(Some("w") == iter.next());
+    assert!(Some("o") == iter.next());
+    assert!(Some("r") == iter.next());
+    assert!(Some("l") == iter.next());
+    assert!(Some("d") == iter.next());
+    assert!(Some("!") == iter.next());
+    assert!(None == iter.next());
+}
+
+
+#[test]
+fn grapheme_iter_at_index_2() {
+    let mut buf = Buffer::new();
+    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+    
+    let mut iter = buf.grapheme_iter_at_index(29);
+    
+    assert!(None == iter.next());
+}
+
+
+
+
+

@@ -207,11 +207,22 @@ impl BufferNode {
     
     pub fn pos_2d_to_closest_1d_recursive(&self, pos: (uint, uint)) -> uint {
         match self.data {
-            BufferNodeData::Leaf(_) => {
+            BufferNodeData::Leaf(ref line) => {
                 if pos.0 != 0 {
-                    panic!("pos_2d_to_closest_1d_recursive(): at leaf, but index is not zero.  This should never happen!");
+                    return self.grapheme_count;
                 }
-                return min(pos.1, self.grapheme_count);
+                
+                if pos.1 >= self.grapheme_count {
+                    if line.ending != LineEnding::None {
+                        return self.grapheme_count - 1;
+                    }
+                    else {
+                        return self.grapheme_count;
+                    }
+                }
+                else {
+                    return pos.1;
+                }
             },
             
             BufferNodeData::Branch(ref left, ref right) => {
@@ -607,7 +618,7 @@ impl BufferNode {
     }
 
 
-    /// Creates an iterator at the first character
+    /// Creates an iterator at the first grapheme
     pub fn grapheme_iter<'a>(&'a self) -> BufferNodeGraphemeIter<'a> {
         let mut node_stack: Vec<&'a BufferNode> = Vec::new();
         let mut cur_node = self;
@@ -629,6 +640,41 @@ impl BufferNode {
             node_stack: node_stack,
             cur_line: match cur_node.data {
                 BufferNodeData::Leaf(ref line) => line.grapheme_iter(),
+                _ => panic!("This should never happen.")
+            }
+        }
+    }
+    
+    
+    /// Creates an iterator at the given grapheme index
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> BufferNodeGraphemeIter<'a> {
+        let mut node_stack: Vec<&'a BufferNode> = Vec::new();
+        let mut cur_node = self;
+        let mut grapheme_i = index;
+        
+        loop {
+            match cur_node.data {
+                BufferNodeData::Leaf(_) => {
+                    break;
+                },
+                
+                BufferNodeData::Branch(ref left, ref right) => {
+                    if grapheme_i < left.grapheme_count {
+                        node_stack.push(&(**right));
+                        cur_node = &(**left);
+                    }
+                    else {
+                        cur_node = &(**right);
+                        grapheme_i -= left.grapheme_count;
+                    }
+                }
+            }
+        }
+        
+        BufferNodeGraphemeIter {
+            node_stack: node_stack,
+            cur_line: match cur_node.data {
+                BufferNodeData::Leaf(ref line) => line.grapheme_iter_at_index(grapheme_i),
                 _ => panic!("This should never happen.")
             }
         }
