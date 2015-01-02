@@ -158,7 +158,7 @@ impl TermUI {
         let mut col_num = editor.view_pos.1;
         
         let mut print_line_num = c1.0;
-        let mut print_col_num = c1.1;
+        let mut print_col_num;
         
         let max_print_line = c2.0 - c1.0;
         let max_print_col = c2.1 - c1.1;
@@ -169,11 +169,22 @@ impl TermUI {
         
         loop {
             if let Some(line) = line_iter.next() {
-                let mut g_iter = line.grapheme_iter();
-                g_iter.skip_graphemes(editor.view_pos.1);
+                let mut g_iter = line.grapheme_vis_iter();
+                g_iter.skip_vis_positions(editor.view_pos.1);
                 
-                for g in g_iter {
+                for (g, pos, width) in g_iter {
+                    print_col_num = pos - editor.view_pos.1;
+                    
                     if is_line_ending(g) {
+                        if (line_num, col_num) == cursor_pos {
+                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                        }
+                    }
+                    else if g == "\t" {
+                        for i in range(print_col_num, print_col_num + width) {
+                            self.rb.print(i, print_line_num, rustbox::RB_NORMAL, Color::White, Color::Black, " ");
+                        }
+                        
                         if (line_num, col_num) == cursor_pos {
                             self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                         }
@@ -188,7 +199,7 @@ impl TermUI {
                     }
                     
                     col_num += 1;
-                    print_col_num += 1;
+                    print_col_num += width;
                     
                     if print_col_num > max_print_col {
                         break;
@@ -205,7 +216,6 @@ impl TermUI {
             line_num += 1;
             print_line_num += 1;
             col_num = editor.view_pos.1;
-            print_col_num = c1.1;
             
             if print_line_num > max_print_line {
                 break;

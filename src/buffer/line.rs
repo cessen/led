@@ -4,6 +4,30 @@ use std::mem;
 use std::str::Graphemes;
 use string_utils::{grapheme_count, grapheme_pos_to_byte_pos, is_line_ending};
 
+const TAB_WIDTH: uint = 4;
+
+
+/// Returns the visual width of a grapheme given a starting
+/// position on a line.
+fn grapheme_vis_width_at_vis_pos(g: &str, pos: uint) -> uint {
+    match g {
+        "\t" => {
+            let ending_pos = ((pos / TAB_WIDTH) + 1) * TAB_WIDTH;
+            return ending_pos - pos;
+        },
+        
+        _ => {
+            if is_line_ending(g) {
+                return 1;
+            }
+            else {
+                return g.width(true);
+            }
+        }
+    }
+}
+
+
 
 /// A single line of text
 pub struct Line {
@@ -208,6 +232,19 @@ impl Line {
     }
     
     
+    /// Returns the visual cell width of the line
+    pub fn vis_width(&self) -> uint {
+        let mut width = 0;
+        
+        for g in self.as_str().graphemes(true) {
+            let w = grapheme_vis_width_at_vis_pos(g, width);
+            width += w;
+        }
+        
+        return width;
+    }
+    
+    
     /// Returns an immutable string slice into the text block's memory
     pub fn as_str<'a>(&'a self) -> &'a str {
         unsafe {
@@ -357,6 +394,15 @@ impl Line {
         
         return iter;
     }
+    
+    
+    /// Returns an iterator over the graphemes of the line
+    pub fn grapheme_vis_iter<'a>(&'a self) -> LineGraphemeVisIter<'a> {
+        LineGraphemeVisIter {
+            graphemes: self.grapheme_iter(),
+            vis_pos: 0,
+        }
+    }
 }
 
 
@@ -456,7 +502,9 @@ pub struct LineGraphemeIter<'a> {
 impl<'a> LineGraphemeIter<'a> {
     pub fn skip_graphemes(&mut self, n: uint) {
         for _ in range(0, n) {
-            self.next();
+            if let None = self.next() {
+                break;
+            }
         }
     }
 }
@@ -481,6 +529,54 @@ impl<'a> Iterator<&'a str> for LineGraphemeIter<'a> {
                     return Some(LINE_ENDINGS[self.ending as uint]);
                 }
             }
+        }
+    }
+}
+
+
+
+
+
+/// An iterator over the graphemes of a Line.  This iterator yields not just
+/// the grapheme, but also it's beginning visual position in the line and its
+/// visual width.
+pub struct LineGraphemeVisIter<'a> {
+    graphemes: LineGraphemeIter<'a>,
+    vis_pos: uint,
+}
+
+impl<'a> LineGraphemeVisIter<'a> {
+    pub fn skip_graphemes(&mut self, n: uint) {
+        for _ in range(0, n) {
+            if let None = self.next() {
+                break;
+            }
+        }
+    }
+    
+    pub fn skip_vis_positions(&mut self, n: uint) {
+        let mut i = 0;
+        while i < n {
+            if let Some((_, _, width)) = self.next() {
+                i += width;
+            }
+            else {
+                break;
+            }
+        }
+    }
+}
+
+impl<'a> Iterator<(&'a str, uint, uint)> for LineGraphemeVisIter<'a> {
+    fn next(&mut self) -> Option<(&'a str, uint, uint)> {
+        if let Some(g) = self.graphemes.next() {
+            let pos = self.vis_pos;
+            let width = grapheme_vis_width_at_vis_pos(g, self.vis_pos);
+            self.vis_pos += width;
+            return Some((g, pos, width));
+        }
+        else {
+            return None;
         }
     }
 }
