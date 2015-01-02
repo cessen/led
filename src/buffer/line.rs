@@ -245,6 +245,56 @@ impl Line {
     }
     
     
+    /// Translates a grapheme index into a visual horizontal position
+    pub fn grapheme_index_to_closest_vis_pos(&self, index: uint) -> uint {
+        let mut pos = 0;
+        let mut iter = self.as_str().graphemes(true);
+        
+        for _ in range(0, index) {
+            if let Some(g) = iter.next() {
+                let w = grapheme_vis_width_at_vis_pos(g, pos);
+                pos += w;
+            }
+            else {
+                panic!("Line::grapheme_index_to_vis_pos(): index past end of line.");
+            }
+        }
+        
+        return pos;
+    }
+    
+    
+    /// Translates a visual horizontal position to the closest grapheme index
+    pub fn vis_pos_to_closest_grapheme_index(&self, vis_pos: uint) -> uint {
+        let mut pos = 0;
+        let mut i = 0;
+        let mut iter = self.as_str().graphemes(true);
+        
+        while pos < vis_pos {
+            if let Some(g) = iter.next() {
+                let w = grapheme_vis_width_at_vis_pos(g, pos);
+                if (w + pos) > vis_pos {
+                    let d1 = vis_pos - pos;
+                    let d2 = (pos + w) - vis_pos;
+                    if d2 < d1 {
+                        i += 1;
+                    }
+                    break;
+                }
+                else {
+                    pos += w;
+                    i += 1;
+                }
+            }
+            else {
+                break;
+            }
+        }
+        
+        return i;
+    }
+    
+    
     /// Returns an immutable string slice into the text block's memory
     pub fn as_str<'a>(&'a self) -> &'a str {
         unsafe {
@@ -826,6 +876,34 @@ fn text_line_split_beginning() {
     assert!(tl2.text[4] == ('o' as u8));
     assert!(tl2.text[5] == ('!' as u8));
     assert!(tl2.ending == LineEnding::CRLF);
+}
+
+#[test]
+fn grapheme_index_to_closest_vis_pos_1() {
+    let tl = Line::new_from_str("Hello!");
+    
+    assert!(tl.grapheme_index_to_closest_vis_pos(0) == 0);
+}
+
+#[test]
+fn grapheme_index_to_closest_vis_pos_2() {
+    let tl = Line::new_from_str("\tHello!");
+    
+    assert!(tl.grapheme_index_to_closest_vis_pos(1) == TAB_WIDTH);
+}
+
+#[test]
+fn vis_pos_to_closest_grapheme_index_1() {
+    let tl = Line::new_from_str("Hello!");
+    
+    assert!(tl.vis_pos_to_closest_grapheme_index(0) == 0);
+}
+
+#[test]
+fn vis_pos_to_closest_grapheme_index_2() {
+    let tl = Line::new_from_str("\tHello!");
+    
+    assert!(tl.vis_pos_to_closest_grapheme_index(TAB_WIDTH) == 1);
 }
 
 

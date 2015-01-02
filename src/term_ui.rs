@@ -87,19 +87,19 @@ impl TermUI {
                             },
                             
                             K_UP => {
-                                self.editor.cursor_up();
+                                self.editor.cursor_up(1);
                             },
                             
                             K_DOWN => {
-                                self.editor.cursor_down();
+                                self.editor.cursor_down(1);
                             },
                             
                             K_LEFT => {
-                                self.editor.cursor_left();
+                                self.editor.cursor_left(1);
                             },
                             
                             K_RIGHT => {
-                                self.editor.cursor_right();
+                                self.editor.cursor_right(1);
                             },
                             
                             K_ENTER => {
@@ -151,6 +151,7 @@ impl TermUI {
         }
     }
 
+
     pub fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
         let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
         
@@ -163,8 +164,7 @@ impl TermUI {
         let max_print_line = c2.0 - c1.0;
         let max_print_col = c2.1 - c1.1;
         
-        let cursor_pos_1d = editor.buffer.pos_2d_to_closest_1d(editor.cursor);
-        let cursor_pos = editor.buffer.pos_1d_to_closest_2d(cursor_pos_1d);
+        let cursor_pos = editor.buffer.pos_1d_to_closest_2d(editor.cursor.range.0);
         let print_cursor_pos = (cursor_pos.0 + editor.view_pos.0, cursor_pos.1 + editor.view_pos.1);
         
         loop {
@@ -207,7 +207,7 @@ impl TermUI {
                 }
             }
             else if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 < c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 < c2.1 {
-                if cursor_pos_1d >= editor.buffer.len() {
+                if editor.cursor.range.0 >= editor.buffer.len() {
                     self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                 }
                 break;

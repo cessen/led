@@ -89,9 +89,28 @@ impl Buffer {
         return self.root.pos_2d_to_closest_1d_recursive(pos);
     }
 
+
+    pub fn pos_vis_2d_to_closest_1d(&self, pos: (uint, uint)) -> uint {
+        if pos.0 >= self.line_count() {
+            return self.len();
+        }
+        else {
+            let gs = self.pos_2d_to_closest_1d((pos.0, 0));
+            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1);
+            return gs + h;
+        }
+    }
+
     
     pub fn pos_1d_to_closest_2d(&self, pos: uint) -> (uint, uint) {
         return self.root.pos_1d_to_closest_2d_recursive(pos);
+    }
+    
+    
+    pub fn pos_1d_to_closest_vis_2d(&self, pos: uint) -> (uint, uint) {
+        let (v, h) = self.root.pos_1d_to_closest_2d_recursive(pos);
+        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h);
+        return (v, vis_h);
     }
 
     

@@ -6,6 +6,32 @@ use files::{load_file_to_buffer, save_buffer_to_file};
 use string_utils::grapheme_count;
 
 
+/// A text cursor.  Also represents selections when range.0 != range.1.
+///
+/// `range` is a pair of 1d grapheme indexes into the text.
+///
+/// `vis_start` is the visual 2d horizontal position of the cursor.  This
+/// doesn't affect editing operations at all, but is used for cursor movement.
+pub struct Cursor {
+    pub range: (uint, uint),  // start, end
+    pub vis_start: uint,  // start
+}
+
+impl Cursor {
+    pub fn new() -> Cursor {
+        Cursor {
+            range: (0, 0),
+            vis_start: 0,
+        }
+    }
+    
+    pub fn update_vis_start(&mut self, buf: &Buffer) {
+        let (v, h) = buf.pos_1d_to_closest_2d(self.range.0);
+        self.vis_start = buf.get_line(v).grapheme_index_to_closest_vis_pos(h);
+    }
+}
+
+
 pub struct Editor {
     pub buffer: Buffer,
     pub file_path: Path,
@@ -16,7 +42,7 @@ pub struct Editor {
     pub view_pos: (uint, uint),  // (line, col)
     
     // The editing cursor position
-    pub cursor: (uint, uint),  // (line, col)
+    pub cursor: Cursor,  
 }
 
 
@@ -29,7 +55,7 @@ impl Editor {
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
-            cursor: (0, 0),
+            cursor: Cursor::new(),
         }
     }
     
@@ -42,7 +68,7 @@ impl Editor {
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
-            cursor: (0, 0),
+            cursor: Cursor::new(),
         }
     }
     
@@ -60,35 +86,38 @@ impl Editor {
     
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
+        let (v, h) = self.buffer.pos_1d_to_closest_vis_2d(self.cursor.range.0);
+        
         // Horizontal
-        if self.cursor.1 < self.view_pos.1 {
-            self.view_pos.1 = self.cursor.1;
+        if h < self.view_pos.1 {
+            self.view_pos.1 = h;
         }
-        else if self.cursor.1 >= (self.view_pos.1 + self.view_dim.1) {
-            self.view_pos.1 = 1 + self.cursor.1 - self.view_dim.1;
+        else if h >= (self.view_pos.1 + self.view_dim.1) {
+            self.view_pos.1 = 1 + h - self.view_dim.1;
         }
         
         // Vertical
-        if self.cursor.0 < self.view_pos.0 {
-            self.view_pos.0 = self.cursor.0;
+        if v < self.view_pos.0 {
+            self.view_pos.0 = v;
         }
-        else if self.cursor.0 >= (self.view_pos.0 + self.view_dim.0) {
-            self.view_pos.0 = 1 + self.cursor.0 - self.view_dim.0;
+        else if v >= (self.view_pos.0 + self.view_dim.0) {
+            self.view_pos.0 = 1 + v - self.view_dim.0;
         }
     }
     
     pub fn insert_text_at_cursor(&mut self, text: &str) {
-        let pos = self.buffer.pos_2d_to_closest_1d(self.cursor);
         let str_len = grapheme_count(text);
-        let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
         
         // Insert text
-        self.buffer.insert_text(text, pos);
+        self.buffer.insert_text(text, self.cursor.range.0);
         self.dirty = true;
         
         // Move cursor
-        self.cursor = self.buffer.pos_1d_to_closest_2d(p + str_len);
+        self.cursor.range.0 += str_len;
+        self.cursor.range.1 += str_len;
+        self.cursor.update_vis_start(&(self.buffer));
         
+        // Adjust view
         self.move_view_to_cursor();
     }
     
@@ -99,67 +128,127 @@ impl Editor {
     }
     
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: uint) {
-        let pos_b = self.buffer.pos_2d_to_closest_1d(self.cursor);
+        let pos_b = self.cursor.range.0;
         let pos_a = if pos_b >= grapheme_count {pos_b - grapheme_count} else {0};
-        
-        // Move cursor
-        self.cursor = self.buffer.pos_1d_to_closest_2d(pos_a);
+        let tot_g = pos_b - pos_a;
         
         // Remove text
         self.buffer.remove_text(pos_a, pos_b);
-        
         self.dirty = true;
         
+        // Move cursor
+        self.cursor.range.0 -= tot_g;
+        self.cursor.range.1 -= tot_g;
+        self.cursor.update_vis_start(&(self.buffer));
+        
+        // Adjust view
+        self.move_view_to_cursor();
+    }
+    
+    pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: uint) {
+        let pos_a = self.cursor.range.1;
+        let pos_b = if (pos_a + grapheme_count) <= self.buffer.len() {pos_a + grapheme_count} else {self.buffer.len()};
+        
+        // Remove text
+        self.buffer.remove_text(pos_a, pos_b);
+        self.dirty = true;
+        
+        // Move cursor
+        self.cursor.update_vis_start(&(self.buffer));
+        
+        // Adjust view
+        self.move_view_to_cursor();
+    }
+    
+    pub fn remove_text_inside_cursor(&mut self) {
+        // If selection, remove text
+        if self.cursor.range.0 < self.cursor.range.1 {
+            self.buffer.remove_text(self.cursor.range.0, self.cursor.range.1);
+            self.dirty = true;
+        }
+        
+        // Move cursor
+        self.cursor.range.1 = self.cursor.range.0;
+        self.cursor.update_vis_start(&(self.buffer));
+        
+        // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn cursor_to_beginning_of_buffer(&mut self) {
-        self.cursor = (0, 0);
+        self.cursor.range = (0, 0);
+        self.cursor.update_vis_start(&(self.buffer));
+        
+        // Adjust view
+        self.move_view_to_cursor();
     }
     
     pub fn cursor_to_end_of_buffer(&mut self) {
-        self.cursor = self.buffer.pos_1d_to_closest_2d(self.buffer.len()+1);
+        let end = self.buffer.len();
+        self.cursor.range = (end, end);
+        self.cursor.update_vis_start(&(self.buffer));
+        
+        // Adjust view
+        self.move_view_to_cursor();
     }
     
-    pub fn cursor_left(&mut self) {
-        let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
-
-        if p > 0 {
-            self.cursor = self.buffer.pos_1d_to_closest_2d(p - 1);
+    pub fn cursor_left(&mut self, n: uint) {
+        if self.cursor.range.0 >= n {
+            self.cursor.range.0 -= n;
         }
         else {
-            self.cursor = self.buffer.pos_1d_to_closest_2d(0);
+            self.cursor.range.0 = 0;
         }
         
-        self.move_view_to_cursor();
-    }
-    
-    pub fn cursor_right(&mut self) {
-        let p = self.buffer.pos_2d_to_closest_1d(self.cursor);
-        self.cursor = self.buffer.pos_1d_to_closest_2d(p + 1);
+        self.cursor.range.1 = self.cursor.range.0;
+        self.cursor.update_vis_start(&(self.buffer));
         
+        // Adjust view
         self.move_view_to_cursor();
     }
     
-    pub fn cursor_up(&mut self) {
-        if self.cursor.0 > 0 {
-            self.cursor.0 -= 1;
+    pub fn cursor_right(&mut self, n: uint) {
+        if self.cursor.range.1 <= (self.buffer.len() - n) {
+            self.cursor.range.1 += n;
+        }
+        else {
+            self.cursor.range.1 = self.buffer.len();
+        }
+        
+        self.cursor.range.0 = self.cursor.range.1;
+        self.cursor.update_vis_start(&(self.buffer));
+        
+        // Adjust view
+        self.move_view_to_cursor();
+    }
+    
+    pub fn cursor_up(&mut self, n: uint) {
+        let (v, _) = self.buffer.pos_1d_to_closest_vis_2d(self.cursor.range.0);
+        
+        if v >= n {
+            self.cursor.range.0 = self.buffer.pos_vis_2d_to_closest_1d((v - n, self.cursor.vis_start));
+            self.cursor.range.1 = self.cursor.range.0;
         }
         else {
             self.cursor_to_beginning_of_buffer();
         }
         
+        // Adjust view
         self.move_view_to_cursor();
     }
     
-    pub fn cursor_down(&mut self) {
-        if self.cursor.0 < (self.buffer.line_count() - 1) {
-            self.cursor.0 += 1;
+    pub fn cursor_down(&mut self, n: uint) {
+        let (v, _) = self.buffer.pos_1d_to_closest_vis_2d(self.cursor.range.0);
+        
+        if v < (self.buffer.line_count() - n) {
+            self.cursor.range.0 = self.buffer.pos_vis_2d_to_closest_1d((v + n, self.cursor.vis_start));
+            self.cursor.range.1 = self.cursor.range.0;
         }
         else {
             self.cursor_to_end_of_buffer();
         }
         
+        // Adjust view
         self.move_view_to_cursor();
     }
     
@@ -167,35 +256,29 @@ impl Editor {
         if self.view_pos.0 > 0 {
             let move_amount = self.view_dim.0 - (self.view_dim.0 / 8);
             if self.view_pos.0 >= move_amount {
-                if self.cursor.0 >= move_amount {
-                    self.cursor.0 -= move_amount;
-                }
                 self.view_pos.0 -= move_amount;
             }
             else {
-                if self.cursor.0 >= self.view_pos.0 {
-                    self.cursor.0 -= self.view_pos.0;
-                }
-                else {
-                    self.cursor_to_beginning_of_buffer();
-                }
                 self.view_pos.0 = 0;
-            }   
+            }
+            
+            self.cursor_up(move_amount);
         }
         else {
             self.cursor_to_beginning_of_buffer();
         }
         
+        // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn page_down(&mut self) {
+        // TODO
         let nlc = self.buffer.line_count() - 1;
         
         if self.view_pos.0 < nlc {
             let move_amount = self.view_dim.0 - (self.view_dim.0 / 8);
             let max_move = nlc - self.view_pos.0;
-            let cursor_max_move = nlc - self.cursor.0;
             
             if max_move >= move_amount {
                 self.view_pos.0 += move_amount;
@@ -204,14 +287,13 @@ impl Editor {
                 self.view_pos.0 += max_move;
             }
             
-            if cursor_max_move >= move_amount {
-                self.cursor.0 += move_amount;
-            }
-            else {
-                self.cursor_to_end_of_buffer();
-            }
+            self.cursor_down(move_amount);
+        }
+        else {
+            self.cursor_to_end_of_buffer();
         }
         
+        // Adjust view
         self.move_view_to_cursor();
     }
 }
