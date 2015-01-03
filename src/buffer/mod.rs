@@ -38,6 +38,26 @@ impl Buffer {
     }
     
     
+    pub fn get_grapheme<'a>(&'a self, index: uint) -> &'a str {
+        if index >= self.len() {
+            panic!("Buffer::get_grapheme(): index past last grapheme.");
+        }
+        else {
+            return self.root.get_grapheme_recursive(index);
+        }
+    }
+    
+    
+    pub fn get_grapheme_width(&self, index: uint) -> uint {
+        if index >= self.len() {
+            panic!("Buffer::get_grapheme_width(): index past last grapheme.");
+        }
+        else {
+            return self.root.get_grapheme_width_recursive(index);
+        }
+    }
+    
+    
     pub fn get_line<'a>(&'a self, index: uint) -> &'a Line {
         if index >= self.line_count() {
             panic!("get_line(): index out of bounds.");

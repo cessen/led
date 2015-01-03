@@ -184,6 +184,42 @@ impl BufferNode {
     }
     
     
+    pub fn get_grapheme_recursive<'a>(&'a self, index: uint) -> &'a str {
+        match self.data {
+            BufferNodeData::Leaf(ref line) => {
+                return line.grapheme_at_index(index);
+            },
+            
+            BufferNodeData::Branch(ref left, ref right) => {
+                if index < left.grapheme_count {
+                    return left.get_grapheme_recursive(index);
+                }
+                else {
+                    return right.get_grapheme_recursive(index - left.grapheme_count);
+                }
+            }
+        }
+    }
+    
+    
+    pub fn get_grapheme_width_recursive(&self, index: uint) -> uint {
+        match self.data {
+            BufferNodeData::Leaf(ref line) => {
+                return line.grapheme_width_at_index(index);
+            },
+            
+            BufferNodeData::Branch(ref left, ref right) => {
+                if index < left.grapheme_count {
+                    return left.get_grapheme_width_recursive(index);
+                }
+                else {
+                    return right.get_grapheme_width_recursive(index - left.grapheme_count);
+                }
+            }
+        }
+    }
+    
+    
     pub fn get_line_recursive<'a>(&'a self, index: uint) -> &'a Line {
         match self.data {
             BufferNodeData::Leaf(ref line) => {

@@ -155,28 +155,32 @@ impl TermUI {
     pub fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
         let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
         
-        let mut line_num = editor.view_pos.0;
-        let mut col_num = editor.view_pos.1;
+        let mut grapheme_index;
+        
+        let mut vis_line_num = editor.view_pos.0;
+        let mut vis_col_num = editor.view_pos.1;
         
         let mut print_line_num = c1.0;
-        let mut print_col_num;
+        let mut print_col_num = c1.1;
         
         let max_print_line = c2.0 - c1.0;
         let max_print_col = c2.1 - c1.1;
         
-        let cursor_pos = editor.buffer.pos_1d_to_closest_2d(editor.cursor.range.0);
-        let print_cursor_pos = (cursor_pos.0 + editor.view_pos.0, cursor_pos.1 + editor.view_pos.1);
-        
         loop {
             if let Some(line) = line_iter.next() {
                 let mut g_iter = line.grapheme_vis_iter();
-                g_iter.skip_vis_positions(editor.view_pos.1);
+                let excess = g_iter.skip_vis_positions(editor.view_pos.1);
+                
+                vis_col_num += excess;
+                print_col_num += excess;
+                
+                grapheme_index = editor.buffer.pos_vis_2d_to_closest_1d((vis_line_num, vis_col_num));
                 
                 for (g, pos, width) in g_iter {
                     print_col_num = pos - editor.view_pos.1;
                     
                     if is_line_ending(g) {
-                        if (line_num, col_num) == cursor_pos {
+                        if grapheme_index == editor.cursor.range.0 {
                             self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                         }
                     }
@@ -185,12 +189,12 @@ impl TermUI {
                             self.rb.print(i, print_line_num, rustbox::RB_NORMAL, Color::White, Color::Black, " ");
                         }
                         
-                        if (line_num, col_num) == cursor_pos {
+                        if grapheme_index == editor.cursor.range.0 {
                             self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                         }
                     }
                     else {
-                        if (line_num, col_num) == cursor_pos {
+                        if grapheme_index == editor.cursor.range.0 {
                             self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, g);
                         }
                         else {
@@ -198,7 +202,8 @@ impl TermUI {
                         }
                     }
                     
-                    col_num += 1;
+                    vis_col_num += width;
+                    grapheme_index += 1;
                     print_col_num += width;
                     
                     if print_col_num > max_print_col {
@@ -206,19 +211,29 @@ impl TermUI {
                     }
                 }
             }
-            else if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 < c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 < c2.1 {
-                if editor.cursor.range.0 >= editor.buffer.len() {
-                    self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-                }
+            else {
                 break;
             }
             
-            line_num += 1;
+            vis_line_num += 1;
             print_line_num += 1;
-            col_num = editor.view_pos.1;
+            vis_col_num = editor.view_pos.1;
             
             if print_line_num > max_print_line {
                 break;
+            }
+        }
+        
+        // Print cursor if it's at the end of the text, and thus wasn't printed
+        // already.
+        if editor.cursor.range.0 >= editor.buffer.len() {
+            let vis_cursor_pos = editor.buffer.pos_1d_to_closest_vis_2d(editor.cursor.range.0);
+                if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
+                let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0, vis_cursor_pos.1 - editor.view_pos.1);
+                
+                if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 <= c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 <= c2.1 {
+                    self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                }
             }
         }
     }

@@ -245,6 +245,42 @@ impl Line {
     }
     
     
+    pub fn grapheme_at_index<'a>(&'a self, index: uint) -> &'a str {
+        let mut iter = self.grapheme_iter();
+        let mut i = 0;
+        
+        for g in iter {
+            if i == index {
+                return g;
+            }
+            else {
+                i += 1;
+            }
+        }
+        
+        // Should never get here
+        panic!("Line::grapheme_at_index(): index past end of line.");
+    }
+    
+    
+    pub fn grapheme_width_at_index(&self, index: uint) -> uint {
+        let mut iter = self.grapheme_vis_iter();
+        let mut i = 0;
+        
+        for (_, _, width) in iter {
+            if i == index {
+                return width;
+            }
+            else {
+                i += 1;
+            }
+        }
+        
+        // Should never get here
+        panic!("Line::grapheme_at_index(): index past end of line.");
+    }
+    
+    
     /// Translates a grapheme index into a visual horizontal position
     pub fn grapheme_index_to_closest_vis_pos(&self, index: uint) -> uint {
         let mut pos = 0;
@@ -604,7 +640,9 @@ impl<'a> LineGraphemeVisIter<'a> {
         }
     }
     
-    pub fn skip_vis_positions(&mut self, n: uint) {
+    // Skips at least n visual positions, and returns the number of excess
+    // skipped visual positions beyond n.
+    pub fn skip_vis_positions(&mut self, n: uint) -> uint {
         let mut i = 0;
         while i < n {
             if let Some((_, _, width)) = self.next() {
@@ -613,6 +651,13 @@ impl<'a> LineGraphemeVisIter<'a> {
             else {
                 break;
             }
+        }
+        
+        if i > n {
+            return i - n;
+        }
+        else {
+            return 0;
         }
     }
 }
