@@ -1,4 +1,3 @@
 - Line number display
-- Editor info display (filename, current line/column, indentation style, etc.)
 - File opening by entering path
 - UI that wraps editors, for split view.

@@ -155,9 +155,43 @@ impl TermUI {
             }
         }
     }
-
-
+    
+    
     pub fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
+        let foreground = Color::Black;
+        let background = Color::Cyan;
+        
+        // Fill in top row with info line color
+        for i in range(c1.1, c2.1 + 1) {
+            self.rb.print(i, c1.0, rustbox::RB_NORMAL, foreground, background, " ");
+        }
+        
+        // Filename and dirty marker
+        let filename = editor.file_path.display();
+        let dirty_char = if editor.dirty {"*"} else {""};
+        let name = format!("{}{}", filename, dirty_char);
+        self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, name.as_slice());
+        
+        // Percentage position in document
+        let percentage: uint = if editor.buffer.len() > 0 {
+            (((editor.cursor.range.0 as f32) / (editor.buffer.len() as f32)) * 100.0) as uint
+        }
+        else {
+            100
+        };
+        let pstring = format!("{}%", percentage);
+        self.rb.print(c2.1 - pstring.len(), c1.0, rustbox::RB_NORMAL, foreground, background, pstring.as_slice());
+        
+        // Text encoding info and tab style
+        let info_line = format!("UTF8:LF  tabs:4");
+        self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, info_line.as_slice());
+
+        // Draw main text editing area
+        self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
+    }
+
+
+    pub fn draw_editor_text(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
         let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
         
         let mut grapheme_index;
@@ -234,7 +268,7 @@ impl TermUI {
         if editor.cursor.range.0 >= editor.buffer.len() {
             let vis_cursor_pos = editor.buffer.pos_1d_to_closest_vis_2d(editor.cursor.range.0);
                 if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
-                let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0, vis_cursor_pos.1 - editor.view_pos.1);
+                let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0 + c1.0, vis_cursor_pos.1 - editor.view_pos.1 + c1.1);
                 
                 if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 <= c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 <= c2.1 {
                     self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
