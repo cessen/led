@@ -8,18 +8,13 @@ use buffer::Buffer as TextBuffer;
 pub fn load_file_to_buffer(path: &Path) -> IoResult<TextBuffer> {
     let mut tb = TextBuffer::new();
     let mut f = BufferedReader::new(try!(File::open(path)));
-    let mut last_line_breaks = true;
     
     for line in f.lines() {
         let l = Line::new_from_string_unchecked(line.unwrap());
-        last_line_breaks = l.ending != LineEnding::None;
+        if l.ending != LineEnding::None {
+            tb.line_ending_type = l.ending;
+        }
         tb.append_line_unchecked(l);
-    }
-    
-    // If the last line had a line break, we need to add a final
-    // blank line.
-    if last_line_breaks {
-        tb.append_line_unchecked(Line::new());
     }
     
     // Remove initial blank line

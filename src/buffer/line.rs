@@ -171,7 +171,7 @@ impl Line {
         
         if le_size == 0 && tl.text.len() >= 1 {
             match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-1))} {
-                // LF or CRLF
+                // LF
                 "\u{000A}" => {
                     tl.ending = LineEnding::LF;
                     le_size = 1;

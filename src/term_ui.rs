@@ -6,6 +6,7 @@ use editor::Editor;
 use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
+use buffer::line::{line_ending_to_str, LineEnding};
 
 // Key codes
 const K_ENTER: u16 = 13;
@@ -126,7 +127,8 @@ impl TermUI {
                             },
                             
                             K_ENTER => {
-                                self.editor.insert_text_at_cursor("\n");
+                                let nl = line_ending_to_str(self.editor.buffer.line_ending_type);
+                                self.editor.insert_text_at_cursor(nl);
                             },
                             
                             K_SPACE => {
@@ -299,7 +301,18 @@ impl TermUI {
         self.rb.print(c2.1 - pstring.len(), c1.0, rustbox::RB_NORMAL, foreground, background, pstring.as_slice());
         
         // Text encoding info and tab style
-        let info_line = format!("UTF8:LF  tabs:4");
+        let nl = match editor.buffer.line_ending_type {
+            LineEnding::None => "None",
+            LineEnding::CRLF => "CRLF",
+            LineEnding::LF => "LF",
+            LineEnding::VT => "VT",
+            LineEnding::FF => "FF",
+            LineEnding::CR => "CR",
+            LineEnding::NEL => "NEL",
+            LineEnding::LS => "LS",
+            LineEnding::PS => "PS",
+        };
+        let info_line = format!("UTF8:{}  tabs:4", nl);
         self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, info_line.as_slice());
 
         // Draw main text editing area

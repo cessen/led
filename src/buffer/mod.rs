@@ -3,7 +3,7 @@
 use std::mem;
 
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
-use self::line::{Line};
+use self::line::{Line, LineEnding};
 use string_utils::{is_line_ending};
 
 pub mod line;
@@ -16,25 +16,27 @@ mod node;
 
 /// A text buffer
 pub struct Buffer {
-    root: BufferNode,
+    text: BufferNode,
+    pub line_ending_type: LineEnding,
 }
 
 
 impl Buffer {
     pub fn new() -> Buffer {
         Buffer {
-            root: BufferNode::new()
+            text: BufferNode::new(),
+            line_ending_type: LineEnding::LF,
         }
     }
 
     
     pub fn len(&self) -> uint {
-        self.root.grapheme_count
+        self.text.grapheme_count
     }
 
     
     pub fn line_count(&self) -> uint {
-        self.root.line_count
+        self.text.line_count
     }
     
     
@@ -43,7 +45,7 @@ impl Buffer {
             panic!("Buffer::get_grapheme(): index past last grapheme.");
         }
         else {
-            return self.root.get_grapheme_recursive(index);
+            return self.text.get_grapheme_recursive(index);
         }
     }
     
@@ -53,7 +55,7 @@ impl Buffer {
             panic!("Buffer::get_grapheme_width(): index past last grapheme.");
         }
         else {
-            return self.root.get_grapheme_width_recursive(index);
+            return self.text.get_grapheme_width_recursive(index);
         }
     }
     
@@ -66,7 +68,7 @@ impl Buffer {
         // NOTE: this can be done non-recursively, which would be more
         // efficient.  However, it seems likely to require unsafe code
         // if done that way.
-        return self.root.get_line_recursive(index);
+        return self.text.get_line_recursive(index);
     }
     
     
@@ -74,7 +76,7 @@ impl Buffer {
     /// doing any sanity checks.  This is primarily for efficient
     /// file loading.
     pub fn append_line_unchecked(&mut self, line: Line) {
-        self.root.append_line_unchecked_recursive(line);
+        self.text.append_line_unchecked_recursive(line);
     }
     
     
@@ -93,20 +95,20 @@ impl Buffer {
             panic!("Buffer::remove_lines(): attempt to remove lines past the last line of text.");
         }
         // Complete removal of all lines
-        else if line_a == 0 && line_b == self.root.line_count {
+        else if line_a == 0 && line_b == self.text.line_count {
             let mut temp_node = BufferNode::new();
-            mem::swap(&mut (self.root), &mut temp_node);
+            mem::swap(&mut (self.text), &mut temp_node);
         }
         // All other cases
         else {
-            self.root.remove_lines_recursive(line_a, line_b);
-            self.root.set_last_line_ending_recursive();
+            self.text.remove_lines_recursive(line_a, line_b);
+            self.text.set_last_line_ending_recursive();
         }
     }
 
     
     pub fn pos_2d_to_closest_1d(&self, pos: (uint, uint)) -> uint {
-        return self.root.pos_2d_to_closest_1d_recursive(pos);
+        return self.text.pos_2d_to_closest_1d_recursive(pos);
     }
 
 
@@ -123,12 +125,12 @@ impl Buffer {
 
     
     pub fn pos_1d_to_closest_2d(&self, pos: uint) -> (uint, uint) {
-        return self.root.pos_1d_to_closest_2d_recursive(pos);
+        return self.text.pos_1d_to_closest_2d_recursive(pos);
     }
     
     
     pub fn pos_1d_to_closest_vis_2d(&self, pos: uint) -> (uint, uint) {
-        let (v, h) = self.root.pos_1d_to_closest_2d_recursive(pos);
+        let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
         let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h);
         return (v, vis_h);
     }
@@ -136,7 +138,7 @@ impl Buffer {
     
     /// Insert 'text' at grapheme position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: uint) {
-        self.root.insert_text(text, pos);
+        self.text.insert_text(text, pos);
     }
 
     
@@ -155,16 +157,16 @@ impl Buffer {
             panic!("Buffer::remove_text(): attempt to remove text past the end of buffer.");
         }
         // Complete removal of all text
-        else if pos_a == 0 && pos_b == self.root.grapheme_count {
+        else if pos_a == 0 && pos_b == self.text.grapheme_count {
             let mut temp_node = BufferNode::new();
-            mem::swap(&mut (self.root), &mut temp_node);
+            mem::swap(&mut (self.text), &mut temp_node);
         }
         // All other cases
         else {
-            if self.root.remove_text_recursive(pos_a, pos_b, true) {
+            if self.text.remove_text_recursive(pos_a, pos_b, true) {
                 panic!("Buffer::remove_text(): dangling left side remains.  This should never happen!");
             }
-            self.root.set_last_line_ending_recursive();
+            self.text.set_last_line_ending_recursive();
         }
     }
 
@@ -172,7 +174,7 @@ impl Buffer {
     /// Creates an iterator at the first character
     pub fn grapheme_iter<'a>(&'a self) -> BufferGraphemeIter<'a> {
         BufferGraphemeIter {
-            gi: self.root.grapheme_iter()
+            gi: self.text.grapheme_iter()
         }
     }
     
@@ -182,21 +184,21 @@ impl Buffer {
     /// return None on next().
     pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> BufferGraphemeIter<'a> {
         BufferGraphemeIter {
-            gi: self.root.grapheme_iter_at_index(index)
+            gi: self.text.grapheme_iter_at_index(index)
         }
     }
     
     
     pub fn line_iter<'a>(&'a self) -> BufferLineIter<'a> {
         BufferLineIter {
-            li: self.root.line_iter()
+            li: self.text.line_iter()
         }
     }
     
     
     pub fn line_iter_at_index<'a>(&'a self, index: uint) -> BufferLineIter<'a> {
         BufferLineIter {
-            li: self.root.line_iter_at_index(index)
+            li: self.text.line_iter_at_index(index)
         }
     }
     
@@ -286,7 +288,7 @@ fn insert_text() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 9);
-    assert!(buf.root.line_count == 1);
+    assert!(buf.text.line_count == 1);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -309,7 +311,7 @@ fn insert_text_with_newlines() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 11);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -335,7 +337,7 @@ fn insert_text_in_non_empty_buffer_1() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 17);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("A") == iter.next());
     assert!(Some("g") == iter.next());
     assert!(Some("a") == iter.next());
@@ -367,7 +369,7 @@ fn insert_text_in_non_empty_buffer_2() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 17);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -399,7 +401,7 @@ fn insert_text_in_non_empty_buffer_3() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 16);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -430,7 +432,7 @@ fn insert_text_in_non_empty_buffer_4() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 16);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -461,7 +463,7 @@ fn insert_text_in_non_empty_buffer_5() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 16);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("a") == iter.next());
@@ -493,7 +495,7 @@ fn insert_text_in_non_empty_buffer_6() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 16);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -525,7 +527,7 @@ fn insert_text_in_non_empty_buffer_7() {
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 20);
-    assert!(buf.root.line_count == 7);
+    assert!(buf.text.line_count == 7);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -557,14 +559,14 @@ fn remove_text_1() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_text(0, 3);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 26);
-    assert!(buf.root.line_count == 5);
+    assert!(buf.text.line_count == 5);
     assert!(Some("t") == iter.next());
     assert!(Some("h") == iter.next());
     assert!(Some("e") == iter.next());
@@ -601,14 +603,14 @@ fn remove_text_2() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_text(0, 12);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 17);
-    assert!(buf.root.line_count == 4);
+    assert!(buf.text.line_count == 4);
     assert!(Some("p") == iter.next());
     assert!(Some("l") == iter.next());
     assert!(Some("e") == iter.next());
@@ -636,14 +638,14 @@ fn remove_text_3() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_text(5, 17);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 17);
-    assert!(buf.root.line_count == 4);
+    assert!(buf.text.line_count == 4);
     assert!(Some("H") == iter.next());
     assert!(Some("i") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -671,14 +673,14 @@ fn remove_text_4() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_text(23, 29);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 23);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     assert!(Some("H") == iter.next());
     assert!(Some("i") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -712,14 +714,14 @@ fn remove_text_5() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_text(17, 29);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 17);
-    assert!(buf.root.line_count == 4);
+    assert!(buf.text.line_count == 4);
     assert!(Some("H") == iter.next());
     assert!(Some("i") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -747,14 +749,14 @@ fn remove_text_6() {
     
     buf.insert_text("Hello\nworld!", 0);
     assert!(buf.len() == 12);
-    assert!(buf.root.line_count == 2);
+    assert!(buf.text.line_count == 2);
     
     buf.remove_text(3, 12);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 3);
-    assert!(buf.root.line_count == 1);
+    assert!(buf.text.line_count == 1);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -768,14 +770,14 @@ fn remove_text_7() {
     
     buf.insert_text("Hi\nthere\nworld!", 0);
     assert!(buf.len() == 15);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     
     buf.remove_text(5, 15);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 5);
-    assert!(buf.root.line_count == 2);
+    assert!(buf.text.line_count == 2);
     assert!(Some("H") == iter.next());
     assert!(Some("i") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -791,14 +793,14 @@ fn remove_text_8() {
     
     buf.insert_text("Hello\nworld!", 0);
     assert!(buf.len() == 12);
-    assert!(buf.root.line_count == 2);
+    assert!(buf.text.line_count == 2);
     
     buf.remove_text(3, 11);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 4);
-    assert!(buf.root.line_count == 1);
+    assert!(buf.text.line_count == 1);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -813,14 +815,14 @@ fn remove_text_9() {
     
     buf.insert_text("Hello\nworld!", 0);
     assert!(buf.len() == 12);
-    assert!(buf.root.line_count == 2);
+    assert!(buf.text.line_count == 2);
     
     buf.remove_text(8, 12);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 8);
-    assert!(buf.root.line_count == 2);
+    assert!(buf.text.line_count == 2);
     assert!(Some("H") == iter.next());
     assert!(Some("e") == iter.next());
     assert!(Some("l") == iter.next());
@@ -839,14 +841,14 @@ fn remove_text_10() {
     
     buf.insert_text("12\n34\n56\n78", 0);
     assert!(buf.len() == 11);
-    assert!(buf.root.line_count == 4);
+    assert!(buf.text.line_count == 4);
     
     buf.remove_text(4, 11);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 4);
-    assert!(buf.root.line_count == 2);
+    assert!(buf.text.line_count == 2);
     assert!(Some("1") == iter.next());
     assert!(Some("2") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -861,14 +863,14 @@ fn remove_text_11() {
     
     buf.insert_text("1234567890", 0);
     assert!(buf.len() == 10);
-    assert!(buf.root.line_count == 1);
+    assert!(buf.text.line_count == 1);
     
     buf.remove_text(9, 10);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 9);
-    assert!(buf.root.line_count == 1);
+    assert!(buf.text.line_count == 1);
     assert!(Some("1") == iter.next());
     assert!(Some("2") == iter.next());
     assert!(Some("3") == iter.next());
@@ -888,14 +890,14 @@ fn remove_lines_1() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_lines(0, 3);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 13);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("o") == iter.next());
     assert!(Some("f") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -919,14 +921,14 @@ fn remove_lines_2() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_lines(1, 4);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 13);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("i") == iter.next());
     assert!(Some("\n") == iter.next());
@@ -950,14 +952,14 @@ fn remove_lines_3() {
     
     buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
     assert!(buf.len() == 29);
-    assert!(buf.root.line_count == 6);
+    assert!(buf.text.line_count == 6);
     
     buf.remove_lines(3, 6);
     
     let mut iter = buf.grapheme_iter();
     
     assert!(buf.len() == 15);
-    assert!(buf.root.line_count == 3);
+    assert!(buf.text.line_count == 3);
     assert!(Some("H") == iter.next());
     assert!(Some("i") == iter.next());
     assert!(Some("\n") == iter.next());
