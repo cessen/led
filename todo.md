@@ -1,3 +1,4 @@
 - Line number display
 - File opening by entering path
 - UI that wraps editors, for split view.
+- Undo functionality

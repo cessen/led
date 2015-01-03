@@ -20,6 +20,8 @@ const K_DOWN: u16 = 65516;
 const K_LEFT: u16 = 65515;
 const K_RIGHT: u16 = 65514;
 const K_ESC: u16 = 27;
+const K_CTRL_L: u16 = 12;
+const K_CTRL_O: u16 = 15;
 const K_CTRL_Q: u16 = 17;
 const K_CTRL_S: u16 = 19;
 
@@ -27,36 +29,52 @@ const K_CTRL_S: u16 = 19;
 pub struct TermUI {
     rb: rustbox::RustBox,
     editor: Editor,
+    width: uint,
+    height: uint,
 }
 
 
 impl TermUI {
     pub fn new() -> TermUI {
+        let rb = rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap();
+        let w = rb.width();
+        let h = rb.height();
+        let mut editor = Editor::new();
+        editor.update_dim(h-1, w);
+        
         TermUI {
-            rb: rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap(),
-            editor: Editor::new(),
-        }
-    }
-    
-    pub fn new_from_editor(editor: Editor) -> TermUI {
-        TermUI {
-            rb: rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap(),
+            rb: rb,
             editor: editor,
+            width: w,
+            height: h,
         }
     }
     
-    pub fn ui_loop(&mut self) {
+    pub fn new_from_editor(ed: Editor) -> TermUI {
+        let rb = rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap();
+        let w = rb.width();
+        let h = rb.height();
+        let mut editor = ed;
+        editor.update_dim(h-1, w);
+        
+        TermUI {
+            rb: rb,
+            editor: editor,
+            width: w,
+            height: h,
+        }
+    }
+    
+    pub fn main_ui_loop(&mut self) {
         // Quitting flag
         let mut quit = false;
     
-        let mut width = self.rb.width();
-        let mut height = self.rb.height();
-        self.editor.update_dim(height, width);
+        self.editor.update_dim(self.height-1, self.width);
     
         loop {
             // Draw the editor to screen
             self.rb.clear();
-            self.draw_editor(&self.editor, (0, 0), (height-1, width-1));
+            self.draw_editor(&self.editor, (0, 0), (self.height-1, self.width-1));
             self.rb.present();
             
             
@@ -70,13 +88,17 @@ impl TermUI {
                     Ok(rustbox::Event::KeyEvent(modifier, key, character)) => {
                         //println!("      {} {} {}", modifier, key, character);
                         match key {
-                            K_CTRL_Q | K_ESC => {
+                            K_CTRL_Q => {
                                 quit = true;
                                 break;
                             },
                             
                             K_CTRL_S => {
                                 self.editor.save_if_dirty();
+                            },
+                            
+                            K_CTRL_L => {
+                                self.go_to_line_ui_loop();
                             },
                             
                             K_PAGEUP => {
@@ -135,10 +157,10 @@ impl TermUI {
                     },
                     
                     Ok(rustbox::Event::ResizeEvent(w, h)) => {
-                        width = w as uint;
-                        height = h as uint;
-                        self.editor.update_dim(height, width);
-                    }
+                        self.width = w as uint;
+                        self.height = h as uint;
+                        self.editor.update_dim(self.height-1, self.width);
+                    },
                     
                     _ => {
                         break;
@@ -157,7 +179,101 @@ impl TermUI {
     }
     
     
-    pub fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
+    fn go_to_line_ui_loop(&mut self) {
+        let foreground = Color::Black;
+        let background = Color::Cyan;
+    
+        let mut cancel = false;
+        let mut confirm = false;
+        let prefix = "Jump to line: ";
+        let mut line = String::new();
+        
+        loop {
+            // Draw the editor to screen
+            self.rb.clear();
+            self.draw_editor(&self.editor, (0, 0), (self.height-1, self.width-1));
+            for i in range(0, self.width) {
+                self.rb.print(i, 0, rustbox::RB_NORMAL, foreground, background, " ");
+            }
+            self.rb.print(1, 0, rustbox::RB_NORMAL, foreground, background, prefix);
+            self.rb.print(prefix.len() + 1, 0, rustbox::RB_NORMAL, foreground, background, line.as_slice());
+            self.rb.present();
+            
+            
+            // Handle events.  We block on the first event, so that the
+            // program doesn't loop like crazy, but then continue pulling
+            // events in a non-blocking way until we run out of events
+            // to handle.
+            let mut e = self.rb.poll_event(); // Block until we get an event
+            loop {
+                match e {
+                    Ok(rustbox::Event::KeyEvent(modifier, key, character)) => {
+                        match key {
+                            K_ESC => {
+                                cancel = true;
+                                break;
+                            },
+                            
+                            K_ENTER => {
+                                confirm = true;
+                                break;
+                            },
+                            
+                            K_BACKSPACE => {
+                                line.pop();
+                            },
+                            
+                            // Character
+                            0 => {
+                                if let Option::Some(c) = char::from_u32(character) {
+                                    if c.is_numeric() {
+                                        line.push(c);
+                                    }
+                                }
+                            },
+                            
+                            _ => {}
+                        }
+                    },
+                    
+                    Ok(rustbox::Event::ResizeEvent(w, h)) => {
+                        self.width = w as uint;
+                        self.height = h as uint;
+                        self.editor.update_dim(self.height-1, self.width);
+                    },
+                    
+                    _ => {
+                        break;
+                    }
+                }
+    
+                e = self.rb.peek_event(Duration::milliseconds(0)); // Get next event (if any)
+            }
+            
+            
+            // Cancel if flag is set
+            if cancel {
+                break;
+            }
+            
+            // Jump to line!
+            if confirm {
+                if let Some(n) = line.parse() {
+                    let n2: uint = n; // Weird work-around: the type of n wasn't being inferred
+                    if n2 > 0 {
+                        self.editor.jump_to_line(n2-1);
+                    }
+                    else {
+                        self.editor.jump_to_line(0);
+                    }
+                }
+                break;
+            }
+        }
+    }
+    
+    
+    fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
         let foreground = Color::Black;
         let background = Color::Cyan;
         
@@ -191,7 +307,7 @@ impl TermUI {
     }
 
 
-    pub fn draw_editor_text(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
+    fn draw_editor_text(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
         let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
         
         let mut grapheme_index;
@@ -202,8 +318,8 @@ impl TermUI {
         let mut print_line_num = c1.0;
         let mut print_col_num = c1.1;
         
-        let max_print_line = c2.0 - c1.0;
-        let max_print_col = c2.1 - c1.1;
+        let max_print_line = c2.0;
+        let max_print_col = c2.1;
         
         loop {
             if let Some(line) = line_iter.next() {

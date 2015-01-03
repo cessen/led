@@ -296,4 +296,14 @@ impl Editor {
         // Adjust view
         self.move_view_to_cursor();
     }
+    
+    pub fn jump_to_line(&mut self, n: uint) {
+        let pos = self.buffer.pos_2d_to_closest_1d((n, 0));
+        let (v, _) = self.buffer.pos_1d_to_closest_vis_2d(pos);
+        self.cursor.range.0 = self.buffer.pos_vis_2d_to_closest_1d((v, self.cursor.vis_start));
+        self.cursor.range.1 = self.cursor.range.0;
+        
+        // Adjust view
+        self.move_view_to_cursor();
+    }
 }

@@ -50,7 +50,7 @@ fn main() {
         
     // Initialize and start UI
     let mut ui = TermUI::new_from_editor(editor);
-    ui.ui_loop();
+    ui.main_ui_loop();
     
     //println!("{}", editor.buffer.root.tree_height);
 }
