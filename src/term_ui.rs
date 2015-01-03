@@ -12,6 +12,7 @@ const K_ENTER: u16 = 13;
 const K_TAB: u16 = 9;
 const K_SPACE: u16 = 32;
 const K_BACKSPACE: u16 = 127;
+const K_DELETE: u16 = 65522;
 const K_PAGEUP: u16 = 65519;
 const K_PAGEDOWN: u16 = 65518;
 const K_UP: u16 = 65517;
@@ -116,6 +117,10 @@ impl TermUI {
                             
                             K_BACKSPACE => {
                                 self.editor.remove_text_behind_cursor(1);
+                            },
+                            
+                            K_DELETE => {
+                                self.editor.remove_text_in_front_of_cursor(1);
                             },
                             
                             // Character
