@@ -202,18 +202,18 @@ impl BufferNode {
     }
     
     
-    pub fn get_grapheme_width_recursive(&self, index: uint) -> uint {
+    pub fn get_grapheme_width_recursive(&self, index: uint, tab_width: uint) -> uint {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
-                return line.grapheme_width_at_index(index);
+                return line.grapheme_width_at_index(index, tab_width);
             },
             
             BufferNodeData::Branch(ref left, ref right) => {
                 if index < left.grapheme_count {
-                    return left.get_grapheme_width_recursive(index);
+                    return left.get_grapheme_width_recursive(index, tab_width);
                 }
                 else {
-                    return right.get_grapheme_width_recursive(index - left.grapheme_count);
+                    return right.get_grapheme_width_recursive(index - left.grapheme_count, tab_width);
                 }
             }
         }

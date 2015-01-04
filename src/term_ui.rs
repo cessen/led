@@ -136,11 +136,11 @@ impl TermUI {
                             },
                             
                             K_TAB => {
-                                self.editor.insert_text_at_cursor("\t");
+                                self.editor.insert_tab_at_cursor();
                             },
                             
                             K_BACKSPACE => {
-                                self.editor.remove_text_behind_cursor(1);
+                                self.editor.backspace_at_cursor();
                             },
                             
                             K_DELETE => {
@@ -312,7 +312,8 @@ impl TermUI {
             LineEnding::LS => "LS",
             LineEnding::PS => "PS",
         };
-        let info_line = format!("UTF8:{}  tabs:4", nl);
+        let soft_tabs_str = if editor.soft_tabs {"spaces"} else {"tabs"};
+        let info_line = format!("UTF8:{}  {}:{}", nl, soft_tabs_str, editor.tab_width);
         self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, info_line.as_slice());
 
         // Draw main text editing area
@@ -336,13 +337,13 @@ impl TermUI {
         
         loop {
             if let Some(line) = line_iter.next() {
-                let mut g_iter = line.grapheme_vis_iter();
+                let mut g_iter = line.grapheme_vis_iter(editor.tab_width);
                 let excess = g_iter.skip_vis_positions(editor.view_pos.1);
                 
                 vis_col_num += excess;
                 print_col_num += excess;
                 
-                grapheme_index = editor.buffer.pos_vis_2d_to_closest_1d((vis_line_num, vis_col_num));
+                grapheme_index = editor.buffer.pos_vis_2d_to_closest_1d((vis_line_num, vis_col_num), editor.tab_width);
                 
                 for (g, pos, width) in g_iter {
                     print_col_num = pos - editor.view_pos.1;
@@ -395,7 +396,7 @@ impl TermUI {
         // Print cursor if it's at the end of the text, and thus wasn't printed
         // already.
         if editor.cursor.range.0 >= editor.buffer.len() {
-            let vis_cursor_pos = editor.buffer.pos_1d_to_closest_vis_2d(editor.cursor.range.0);
+            let vis_cursor_pos = editor.buffer.pos_1d_to_closest_vis_2d(editor.cursor.range.0, editor.tab_width);
                 if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
                 let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0 + c1.0, vis_cursor_pos.1 - editor.view_pos.1 + c1.1);
                 

@@ -50,12 +50,12 @@ impl Buffer {
     }
     
     
-    pub fn get_grapheme_width(&self, index: uint) -> uint {
+    pub fn get_grapheme_width(&self, index: uint, tab_width: uint) -> uint {
         if index >= self.len() {
             panic!("Buffer::get_grapheme_width(): index past last grapheme.");
         }
         else {
-            return self.text.get_grapheme_width_recursive(index);
+            return self.text.get_grapheme_width_recursive(index, tab_width);
         }
     }
     
@@ -112,13 +112,13 @@ impl Buffer {
     }
 
 
-    pub fn pos_vis_2d_to_closest_1d(&self, pos: (uint, uint)) -> uint {
+    pub fn pos_vis_2d_to_closest_1d(&self, pos: (uint, uint), tab_width: uint) -> uint {
         if pos.0 >= self.line_count() {
             return self.len();
         }
         else {
             let gs = self.pos_2d_to_closest_1d((pos.0, 0));
-            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1);
+            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, tab_width);
             return gs + h;
         }
     }
@@ -129,9 +129,9 @@ impl Buffer {
     }
     
     
-    pub fn pos_1d_to_closest_vis_2d(&self, pos: uint) -> (uint, uint) {
+    pub fn pos_1d_to_closest_vis_2d(&self, pos: uint, tab_width: uint) -> (uint, uint) {
         let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
-        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h);
+        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
         return (v, vis_h);
     }
 

@@ -9,10 +9,10 @@ const TAB_WIDTH: uint = 4;
 
 /// Returns the visual width of a grapheme given a starting
 /// position on a line.
-fn grapheme_vis_width_at_vis_pos(g: &str, pos: uint) -> uint {
+fn grapheme_vis_width_at_vis_pos(g: &str, pos: uint, tab_width: uint) -> uint {
     match g {
         "\t" => {
-            let ending_pos = ((pos / TAB_WIDTH) + 1) * TAB_WIDTH;
+            let ending_pos = ((pos / tab_width) + 1) * tab_width;
             return ending_pos - pos;
         },
         
@@ -233,11 +233,11 @@ impl Line {
     
     
     /// Returns the visual cell width of the line
-    pub fn vis_width(&self) -> uint {
+    pub fn vis_width(&self, tab_width: uint) -> uint {
         let mut width = 0;
         
         for g in self.as_str().graphemes(true) {
-            let w = grapheme_vis_width_at_vis_pos(g, width);
+            let w = grapheme_vis_width_at_vis_pos(g, width, tab_width);
             width += w;
         }
         
@@ -263,8 +263,8 @@ impl Line {
     }
     
     
-    pub fn grapheme_width_at_index(&self, index: uint) -> uint {
-        let mut iter = self.grapheme_vis_iter();
+    pub fn grapheme_width_at_index(&self, index: uint, tab_width: uint) -> uint {
+        let mut iter = self.grapheme_vis_iter(tab_width);
         let mut i = 0;
         
         for (_, _, width) in iter {
@@ -282,13 +282,13 @@ impl Line {
     
     
     /// Translates a grapheme index into a visual horizontal position
-    pub fn grapheme_index_to_closest_vis_pos(&self, index: uint) -> uint {
+    pub fn grapheme_index_to_closest_vis_pos(&self, index: uint, tab_width: uint) -> uint {
         let mut pos = 0;
         let mut iter = self.as_str().graphemes(true);
         
         for _ in range(0, index) {
             if let Some(g) = iter.next() {
-                let w = grapheme_vis_width_at_vis_pos(g, pos);
+                let w = grapheme_vis_width_at_vis_pos(g, pos, tab_width);
                 pos += w;
             }
             else {
@@ -301,14 +301,14 @@ impl Line {
     
     
     /// Translates a visual horizontal position to the closest grapheme index
-    pub fn vis_pos_to_closest_grapheme_index(&self, vis_pos: uint) -> uint {
+    pub fn vis_pos_to_closest_grapheme_index(&self, vis_pos: uint, tab_width: uint) -> uint {
         let mut pos = 0;
         let mut i = 0;
         let mut iter = self.as_str().graphemes(true);
         
         while pos < vis_pos {
             if let Some(g) = iter.next() {
-                let w = grapheme_vis_width_at_vis_pos(g, pos);
+                let w = grapheme_vis_width_at_vis_pos(g, pos, tab_width);
                 if (w + pos) > vis_pos {
                     let d1 = vis_pos - pos;
                     let d2 = (pos + w) - vis_pos;
@@ -483,10 +483,11 @@ impl Line {
     
     
     /// Returns an iterator over the graphemes of the line
-    pub fn grapheme_vis_iter<'a>(&'a self) -> LineGraphemeVisIter<'a> {
+    pub fn grapheme_vis_iter<'a>(&'a self, tab_width: uint) -> LineGraphemeVisIter<'a> {
         LineGraphemeVisIter {
             graphemes: self.grapheme_iter(),
             vis_pos: 0,
+            tab_width: tab_width,
         }
     }
 }
@@ -629,6 +630,7 @@ impl<'a> Iterator<&'a str> for LineGraphemeIter<'a> {
 pub struct LineGraphemeVisIter<'a> {
     graphemes: LineGraphemeIter<'a>,
     vis_pos: uint,
+    tab_width: uint,
 }
 
 impl<'a> LineGraphemeVisIter<'a> {
@@ -666,7 +668,7 @@ impl<'a> Iterator<(&'a str, uint, uint)> for LineGraphemeVisIter<'a> {
     fn next(&mut self) -> Option<(&'a str, uint, uint)> {
         if let Some(g) = self.graphemes.next() {
             let pos = self.vis_pos;
-            let width = grapheme_vis_width_at_vis_pos(g, self.vis_pos);
+            let width = grapheme_vis_width_at_vis_pos(g, self.vis_pos, self.tab_width);
             self.vis_pos += width;
             return Some((g, pos, width));
         }
