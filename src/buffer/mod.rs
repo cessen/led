@@ -253,7 +253,9 @@ impl<'a> BufferGraphemeIter<'a> {
 }
 
 
-impl<'a> Iterator<&'a str> for BufferGraphemeIter<'a> {
+impl<'a> Iterator for BufferGraphemeIter<'a> {
+    type Item = &'a str;
+    
     fn next(&mut self) -> Option<&'a str> {
         self.gi.next()
     }
@@ -265,7 +267,9 @@ pub struct BufferLineIter<'a> {
 }
 
 
-impl<'a> Iterator<&'a Line> for BufferLineIter<'a> {
+impl<'a> Iterator for BufferLineIter<'a> {
+    type Item = &'a Line;
+
     fn next(&mut self) -> Option<&'a Line> {
         self.li.next()
     }

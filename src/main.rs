@@ -1,3 +1,6 @@
+#![feature(old_orphan_check)]  // Temporary, get rid of this once the new orphan check works well
+#![feature(associated_types)]
+
 extern crate rustbox;
 extern crate docopt;
 extern crate "rustc-serialize" as rustc_serialize;
@@ -27,7 +30,7 @@ Options:
 
 
 // Struct for storing command-line arguments
-#[deriving(RustcDecodable, Show)]
+#[derive(RustcDecodable, Show)]
     struct Args {
     arg_file: Option<String>,
     flag_help: bool,
@@ -42,10 +45,10 @@ fn main() {
     
     // Load file, if specified    
     let editor = if let Option::Some(s) = args.arg_file {
-     Editor::new_from_file(&Path::new(s.as_slice()))
+        Editor::new_from_file(&Path::new(s.as_slice()))
     }
     else {
-     Editor::new()
+        Editor::new()
     };
         
     // Initialize and start UI

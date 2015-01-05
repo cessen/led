@@ -856,7 +856,9 @@ impl<'a> BufferNodeGraphemeIter<'a> {
 }
 
 
-impl<'a> Iterator<&'a str> for BufferNodeGraphemeIter<'a> {
+impl<'a> Iterator for BufferNodeGraphemeIter<'a> {
+    type Item = &'a str;
+    
     fn next(&mut self) -> Option<&'a str> {
         loop {
             if let Option::Some(g) = self.cur_line.next() {
@@ -884,7 +886,9 @@ pub struct BufferNodeLineIter<'a> {
 }
 
 
-impl<'a> Iterator<&'a Line> for BufferNodeLineIter<'a> {
+impl<'a> Iterator for BufferNodeLineIter<'a> {
+    type Item = &'a Line;
+    
     fn next(&mut self) -> Option<&'a Line> {
         loop {
             if let Option::Some(node) = self.node_stack.pop() {

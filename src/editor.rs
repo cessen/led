@@ -93,7 +93,7 @@ impl Editor {
     pub fn auto_detect_indentation_style(&mut self) {
         let mut tab_blocks: uint = 0;
         let mut space_blocks: uint = 0;
-        let mut space_histogram: [uint, ..9] = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut space_histogram: [uint; 9] = [0, 0, 0, 0, 0, 0, 0, 0, 0];
         
         let mut last_indent = (false, 0u);  // (was_tabs, indent_count)
         

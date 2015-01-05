@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::iter::repeat;
 use std::mem;
 use std::str::Graphemes;
 use string_utils::{grapheme_count, grapheme_pos_to_byte_pos, is_line_ending};
@@ -346,7 +347,7 @@ impl Line {
         let byte_pos = grapheme_pos_to_byte_pos(self.as_str(), pos);
 
         // Grow data size        
-        self.text.grow(text.len(), 0);
+        self.text.extend(repeat(0).take(text.len()));
         
         // Move old bytes forward
         let mut from = self.text.len() - text.len();
@@ -380,7 +381,7 @@ impl Line {
         let mut i = self.text.len();
     
         // Grow data size        
-        self.text.grow(text.len(), 0);
+        self.text.extend(repeat(0).take(text.len()));
         
         // Copy new bytes in
         for g in text.graphemes(true) {
@@ -440,7 +441,7 @@ impl Line {
             let byte_pos = grapheme_pos_to_byte_pos(self.as_str(), pos);
             
             // Copy the elements after the split index to the second line
-            other.text.push_all(self.text.slice_from_or_fail(&byte_pos));
+            other.text.push_all(self.text.slice_from(byte_pos));
             
             // Truncate the first line
             self.text.truncate(byte_pos);
@@ -495,7 +496,7 @@ impl Line {
 
 /// Represents one of the valid Unicode line endings.
 /// Also acts as an index into `LINE_ENDINGS`.
-#[deriving(PartialEq, Copy)]
+#[derive(PartialEq, Copy)]
 pub enum LineEnding {
     None = 0,  // No line ending
     CRLF = 1,  // CarriageReturn followed by LineFeed
@@ -567,7 +568,7 @@ pub fn line_ending_to_str(ending: LineEnding) -> &'static str {
 
 /// An array of string literals corresponding to the possible
 /// unicode line endings.
-pub const LINE_ENDINGS: [&'static str, ..9] = ["",
+pub const LINE_ENDINGS: [&'static str; 9] = ["",
                           "\u{000D}\u{000A}",
                           "\u{000A}",
                           "\u{000B}",
@@ -596,7 +597,9 @@ impl<'a> LineGraphemeIter<'a> {
     }
 }
 
-impl<'a> Iterator<&'a str> for LineGraphemeIter<'a> {
+impl<'a> Iterator for LineGraphemeIter<'a> {
+    type Item = &'a str;
+
     fn next(&mut self) -> Option<&'a str> {
         if self.done {
             return None;
@@ -664,7 +667,9 @@ impl<'a> LineGraphemeVisIter<'a> {
     }
 }
 
-impl<'a> Iterator<(&'a str, uint, uint)> for LineGraphemeVisIter<'a> {
+impl<'a> Iterator for LineGraphemeVisIter<'a> {
+    type Item = (&'a str, uint, uint);
+    
     fn next(&mut self) -> Option<(&'a str, uint, uint)> {
         if let Some(g) = self.graphemes.next() {
             let pos = self.vis_pos;
