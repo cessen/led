@@ -688,6 +688,7 @@ impl<'a> Iterator for LineGraphemeVisIter<'a> {
 // Line tests
 //=========================================================================
 
+#[cfg(test)]
 mod tests {
     use super::{Line, LineEnding, LineGraphemeIter, LineGraphemeVisIter};
     const TAB_WIDTH: usize = 4;

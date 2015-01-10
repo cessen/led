@@ -296,8 +296,8 @@ impl TermUI {
         self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, name.as_slice());
         
         // Percentage position in document
-        let percentage: usize = if editor.buffer.len() > 0 {
-            (((editor.cursor.range.0 as f32) / (editor.buffer.len() as f32)) * 100.0) as usize
+        let percentage: usize = if editor.buffer.grapheme_count() > 0 {
+            (((editor.cursor.range.0 as f32) / (editor.buffer.grapheme_count() as f32)) * 100.0) as usize
         }
         else {
             100
@@ -400,7 +400,7 @@ impl TermUI {
         
         // Print cursor if it's at the end of the text, and thus wasn't printed
         // already.
-        if editor.cursor.range.0 >= editor.buffer.len() {
+        if editor.cursor.range.0 >= editor.buffer.grapheme_count() {
             let vis_cursor_pos = editor.buffer.pos_1d_to_closest_vis_2d(editor.cursor.range.0, editor.tab_width);
                 if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
                 let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0 + c1.0, vis_cursor_pos.1 - editor.view_pos.1 + c1.1);

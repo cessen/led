@@ -919,269 +919,275 @@ impl<'a> Iterator for BufferNodeLineIter<'a> {
 // TESTS
 //====================================================================
 
-#[test]
-fn merge_line_with_next_recursive_1() {
-    let mut node = BufferNode::new();
-    node.insert_text("Hi\n there!", 0);
+#[cfg(test)]
+mod tests {
+    use super::BufferNode;
+    use super::super::line::LineEnding;
+
+    #[test]
+    fn merge_line_with_next_recursive_1() {
+        let mut node = BufferNode::new();
+        node.insert_text("Hi\n there!", 0);
+        
+        assert!(node.grapheme_count == 10);
+        assert!(node.line_count == 2);
+        
+        node.merge_line_with_next_recursive(0, None);
+        
+        let mut iter = node.grapheme_iter();
+        
+        assert!(node.grapheme_count == 9);
+        assert!(node.line_count == 1);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
     
-    assert!(node.grapheme_count == 10);
-    assert!(node.line_count == 2);
     
-    node.merge_line_with_next_recursive(0, None);
+    #[test]
+    fn merge_line_with_next_recursive_2() {
+        let mut node = BufferNode::new();
+        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        
+        assert!(node.grapheme_count == 33);
+        assert!(node.line_count == 5);
+        
+        node.merge_line_with_next_recursive(2, None);
+        
+        let mut iter = node.grapheme_iter();
+        
+        assert!(node.grapheme_count == 32);
+        assert!(node.line_count == 4);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
     
-    let mut iter = node.grapheme_iter();
     
-    assert!(node.grapheme_count == 9);
-    assert!(node.line_count == 1);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
+    #[test]
+    fn merge_line_with_next_recursive_3() {
+        let mut node = BufferNode::new();
+        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        
+        assert!(node.grapheme_count == 33);
+        assert!(node.line_count == 5);
+        
+        node.merge_line_with_next_recursive(0, None);
+        
+        let mut iter = node.grapheme_iter();
+        
+        assert!(node.grapheme_count == 32);
+        assert!(node.line_count == 4);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn pull_out_line_recursive_1() {
+        let mut node = BufferNode::new();
+        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        
+        assert!(node.grapheme_count == 33);
+        assert!(node.line_count == 5);
+        
+        let line = node.pull_out_line_recursive(0).unwrap();
+        assert!(line.as_str() == "Hi");
+        assert!(line.ending == LineEnding::LF);
+        
+        let mut iter = node.grapheme_iter();
+        
+        assert!(node.grapheme_count == 30);
+        assert!(node.line_count == 4);
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn pull_out_line_recursive_2() {
+        let mut node = BufferNode::new();
+        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        
+        assert!(node.grapheme_count == 33);
+        assert!(node.line_count == 5);
+        
+        let line = node.pull_out_line_recursive(2).unwrap();
+        assert!(line.as_str() == " people ");
+        assert!(line.ending == LineEnding::LF);
+        
+        let mut iter = node.grapheme_iter();
+        
+        assert!(node.grapheme_count == 24);
+        assert!(node.line_count == 4);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn pull_out_line_recursive_3() {
+        let mut node = BufferNode::new();
+        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        
+        assert!(node.grapheme_count == 33);
+        assert!(node.line_count == 5);
+        
+        let line = node.pull_out_line_recursive(4).unwrap();
+        assert!(line.as_str() == " world!");
+        assert!(line.ending == LineEnding::None);
+        
+        let mut iter = node.grapheme_iter();
+        
+        assert!(node.grapheme_count == 26);
+        assert!(node.line_count == 4);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(None == iter.next());
+    }
+    
 }
-
-
-#[test]
-fn merge_line_with_next_recursive_2() {
-    let mut node = BufferNode::new();
-    node.insert_text("Hi\n there\n people \nof the\n world!", 0);
-    
-    assert!(node.grapheme_count == 33);
-    assert!(node.line_count == 5);
-    
-    node.merge_line_with_next_recursive(2, None);
-    
-    let mut iter = node.grapheme_iter();
-    
-    assert!(node.grapheme_count == 32);
-    assert!(node.line_count == 4);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn merge_line_with_next_recursive_3() {
-    let mut node = BufferNode::new();
-    node.insert_text("Hi\n there\n people \nof the\n world!", 0);
-    
-    assert!(node.grapheme_count == 33);
-    assert!(node.line_count == 5);
-    
-    node.merge_line_with_next_recursive(0, None);
-    
-    let mut iter = node.grapheme_iter();
-    
-    assert!(node.grapheme_count == 32);
-    assert!(node.line_count == 4);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn pull_out_line_recursive_1() {
-    let mut node = BufferNode::new();
-    node.insert_text("Hi\n there\n people \nof the\n world!", 0);
-    
-    assert!(node.grapheme_count == 33);
-    assert!(node.line_count == 5);
-    
-    let line = node.pull_out_line_recursive(0).unwrap();
-    assert!(line.as_str() == "Hi");
-    assert!(line.ending == LineEnding::LF);
-    
-    let mut iter = node.grapheme_iter();
-    
-    assert!(node.grapheme_count == 30);
-    assert!(node.line_count == 4);
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn pull_out_line_recursive_2() {
-    let mut node = BufferNode::new();
-    node.insert_text("Hi\n there\n people \nof the\n world!", 0);
-    
-    assert!(node.grapheme_count == 33);
-    assert!(node.line_count == 5);
-    
-    let line = node.pull_out_line_recursive(2).unwrap();
-    assert!(line.as_str() == " people ");
-    assert!(line.ending == LineEnding::LF);
-    
-    let mut iter = node.grapheme_iter();
-    
-    assert!(node.grapheme_count == 24);
-    assert!(node.line_count == 4);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn pull_out_line_recursive_3() {
-    let mut node = BufferNode::new();
-    node.insert_text("Hi\n there\n people \nof the\n world!", 0);
-    
-    assert!(node.grapheme_count == 33);
-    assert!(node.line_count == 5);
-    
-    let line = node.pull_out_line_recursive(4).unwrap();
-    assert!(line.as_str() == " world!");
-    assert!(line.ending == LineEnding::None);
-    
-    let mut iter = node.grapheme_iter();
-    
-    assert!(node.grapheme_count == 26);
-    assert!(node.line_count == 4);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(None == iter.next());
-}
-

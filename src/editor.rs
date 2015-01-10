@@ -270,7 +270,7 @@ impl Editor {
     
     pub fn insert_text_at_grapheme(&mut self, text: &str, pos: usize) {
         self.dirty = true;
-        let buf_len = self.buffer.len();
+        let buf_len = self.buffer.grapheme_count();
         self.buffer.insert_text(text, if pos < buf_len {pos} else {buf_len});
     }
     
@@ -294,7 +294,7 @@ impl Editor {
     
     pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: usize) {
         let pos_a = self.cursor.range.1;
-        let pos_b = if (pos_a + grapheme_count) <= self.buffer.len() {pos_a + grapheme_count} else {self.buffer.len()};
+        let pos_b = if (pos_a + grapheme_count) <= self.buffer.grapheme_count() {pos_a + grapheme_count} else {self.buffer.grapheme_count()};
         
         // Remove text
         self.buffer.remove_text(pos_a, pos_b);
@@ -331,7 +331,7 @@ impl Editor {
     }
     
     pub fn cursor_to_end_of_buffer(&mut self) {
-        let end = self.buffer.len();
+        let end = self.buffer.grapheme_count();
         self.cursor.range = (end, end);
         self.cursor.update_vis_start(&(self.buffer), self.tab_width);
         
@@ -355,11 +355,11 @@ impl Editor {
     }
     
     pub fn cursor_right(&mut self, n: usize) {
-        if self.cursor.range.1 <= (self.buffer.len() - n) {
+        if self.cursor.range.1 <= (self.buffer.grapheme_count() - n) {
             self.cursor.range.1 += n;
         }
         else {
-            self.cursor.range.1 = self.buffer.len();
+            self.cursor.range.1 = self.buffer.grapheme_count();
         }
         
         self.cursor.range.0 = self.cursor.range.1;
