@@ -13,8 +13,8 @@
       a 2d representation of the text, for which it needs that information to
       know the relative positions of things.
     - Editing (these are undoable):
-        - insert_text
-        - remove_text
+        //- insert_text
+        //- remove_text
         - move_text
     - Undo functionality:
         - Undo
@@ -23,8 +23,8 @@
         - Op section end
     - Info:
         - byte_count (useful when saving the file)
-        - grapheme_count
-        - line_count
+        //- grapheme_count
+        //- line_count
     - Position conversions:
         - index -> line_col
         - line_col -> index

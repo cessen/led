@@ -33,6 +33,11 @@ impl Buffer {
     }
 
     
+    
+    //------------------------------------------------------------------------
+    // Functions for getting information about the buffer.
+    //------------------------------------------------------------------------
+    
     pub fn grapheme_count(&self) -> usize {
         self.text.grapheme_count
     }
@@ -43,101 +48,10 @@ impl Buffer {
     }
     
     
-    pub fn get_grapheme<'a>(&'a self, index: usize) -> &'a str {
-        if index >= self.grapheme_count() {
-            panic!("Buffer::get_grapheme(): index past last grapheme.");
-        }
-        else {
-            return self.text.get_grapheme_recursive(index);
-        }
-    }
     
-    
-    pub fn get_grapheme_width(&self, index: usize, tab_width: usize) -> usize {
-        if index >= self.grapheme_count() {
-            panic!("Buffer::get_grapheme_width(): index past last grapheme.");
-        }
-        else {
-            return self.text.get_grapheme_width_recursive(index, tab_width);
-        }
-    }
-    
-    
-    pub fn get_line<'a>(&'a self, index: usize) -> &'a Line {
-        if index >= self.line_count() {
-            panic!("get_line(): index out of bounds.");
-        }
-        
-        // NOTE: this can be done non-recursively, which would be more
-        // efficient.  However, it seems likely to require unsafe code
-        // if done that way.
-        return self.text.get_line_recursive(index);
-    }
-    
-    
-    /// Blindly appends a line to the end of the current text without
-    /// doing any sanity checks.  This is primarily for efficient
-    /// file loading.
-    pub fn append_line_unchecked(&mut self, line: Line) {
-        self.text.append_line_unchecked_recursive(line);
-    }
-    
-    
-    /// Removes the lines in line indices [line_a, line_b).
-    pub fn remove_lines(&mut self, line_a: usize, line_b: usize) {
-        // Nothing to do
-        if line_a == line_b {
-            return;
-        }
-        // Bounds error
-        else if line_a > line_b {
-            panic!("Buffer::remove_lines(): line_a must be less than or equal to line_b.");
-        }
-        // Bounds error
-        else if line_b > self.line_count() {
-            panic!("Buffer::remove_lines(): attempt to remove lines past the last line of text.");
-        }
-        // Complete removal of all lines
-        else if line_a == 0 && line_b == self.text.line_count {
-            let mut temp_node = BufferNode::new();
-            mem::swap(&mut (self.text), &mut temp_node);
-        }
-        // All other cases
-        else {
-            self.text.remove_lines_recursive(line_a, line_b);
-            self.text.set_last_line_ending_recursive();
-        }
-    }
-
-    
-    pub fn pos_2d_to_closest_1d(&self, pos: (usize, usize)) -> usize {
-        return self.text.pos_2d_to_closest_1d_recursive(pos);
-    }
-
-
-    pub fn pos_vis_2d_to_closest_1d(&self, pos: (usize, usize), tab_width: usize) -> usize {
-        if pos.0 >= self.line_count() {
-            return self.grapheme_count();
-        }
-        else {
-            let gs = self.pos_2d_to_closest_1d((pos.0, 0));
-            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, tab_width);
-            return gs + h;
-        }
-    }
-
-    
-    pub fn pos_1d_to_closest_2d(&self, pos: usize) -> (usize, usize) {
-        return self.text.pos_1d_to_closest_2d_recursive(pos);
-    }
-    
-    
-    pub fn pos_1d_to_closest_vis_2d(&self, pos: usize, tab_width: usize) -> (usize, usize) {
-        let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
-        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
-        return (v, vis_h);
-    }
-
+    //------------------------------------------------------------------------
+    // Editing operations
+    //------------------------------------------------------------------------
     
     /// Insert 'text' at grapheme position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: usize) {
@@ -189,6 +103,46 @@ impl Buffer {
     }
     
     
+    /// Removes the lines in line indices [line_a, line_b).
+    pub fn remove_lines(&mut self, line_a: usize, line_b: usize) {
+        // Nothing to do
+        if line_a == line_b {
+            return;
+        }
+        // Bounds error
+        else if line_a > line_b {
+            panic!("Buffer::remove_lines(): line_a must be less than or equal to line_b.");
+        }
+        // Bounds error
+        else if line_b > self.line_count() {
+            panic!("Buffer::remove_lines(): attempt to remove lines past the last line of text.");
+        }
+        // Complete removal of all lines
+        else if line_a == 0 && line_b == self.text.line_count {
+            let mut temp_node = BufferNode::new();
+            mem::swap(&mut (self.text), &mut temp_node);
+        }
+        // All other cases
+        else {
+            self.text.remove_lines_recursive(line_a, line_b);
+            self.text.set_last_line_ending_recursive();
+        }
+    }
+    
+    
+    /// Blindly appends a line to the end of the current text without
+    /// doing any sanity checks.  This is primarily for efficient
+    /// file loading.
+    pub fn append_line_unchecked(&mut self, line: Line) {
+        self.text.append_line_unchecked_recursive(line);
+    }
+    
+    
+    
+    //------------------------------------------------------------------------
+    // Undo/redo functionality
+    //------------------------------------------------------------------------
+    
     /// Undoes operations that were pushed to the undo stack, and returns a
     /// cursor position that the cursor should jump to, if any.
     pub fn undo(&mut self) -> Option<usize> {
@@ -209,6 +163,77 @@ impl Buffer {
         }
         
         return None;
+    }
+    
+    
+    
+    //------------------------------------------------------------------------
+    // Position conversions
+    //------------------------------------------------------------------------
+    
+    pub fn pos_2d_to_closest_1d(&self, pos: (usize, usize)) -> usize {
+        return self.text.pos_2d_to_closest_1d_recursive(pos);
+    }
+
+
+    pub fn pos_vis_2d_to_closest_1d(&self, pos: (usize, usize), tab_width: usize) -> usize {
+        if pos.0 >= self.line_count() {
+            return self.grapheme_count();
+        }
+        else {
+            let gs = self.pos_2d_to_closest_1d((pos.0, 0));
+            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, tab_width);
+            return gs + h;
+        }
+    }
+
+    
+    pub fn pos_1d_to_closest_2d(&self, pos: usize) -> (usize, usize) {
+        return self.text.pos_1d_to_closest_2d_recursive(pos);
+    }
+    
+    
+    pub fn pos_1d_to_closest_vis_2d(&self, pos: usize, tab_width: usize) -> (usize, usize) {
+        let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
+        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
+        return (v, vis_h);
+    }
+    
+    
+    
+    //------------------------------------------------------------------------
+    // Text reading functions
+    //------------------------------------------------------------------------
+    
+    pub fn get_grapheme<'a>(&'a self, index: usize) -> &'a str {
+        if index >= self.grapheme_count() {
+            panic!("Buffer::get_grapheme(): index past last grapheme.");
+        }
+        else {
+            return self.text.get_grapheme_recursive(index);
+        }
+    }
+    
+    
+    pub fn get_grapheme_width(&self, index: usize, tab_width: usize) -> usize {
+        if index >= self.grapheme_count() {
+            panic!("Buffer::get_grapheme_width(): index past last grapheme.");
+        }
+        else {
+            return self.text.get_grapheme_width_recursive(index, tab_width);
+        }
+    }
+    
+    
+    pub fn get_line<'a>(&'a self, index: usize) -> &'a Line {
+        if index >= self.line_count() {
+            panic!("get_line(): index out of bounds.");
+        }
+        
+        // NOTE: this can be done non-recursively, which would be more
+        // efficient.  However, it seems likely to require unsafe code
+        // if done that way.
+        return self.text.get_line_recursive(index);
     }
     
     
@@ -240,6 +265,12 @@ impl Buffer {
         
         return s;
     }
+    
+    
+    
+    //------------------------------------------------------------------------
+    // Iterator creators
+    //------------------------------------------------------------------------
     
     /// Creates an iterator at the first character
     pub fn grapheme_iter<'a>(&'a self) -> BufferGraphemeIter<'a> {
