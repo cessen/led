@@ -4,7 +4,7 @@ use std::mem;
 
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::line::{Line, LineEnding};
-use string_utils::{is_line_ending};
+use string_utils::{is_line_ending, grapheme_count};
 
 pub mod line;
 mod node;
@@ -18,6 +18,7 @@ mod node;
 pub struct Buffer {
     text: BufferNode,
     pub line_ending_type: LineEnding,
+    undo_stack: Vec<Operation>,
 }
 
 
@@ -26,6 +27,7 @@ impl Buffer {
         Buffer {
             text: BufferNode::new(),
             line_ending_type: LineEnding::LF,
+            undo_stack: Vec::new(),
         }
     }
 
@@ -138,12 +140,27 @@ impl Buffer {
     
     /// Insert 'text' at grapheme position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: usize) {
+        self._insert_text(text, pos);
+        
+        self.undo_stack.push(Operation::InsertText(String::from_str(text), pos));
+    }
+    
+    fn _insert_text(&mut self, text: &str, pos: usize) {
         self.text.insert_text(text, pos);
     }
 
     
     /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
     pub fn remove_text(&mut self, pos_a: usize, pos_b: usize) {
+        let removed_text = self.string_from_range(pos_a, pos_b);
+    
+        self._remove_text(pos_a, pos_b);
+        
+        // Push operation to the undo stack
+        self.undo_stack.push(Operation::RemoveText(removed_text, pos_a));
+    }
+    
+    fn _remove_text(&mut self, pos_a: usize, pos_b: usize) {
         // Nothing to do
         if pos_a == pos_b {
             return;
@@ -169,7 +186,59 @@ impl Buffer {
             self.text.set_last_line_ending_recursive();
         }
     }
-
+    
+    
+    /// Undoes operations that were pushed to the undo stack, and returns a
+    /// cursor position that the cursor should jump to, if any.
+    pub fn undo(&mut self) -> Option<usize> {
+        if let Some(op) = self.undo_stack.pop() {
+            match op {
+                Operation::InsertText(ref s, p) => {
+                    let size = grapheme_count(s.as_slice());
+                    self._remove_text(p, p+size);
+                    return Some(p);
+                },
+                
+                Operation::RemoveText(ref s, p) => {
+                    let size = grapheme_count(s.as_slice());
+                    self._insert_text(s.as_slice(), p);
+                    return Some(p+size);
+                },
+            }
+        }
+        
+        return None;
+    }
+    
+    
+    /// Creates a String from the buffer text in grapheme range [pos_a, posb).
+    fn string_from_range(&self, pos_a: usize, pos_b: usize) -> String {
+        // Bounds checks
+        if pos_b < pos_a {
+            panic!("Buffer::string_from_range(): pos_a must be less than or equal to pos_b.");
+        }
+        else if pos_b > self.len() {
+            panic!("Buffer::string_from_range(): specified range is past end of buffer text.");
+        }
+        
+        let mut s = String::with_capacity(pos_b - pos_a);
+        
+        let mut iter = self.grapheme_iter_at_index(pos_a);
+        let mut i = 0;
+        let i_end = pos_b - pos_a;
+        
+        for g in iter {
+            if i == i_end {
+                break;
+            }
+            
+            s.push_str(g);
+            
+            i += 1;
+        }
+        
+        return s;
+    }
     
     /// Creates an iterator at the first character
     pub fn grapheme_iter<'a>(&'a self) -> BufferGraphemeIter<'a> {
@@ -278,799 +347,835 @@ impl<'a> Iterator for BufferLineIter<'a> {
 
 
 
+//================================================================
+// Buffer undo structures
+//================================================================
+
+enum Operation {
+    InsertText(String, usize),
+    RemoveText(String, usize),
+}
+
+
+
 
 //================================================================
 // TESTS
 //================================================================
 
-#[test]
-fn insert_text() {
-    let mut buf = Buffer::new();
+mod tests {
+    use super::{Buffer, Operation, BufferGraphemeIter, BufferLineIter};
+
+    #[test]
+    fn insert_text() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello 世界!", 0);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 9);
+        assert!(buf.text.line_count == 1);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
     
-    buf.insert_text("Hello 世界!", 0);
     
-    let mut iter = buf.grapheme_iter();
+    #[test]
+    fn insert_text_with_newlines() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 11);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
     
-    assert!(buf.len() == 9);
-    assert!(buf.text.line_count == 1);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
+    
+    #[test]
+    fn insert_text_in_non_empty_buffer_1() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        buf.insert_text("Again ", 0);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 17);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("A") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn insert_text_in_non_empty_buffer_2() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        buf.insert_text(" again", 5);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 17);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn insert_text_in_non_empty_buffer_3() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        buf.insert_text("again", 6);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 16);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn insert_text_in_non_empty_buffer_4() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        buf.insert_text("again", 11);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 16);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn insert_text_in_non_empty_buffer_5() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        buf.insert_text("again", 2);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 16);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn insert_text_in_non_empty_buffer_6() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        buf.insert_text("again", 8);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 16);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn insert_text_in_non_empty_buffer_7() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\n 世界\r\n!", 0);
+        buf.insert_text("\nag\n\nain\n", 2);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 20);
+        assert!(buf.text.line_count == 7);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("世") == iter.next());
+        assert!(Some("界") == iter.next());
+        assert!(Some("\r\n") == iter.next());
+        assert!(Some("!") == iter.next());
+        
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_1() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_text(0, 3);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 26);
+        assert!(buf.text.line_count == 5);
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_2() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_text(0, 12);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 17);
+        assert!(buf.text.line_count == 4);
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_3() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_text(5, 17);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 17);
+        assert!(buf.text.line_count == 4);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_4() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_text(23, 29);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 23);
+        assert!(buf.text.line_count == 6);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_5() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_text(17, 29);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 17);
+        assert!(buf.text.line_count == 4);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_6() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\nworld!", 0);
+        assert!(buf.len() == 12);
+        assert!(buf.text.line_count == 2);
+        
+        buf.remove_text(3, 12);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 3);
+        assert!(buf.text.line_count == 1);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_7() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\nworld!", 0);
+        assert!(buf.len() == 15);
+        assert!(buf.text.line_count == 3);
+        
+        buf.remove_text(5, 15);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 5);
+        assert!(buf.text.line_count == 2);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_8() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\nworld!", 0);
+        assert!(buf.len() == 12);
+        assert!(buf.text.line_count == 2);
+        
+        buf.remove_text(3, 11);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 4);
+        assert!(buf.text.line_count == 1);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_9() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hello\nworld!", 0);
+        assert!(buf.len() == 12);
+        assert!(buf.text.line_count == 2);
+        
+        buf.remove_text(8, 12);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 8);
+        assert!(buf.text.line_count == 2);
+        assert!(Some("H") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_10() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("12\n34\n56\n78", 0);
+        assert!(buf.len() == 11);
+        assert!(buf.text.line_count == 4);
+        
+        buf.remove_text(4, 11);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 4);
+        assert!(buf.text.line_count == 2);
+        assert!(Some("1") == iter.next());
+        assert!(Some("2") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("3") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_text_11() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("1234567890", 0);
+        assert!(buf.len() == 10);
+        assert!(buf.text.line_count == 1);
+        
+        buf.remove_text(9, 10);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 9);
+        assert!(buf.text.line_count == 1);
+        assert!(Some("1") == iter.next());
+        assert!(Some("2") == iter.next());
+        assert!(Some("3") == iter.next());
+        assert!(Some("4") == iter.next());
+        assert!(Some("5") == iter.next());
+        assert!(Some("6") == iter.next());
+        assert!(Some("7") == iter.next());
+        assert!(Some("8") == iter.next());
+        assert!(Some("9") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_lines_1() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_lines(0, 3);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 13);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_lines_2() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_lines(1, 4);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 13);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn remove_lines_3() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        assert!(buf.len() == 29);
+        assert!(buf.text.line_count == 6);
+        
+        buf.remove_lines(3, 6);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.len() == 15);
+        assert!(buf.text.line_count == 3);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn pos_2d_to_closest_1d_1() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let pos = buf.pos_2d_to_closest_1d((2, 3));
+        
+        assert!(pos == 12);
+    }
+    
+    
+    #[test]
+    fn pos_2d_to_closest_1d_2() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let pos = buf.pos_2d_to_closest_1d((2, 10));
+        
+        assert!(pos == 15);
+    }
+    
+    #[test]
+    fn pos_2d_to_closest_1d_3() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let pos = buf.pos_2d_to_closest_1d((10, 2));
+        
+        assert!(pos == 29);
+    }
+    
+    
+    #[test]
+    fn pos_1d_to_closest_2d_1() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let pos = buf.pos_1d_to_closest_2d(5);
+        
+        assert!(pos == (1, 2));
+    }
+    
+    
+    #[test]
+    fn pos_1d_to_closest_2d_2() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let pos = buf.pos_1d_to_closest_2d(50);
+        
+        assert!(pos == (5, 6));
+    }
+    
+    
+    #[test]
+    fn string_from_range_1() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let s = buf.string_from_range(1, 12);
+        
+        assert!(s.as_slice() == "i\nthere\npeo");
+    }
+    
+    
+    #[test]
+    fn string_from_range_2() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let s = buf.string_from_range(0, 29);
+        
+        assert!(s.as_slice() == "Hi\nthere\npeople\nof\nthe\nworld!");
+    }
+    
+    
+    #[test]
+    fn grapheme_iter_at_index_1() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let mut iter = buf.grapheme_iter_at_index(16);
+        
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn grapheme_iter_at_index_2() {
+        let mut buf = Buffer::new();
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        let mut iter = buf.grapheme_iter_at_index(29);
+        
+        assert!(None == iter.next());
+    }
+    
+    
 }
-
-
-#[test]
-fn insert_text_with_newlines() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 11);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn insert_text_in_non_empty_buffer_1() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    buf.insert_text("Again ", 0);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 17);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("A") == iter.next());
-    assert!(Some("g") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn insert_text_in_non_empty_buffer_2() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    buf.insert_text(" again", 5);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 17);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("g") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("n") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn insert_text_in_non_empty_buffer_3() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    buf.insert_text("again", 6);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 16);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("g") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn insert_text_in_non_empty_buffer_4() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    buf.insert_text("again", 11);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 16);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("g") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("n") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn insert_text_in_non_empty_buffer_5() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    buf.insert_text("again", 2);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 16);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("g") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("n") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn insert_text_in_non_empty_buffer_6() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    buf.insert_text("again", 8);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 16);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("g") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("n") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn insert_text_in_non_empty_buffer_7() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\n 世界\r\n!", 0);
-    buf.insert_text("\nag\n\nain\n", 2);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 20);
-    assert!(buf.text.line_count == 7);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("g") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("a") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("n") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some(" ") == iter.next());
-    assert!(Some("世") == iter.next());
-    assert!(Some("界") == iter.next());
-    assert!(Some("\r\n") == iter.next());
-    assert!(Some("!") == iter.next());
-    
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_1() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_text(0, 3);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 26);
-    assert!(buf.text.line_count == 5);
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_2() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_text(0, 12);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 17);
-    assert!(buf.text.line_count == 4);
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_3() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_text(5, 17);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 17);
-    assert!(buf.text.line_count == 4);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_4() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_text(23, 29);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 23);
-    assert!(buf.text.line_count == 6);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_5() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_text(17, 29);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 17);
-    assert!(buf.text.line_count == 4);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_6() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\nworld!", 0);
-    assert!(buf.len() == 12);
-    assert!(buf.text.line_count == 2);
-    
-    buf.remove_text(3, 12);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 3);
-    assert!(buf.text.line_count == 1);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_7() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\nworld!", 0);
-    assert!(buf.len() == 15);
-    assert!(buf.text.line_count == 3);
-    
-    buf.remove_text(5, 15);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 5);
-    assert!(buf.text.line_count == 2);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_8() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\nworld!", 0);
-    assert!(buf.len() == 12);
-    assert!(buf.text.line_count == 2);
-    
-    buf.remove_text(3, 11);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 4);
-    assert!(buf.text.line_count == 1);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_9() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hello\nworld!", 0);
-    assert!(buf.len() == 12);
-    assert!(buf.text.line_count == 2);
-    
-    buf.remove_text(8, 12);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 8);
-    assert!(buf.text.line_count == 2);
-    assert!(Some("H") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_10() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("12\n34\n56\n78", 0);
-    assert!(buf.len() == 11);
-    assert!(buf.text.line_count == 4);
-    
-    buf.remove_text(4, 11);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 4);
-    assert!(buf.text.line_count == 2);
-    assert!(Some("1") == iter.next());
-    assert!(Some("2") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("3") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_text_11() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("1234567890", 0);
-    assert!(buf.len() == 10);
-    assert!(buf.text.line_count == 1);
-    
-    buf.remove_text(9, 10);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 9);
-    assert!(buf.text.line_count == 1);
-    assert!(Some("1") == iter.next());
-    assert!(Some("2") == iter.next());
-    assert!(Some("3") == iter.next());
-    assert!(Some("4") == iter.next());
-    assert!(Some("5") == iter.next());
-    assert!(Some("6") == iter.next());
-    assert!(Some("7") == iter.next());
-    assert!(Some("8") == iter.next());
-    assert!(Some("9") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_lines_1() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_lines(0, 3);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 13);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_lines_2() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_lines(1, 4);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 13);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn remove_lines_3() {
-    let mut buf = Buffer::new();
-    
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    assert!(buf.len() == 29);
-    assert!(buf.text.line_count == 6);
-    
-    buf.remove_lines(3, 6);
-    
-    let mut iter = buf.grapheme_iter();
-    
-    assert!(buf.len() == 15);
-    assert!(buf.text.line_count == 3);
-    assert!(Some("H") == iter.next());
-    assert!(Some("i") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("p") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn pos_2d_to_closest_1d_1() {
-    let mut buf = Buffer::new();
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    
-    let pos = buf.pos_2d_to_closest_1d((2, 3));
-    
-    assert!(pos == 12);
-}
-
-
-#[test]
-fn pos_2d_to_closest_1d_2() {
-    let mut buf = Buffer::new();
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    
-    let pos = buf.pos_2d_to_closest_1d((2, 10));
-    
-    assert!(pos == 15);
-}
-
-#[test]
-fn pos_2d_to_closest_1d_3() {
-    let mut buf = Buffer::new();
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    
-    let pos = buf.pos_2d_to_closest_1d((10, 2));
-    
-    assert!(pos == 29);
-}
-
-
-#[test]
-fn pos_1d_to_closest_2d_1() {
-    let mut buf = Buffer::new();
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    
-    let pos = buf.pos_1d_to_closest_2d(5);
-    
-    assert!(pos == (1, 2));
-}
-
-
-#[test]
-fn pos_1d_to_closest_2d_2() {
-    let mut buf = Buffer::new();
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    
-    let pos = buf.pos_1d_to_closest_2d(50);
-    
-    assert!(pos == (5, 6));
-}
-
-
-#[test]
-fn grapheme_iter_at_index_1() {
-    let mut buf = Buffer::new();
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    
-    let mut iter = buf.grapheme_iter_at_index(16);
-    
-    assert!(Some("o") == iter.next());
-    assert!(Some("f") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("t") == iter.next());
-    assert!(Some("h") == iter.next());
-    assert!(Some("e") == iter.next());
-    assert!(Some("\n") == iter.next());
-    assert!(Some("w") == iter.next());
-    assert!(Some("o") == iter.next());
-    assert!(Some("r") == iter.next());
-    assert!(Some("l") == iter.next());
-    assert!(Some("d") == iter.next());
-    assert!(Some("!") == iter.next());
-    assert!(None == iter.next());
-}
-
-
-#[test]
-fn grapheme_iter_at_index_2() {
-    let mut buf = Buffer::new();
-    buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
-    
-    let mut iter = buf.grapheme_iter_at_index(29);
-    
-    assert!(None == iter.next());
-}
-
-
-
 

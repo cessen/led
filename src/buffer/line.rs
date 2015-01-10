@@ -5,8 +5,6 @@ use std::mem;
 use std::str::Graphemes;
 use string_utils::{grapheme_count, grapheme_pos_to_byte_pos, is_line_ending};
 
-const TAB_WIDTH: usize = 4;
-
 
 /// Returns the visual width of a grapheme given a starting
 /// position on a line.
@@ -690,348 +688,355 @@ impl<'a> Iterator for LineGraphemeVisIter<'a> {
 // Line tests
 //=========================================================================
 
-#[test]
-fn new_text_line() {
-    let tl = Line::new();
-    
-    assert!(tl.text.len() == 0);
-    assert!(tl.ending == LineEnding::None);
-}
-
-#[test]
-fn new_text_line_from_str() {
-    let tl = Line::new_from_str("Hello!");
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::None);
-}
-
-#[test]
-fn new_text_line_from_empty_str() {
-    let tl = Line::new_from_str("");
-    
-    assert!(tl.text.len() == 0);
-    assert!(tl.ending == LineEnding::None);
-}
-
-#[test]
-fn new_text_line_from_str_with_lf() {
-    let tl = Line::new_from_str("Hello!\n");
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::LF);
-}
-
-#[test]
-fn new_text_line_from_str_with_crlf() {
-    let tl = Line::new_from_str("Hello!\r\n");
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn new_text_line_from_str_with_crlf_and_too_long() {
-    let tl = Line::new_from_str("Hello!\r\nLa la la la");
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn new_text_line_from_string_unchecked() {
-    let s = String::from_str("Hello!");
-    
-    let tl = Line::new_from_string_unchecked(s);
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::None);
-}
-
-#[test]
-fn new_text_line_from_string_unchecked_with_lf() {
-    let s = String::from_str("Hello!\u{000A}");
-    
-    let tl = Line::new_from_string_unchecked(s);
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::LF);
-}
-
-#[test]
-fn new_text_line_from_string_unchecked_with_crlf() {
-    let s = String::from_str("Hello!\u{000D}\u{000A}");
-    
-    let tl = Line::new_from_string_unchecked(s);
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn new_text_line_from_string_unchecked_with_ls() {
-    let s = String::from_str("Hello!\u{2028}");
-    
-    let tl = Line::new_from_string_unchecked(s);
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::LS);
-}
-
-#[test]
-fn text_line_insert_text() {
-    let mut tl = Line::new_from_str("Hello!\r\n");
-    
-    tl.insert_text(" world", 5);
-    
-    assert!(tl.text.len() == 12);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == (' ' as u8));
-    assert!(tl.text[6] == ('w' as u8));
-    assert!(tl.text[7] == ('o' as u8));
-    assert!(tl.text[8] == ('r' as u8));
-    assert!(tl.text[9] == ('l' as u8));
-    assert!(tl.text[10] == ('d' as u8));
-    assert!(tl.text[11] == ('!' as u8));
-    assert!(tl.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn text_line_append_text() {
-    let mut tl = Line::new_from_str("Hello\r\n");
-    
-    tl.append_text(" world!");
-    
-    assert!(tl.text.len() == 12);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == (' ' as u8));
-    assert!(tl.text[6] == ('w' as u8));
-    assert!(tl.text[7] == ('o' as u8));
-    assert!(tl.text[8] == ('r' as u8));
-    assert!(tl.text[9] == ('l' as u8));
-    assert!(tl.text[10] == ('d' as u8));
-    assert!(tl.text[11] == ('!' as u8));
-    assert!(tl.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn text_line_remove_text() {
-    let mut tl = Line::new_from_str("Hello world!\r\n");
-    
-    tl.remove_text(5, 11);
-    
-    assert!(tl.text.len() == 6);
-    assert!(tl.text[0] == ('H' as u8));
-    assert!(tl.text[1] == ('e' as u8));
-    assert!(tl.text[2] == ('l' as u8));
-    assert!(tl.text[3] == ('l' as u8));
-    assert!(tl.text[4] == ('o' as u8));
-    assert!(tl.text[5] == ('!' as u8));
-    assert!(tl.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn text_line_split() {
-    let mut tl1 = Line::new_from_str("Hello world!\r\n");
-    
-    let tl2 = tl1.split(LineEnding::LF, 5);
-    
-    assert!(tl1.text.len() == 5);
-    assert!(tl1.text[0] == ('H' as u8));
-    assert!(tl1.text[1] == ('e' as u8));
-    assert!(tl1.text[2] == ('l' as u8));
-    assert!(tl1.text[3] == ('l' as u8));
-    assert!(tl1.text[4] == ('o' as u8));
-    assert!(tl1.ending == LineEnding::LF);
-    
-    assert!(tl2.text.len() == 7);
-    assert!(tl2.text[0] == (' ' as u8));
-    assert!(tl2.text[1] == ('w' as u8));
-    assert!(tl2.text[2] == ('o' as u8));
-    assert!(tl2.text[3] == ('r' as u8));
-    assert!(tl2.text[4] == ('l' as u8));
-    assert!(tl2.text[5] == ('d' as u8));
-    assert!(tl2.text[6] == ('!' as u8));
-    assert!(tl2.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn text_line_split_beginning() {
-    let mut tl1 = Line::new_from_str("Hello!\r\n");
-    
-    let tl2 = tl1.split(LineEnding::LF, 0);
-    
-    assert!(tl1.text.len() == 0);
-    assert!(tl1.ending == LineEnding::LF);
-    
-    assert!(tl2.text.len() == 6);
-    assert!(tl2.text[0] == ('H' as u8));
-    assert!(tl2.text[1] == ('e' as u8));
-    assert!(tl2.text[2] == ('l' as u8));
-    assert!(tl2.text[3] == ('l' as u8));
-    assert!(tl2.text[4] == ('o' as u8));
-    assert!(tl2.text[5] == ('!' as u8));
-    assert!(tl2.ending == LineEnding::CRLF);
-}
-
-#[test]
-fn grapheme_index_to_closest_vis_pos_1() {
-    let tl = Line::new_from_str("Hello!");
-    
-    assert!(tl.grapheme_index_to_closest_vis_pos(0) == 0);
-}
-
-#[test]
-fn grapheme_index_to_closest_vis_pos_2() {
-    let tl = Line::new_from_str("\tHello!");
-    
-    assert!(tl.grapheme_index_to_closest_vis_pos(1) == TAB_WIDTH);
-}
-
-#[test]
-fn vis_pos_to_closest_grapheme_index_1() {
-    let tl = Line::new_from_str("Hello!");
-    
-    assert!(tl.vis_pos_to_closest_grapheme_index(0) == 0);
-}
-
-#[test]
-fn vis_pos_to_closest_grapheme_index_2() {
-    let tl = Line::new_from_str("\tHello!");
-    
-    assert!(tl.vis_pos_to_closest_grapheme_index(TAB_WIDTH) == 1);
-}
+mod tests {
+    use super::{Line, LineEnding, LineGraphemeIter, LineGraphemeVisIter};
+    const TAB_WIDTH: usize = 4;
 
 
-//=========================================================================
-// LineGraphemeIter tests
-//=========================================================================
-
-#[test]
-fn text_line_grapheme_iter() {
-    let tl = Line::new_from_str("Hello!");
-    let mut iter = tl.grapheme_iter();
+    #[test]
+    fn new_text_line() {
+        let tl = Line::new();
+        
+        assert!(tl.text.len() == 0);
+        assert!(tl.ending == LineEnding::None);
+    }
     
-    assert!(iter.next() == Some("H"));
-    assert!(iter.next() == Some("e"));
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("o"));
-    assert!(iter.next() == Some("!"));
-    assert!(iter.next() == None);
-}
-
-#[test]
-fn text_line_grapheme_iter_with_lf() {
-    let tl = Line::new_from_str("Hello!\n");
-    let mut iter = tl.grapheme_iter();
+    #[test]
+    fn new_text_line_from_str() {
+        let tl = Line::new_from_str("Hello!");
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::None);
+    }
     
-    assert!(iter.next() == Some("H"));
-    assert!(iter.next() == Some("e"));
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("o"));
-    assert!(iter.next() == Some("!"));
-    assert!(iter.next() == Some("\n"));
-    assert!(iter.next() == None);
-}
-
-#[test]
-fn text_line_grapheme_iter_with_crlf() {
-    let tl = Line::new_from_str("Hello!\r\n");
-    let mut iter = tl.grapheme_iter();
+    #[test]
+    fn new_text_line_from_empty_str() {
+        let tl = Line::new_from_str("");
+        
+        assert!(tl.text.len() == 0);
+        assert!(tl.ending == LineEnding::None);
+    }
     
-    assert!(iter.next() == Some("H"));
-    assert!(iter.next() == Some("e"));
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("o"));
-    assert!(iter.next() == Some("!"));
-    assert!(iter.next() == Some("\r\n"));
-    assert!(iter.next() == None);
-}
-
-#[test]
-fn text_line_grapheme_iter_at_index() {
-    let tl = Line::new_from_str("Hello!");
-    let mut iter = tl.grapheme_iter_at_index(2);
+    #[test]
+    fn new_text_line_from_str_with_lf() {
+        let tl = Line::new_from_str("Hello!\n");
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::LF);
+    }
     
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("l"));
-    assert!(iter.next() == Some("o"));
-    assert!(iter.next() == Some("!"));
-    assert!(iter.next() == None);
-}
-
-#[test]
-fn text_line_grapheme_iter_at_index_past_end() {
-    let tl = Line::new_from_str("Hello!");
-    let mut iter = tl.grapheme_iter_at_index(10);
+    #[test]
+    fn new_text_line_from_str_with_crlf() {
+        let tl = Line::new_from_str("Hello!\r\n");
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::CRLF);
+    }
     
-    assert!(iter.next() == None);
-}
-
-#[test]
-fn text_line_grapheme_iter_at_index_at_lf() {
-    let tl = Line::new_from_str("Hello!\n");
-    let mut iter = tl.grapheme_iter_at_index(6);
+    #[test]
+    fn new_text_line_from_str_with_crlf_and_too_long() {
+        let tl = Line::new_from_str("Hello!\r\nLa la la la");
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::CRLF);
+    }
     
-    assert!(iter.next() == Some("\n"));
-    assert!(iter.next() == None);
+    #[test]
+    fn new_text_line_from_string_unchecked() {
+        let s = String::from_str("Hello!");
+        
+        let tl = Line::new_from_string_unchecked(s);
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::None);
+    }
+    
+    #[test]
+    fn new_text_line_from_string_unchecked_with_lf() {
+        let s = String::from_str("Hello!\u{000A}");
+        
+        let tl = Line::new_from_string_unchecked(s);
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::LF);
+    }
+    
+    #[test]
+    fn new_text_line_from_string_unchecked_with_crlf() {
+        let s = String::from_str("Hello!\u{000D}\u{000A}");
+        
+        let tl = Line::new_from_string_unchecked(s);
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::CRLF);
+    }
+    
+    #[test]
+    fn new_text_line_from_string_unchecked_with_ls() {
+        let s = String::from_str("Hello!\u{2028}");
+        
+        let tl = Line::new_from_string_unchecked(s);
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::LS);
+    }
+    
+    #[test]
+    fn text_line_insert_text() {
+        let mut tl = Line::new_from_str("Hello!\r\n");
+        
+        tl.insert_text(" world", 5);
+        
+        assert!(tl.text.len() == 12);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == (' ' as u8));
+        assert!(tl.text[6] == ('w' as u8));
+        assert!(tl.text[7] == ('o' as u8));
+        assert!(tl.text[8] == ('r' as u8));
+        assert!(tl.text[9] == ('l' as u8));
+        assert!(tl.text[10] == ('d' as u8));
+        assert!(tl.text[11] == ('!' as u8));
+        assert!(tl.ending == LineEnding::CRLF);
+    }
+    
+    #[test]
+    fn text_line_append_text() {
+        let mut tl = Line::new_from_str("Hello\r\n");
+        
+        tl.append_text(" world!");
+        
+        assert!(tl.text.len() == 12);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == (' ' as u8));
+        assert!(tl.text[6] == ('w' as u8));
+        assert!(tl.text[7] == ('o' as u8));
+        assert!(tl.text[8] == ('r' as u8));
+        assert!(tl.text[9] == ('l' as u8));
+        assert!(tl.text[10] == ('d' as u8));
+        assert!(tl.text[11] == ('!' as u8));
+        assert!(tl.ending == LineEnding::CRLF);
+    }
+    
+    #[test]
+    fn text_line_remove_text() {
+        let mut tl = Line::new_from_str("Hello world!\r\n");
+        
+        tl.remove_text(5, 11);
+        
+        assert!(tl.text.len() == 6);
+        assert!(tl.text[0] == ('H' as u8));
+        assert!(tl.text[1] == ('e' as u8));
+        assert!(tl.text[2] == ('l' as u8));
+        assert!(tl.text[3] == ('l' as u8));
+        assert!(tl.text[4] == ('o' as u8));
+        assert!(tl.text[5] == ('!' as u8));
+        assert!(tl.ending == LineEnding::CRLF);
+    }
+    
+    #[test]
+    fn text_line_split() {
+        let mut tl1 = Line::new_from_str("Hello world!\r\n");
+        
+        let tl2 = tl1.split(LineEnding::LF, 5);
+        
+        assert!(tl1.text.len() == 5);
+        assert!(tl1.text[0] == ('H' as u8));
+        assert!(tl1.text[1] == ('e' as u8));
+        assert!(tl1.text[2] == ('l' as u8));
+        assert!(tl1.text[3] == ('l' as u8));
+        assert!(tl1.text[4] == ('o' as u8));
+        assert!(tl1.ending == LineEnding::LF);
+        
+        assert!(tl2.text.len() == 7);
+        assert!(tl2.text[0] == (' ' as u8));
+        assert!(tl2.text[1] == ('w' as u8));
+        assert!(tl2.text[2] == ('o' as u8));
+        assert!(tl2.text[3] == ('r' as u8));
+        assert!(tl2.text[4] == ('l' as u8));
+        assert!(tl2.text[5] == ('d' as u8));
+        assert!(tl2.text[6] == ('!' as u8));
+        assert!(tl2.ending == LineEnding::CRLF);
+    }
+    
+    #[test]
+    fn text_line_split_beginning() {
+        let mut tl1 = Line::new_from_str("Hello!\r\n");
+        
+        let tl2 = tl1.split(LineEnding::LF, 0);
+        
+        assert!(tl1.text.len() == 0);
+        assert!(tl1.ending == LineEnding::LF);
+        
+        assert!(tl2.text.len() == 6);
+        assert!(tl2.text[0] == ('H' as u8));
+        assert!(tl2.text[1] == ('e' as u8));
+        assert!(tl2.text[2] == ('l' as u8));
+        assert!(tl2.text[3] == ('l' as u8));
+        assert!(tl2.text[4] == ('o' as u8));
+        assert!(tl2.text[5] == ('!' as u8));
+        assert!(tl2.ending == LineEnding::CRLF);
+    }
+    
+    #[test]
+    fn grapheme_index_to_closest_vis_pos_1() {
+        let tl = Line::new_from_str("Hello!");
+        
+        assert!(tl.grapheme_index_to_closest_vis_pos(0, TAB_WIDTH) == 0);
+    }
+    
+    #[test]
+    fn grapheme_index_to_closest_vis_pos_2() {
+        let tl = Line::new_from_str("\tHello!");
+        
+        assert!(tl.grapheme_index_to_closest_vis_pos(1, TAB_WIDTH) == TAB_WIDTH);
+    }
+    
+    #[test]
+    fn vis_pos_to_closest_grapheme_index_1() {
+        let tl = Line::new_from_str("Hello!");
+        
+        assert!(tl.vis_pos_to_closest_grapheme_index(0, TAB_WIDTH) == 0);
+    }
+    
+    #[test]
+    fn vis_pos_to_closest_grapheme_index_2() {
+        let tl = Line::new_from_str("\tHello!");
+        
+        assert!(tl.vis_pos_to_closest_grapheme_index(TAB_WIDTH, TAB_WIDTH) == 1);
+    }
+    
+    
+    //=========================================================================
+    // LineGraphemeIter tests
+    //=========================================================================
+    
+    #[test]
+    fn text_line_grapheme_iter() {
+        let tl = Line::new_from_str("Hello!");
+        let mut iter = tl.grapheme_iter();
+        
+        assert!(iter.next() == Some("H"));
+        assert!(iter.next() == Some("e"));
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("o"));
+        assert!(iter.next() == Some("!"));
+        assert!(iter.next() == None);
+    }
+    
+    #[test]
+    fn text_line_grapheme_iter_with_lf() {
+        let tl = Line::new_from_str("Hello!\n");
+        let mut iter = tl.grapheme_iter();
+        
+        assert!(iter.next() == Some("H"));
+        assert!(iter.next() == Some("e"));
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("o"));
+        assert!(iter.next() == Some("!"));
+        assert!(iter.next() == Some("\n"));
+        assert!(iter.next() == None);
+    }
+    
+    #[test]
+    fn text_line_grapheme_iter_with_crlf() {
+        let tl = Line::new_from_str("Hello!\r\n");
+        let mut iter = tl.grapheme_iter();
+        
+        assert!(iter.next() == Some("H"));
+        assert!(iter.next() == Some("e"));
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("o"));
+        assert!(iter.next() == Some("!"));
+        assert!(iter.next() == Some("\r\n"));
+        assert!(iter.next() == None);
+    }
+    
+    #[test]
+    fn text_line_grapheme_iter_at_index() {
+        let tl = Line::new_from_str("Hello!");
+        let mut iter = tl.grapheme_iter_at_index(2);
+        
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("l"));
+        assert!(iter.next() == Some("o"));
+        assert!(iter.next() == Some("!"));
+        assert!(iter.next() == None);
+    }
+    
+    #[test]
+    fn text_line_grapheme_iter_at_index_past_end() {
+        let tl = Line::new_from_str("Hello!");
+        let mut iter = tl.grapheme_iter_at_index(10);
+        
+        assert!(iter.next() == None);
+    }
+    
+    #[test]
+    fn text_line_grapheme_iter_at_index_at_lf() {
+        let tl = Line::new_from_str("Hello!\n");
+        let mut iter = tl.grapheme_iter_at_index(6);
+        
+        assert!(iter.next() == Some("\n"));
+        assert!(iter.next() == None);
+    }
+    
 }
