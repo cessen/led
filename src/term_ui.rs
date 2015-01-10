@@ -30,8 +30,8 @@ const K_CTRL_S: u16 = 19;
 pub struct TermUI {
     rb: rustbox::RustBox,
     editor: Editor,
-    width: uint,
-    height: uint,
+    width: usize,
+    height: usize,
 }
 
 
@@ -159,8 +159,8 @@ impl TermUI {
                     },
                     
                     Ok(rustbox::Event::ResizeEvent(w, h)) => {
-                        self.width = w as uint;
-                        self.height = h as uint;
+                        self.width = w as usize;
+                        self.height = h as usize;
                         self.editor.update_dim(self.height-1, self.width);
                     },
                     
@@ -239,8 +239,8 @@ impl TermUI {
                     },
                     
                     Ok(rustbox::Event::ResizeEvent(w, h)) => {
-                        self.width = w as uint;
-                        self.height = h as uint;
+                        self.width = w as usize;
+                        self.height = h as usize;
                         self.editor.update_dim(self.height-1, self.width);
                     },
                     
@@ -261,7 +261,7 @@ impl TermUI {
             // Jump to line!
             if confirm {
                 if let Some(n) = line.parse() {
-                    let n2: uint = n; // Weird work-around: the type of n wasn't being inferred
+                    let n2: usize = n; // Weird work-around: the type of n wasn't being inferred
                     if n2 > 0 {
                         self.editor.jump_to_line(n2-1);
                     }
@@ -275,7 +275,7 @@ impl TermUI {
     }
     
     
-    fn draw_editor(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
+    fn draw_editor(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
         let foreground = Color::Black;
         let background = Color::Cyan;
         
@@ -291,8 +291,8 @@ impl TermUI {
         self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, name.as_slice());
         
         // Percentage position in document
-        let percentage: uint = if editor.buffer.len() > 0 {
-            (((editor.cursor.range.0 as f32) / (editor.buffer.len() as f32)) * 100.0) as uint
+        let percentage: usize = if editor.buffer.len() > 0 {
+            (((editor.cursor.range.0 as f32) / (editor.buffer.len() as f32)) * 100.0) as usize
         }
         else {
             100
@@ -321,7 +321,7 @@ impl TermUI {
     }
 
 
-    fn draw_editor_text(&self, editor: &Editor, c1: (uint, uint), c2: (uint, uint)) {
+    fn draw_editor_text(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
         let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
         
         let mut grapheme_index;

@@ -11,10 +11,10 @@ pub enum BufferNodeData {
 
 pub struct BufferNode {
     pub data: BufferNodeData,
-    pub tree_height: uint,
+    pub tree_height: usize,
     
-    pub grapheme_count: uint,
-    pub line_count: uint,
+    pub grapheme_count: usize,
+    pub line_count: usize,
 }
 
 impl BufferNode {
@@ -129,10 +129,10 @@ impl BufferNode {
     /// Rebalances the tree under the node
     fn rebalance(&mut self) {
         loop {
-            let mut rot: int;
+            let mut rot: isize;
             
             if let BufferNodeData::Branch(ref mut left, ref mut right) = self.data {
-                let height_diff = (left.tree_height as int) - (right.tree_height as int);
+                let height_diff = (left.tree_height as isize) - (right.tree_height as isize);
 
                 // Left side higher than right side
                 if height_diff > 1 {
@@ -184,7 +184,7 @@ impl BufferNode {
     }
     
     
-    pub fn get_grapheme_recursive<'a>(&'a self, index: uint) -> &'a str {
+    pub fn get_grapheme_recursive<'a>(&'a self, index: usize) -> &'a str {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
                 return line.grapheme_at_index(index);
@@ -202,7 +202,7 @@ impl BufferNode {
     }
     
     
-    pub fn get_grapheme_width_recursive(&self, index: uint, tab_width: uint) -> uint {
+    pub fn get_grapheme_width_recursive(&self, index: usize, tab_width: usize) -> usize {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
                 return line.grapheme_width_at_index(index, tab_width);
@@ -220,7 +220,7 @@ impl BufferNode {
     }
     
     
-    pub fn get_line_recursive<'a>(&'a self, index: uint) -> &'a Line {
+    pub fn get_line_recursive<'a>(&'a self, index: usize) -> &'a Line {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
                 if index != 0 {
@@ -241,7 +241,7 @@ impl BufferNode {
     }
     
     
-    pub fn pos_2d_to_closest_1d_recursive(&self, pos: (uint, uint)) -> uint {
+    pub fn pos_2d_to_closest_1d_recursive(&self, pos: (usize, usize)) -> usize {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
                 if pos.0 != 0 {
@@ -273,7 +273,7 @@ impl BufferNode {
     }
     
     
-    pub fn pos_1d_to_closest_2d_recursive(&self, pos: uint) -> (uint, uint) {
+    pub fn pos_1d_to_closest_2d_recursive(&self, pos: usize) -> (usize, usize) {
         match self.data {
             BufferNodeData::Leaf(_) => {
                 return (0, min(pos, self.grapheme_count));
@@ -293,14 +293,14 @@ impl BufferNode {
     
     
     /// Insert 'text' at grapheme position 'pos'.
-    pub fn insert_text(&mut self, text: &str, pos: uint) {
+    pub fn insert_text(&mut self, text: &str, pos: usize) {
         // Byte indices
-        let mut b1: uint = 0;
-        let mut b2: uint = 0;
+        let mut b1: usize = 0;
+        let mut b2: usize = 0;
         
         // Grapheme indices
-        let mut g1: uint = 0;
-        let mut g2: uint = 0;
+        let mut g1: usize = 0;
+        let mut g2: usize = 0;
         
         // Iterate through graphemes
         for grapheme in text.grapheme_indices(true) {
@@ -332,7 +332,7 @@ impl BufferNode {
 
     /// Inserts the given text string at the given grapheme position.
     /// Note: this assumes the given text has no newline graphemes.
-    pub fn insert_text_recursive(&mut self, text: &str, pos: uint) {
+    pub fn insert_text_recursive(&mut self, text: &str, pos: usize) {
         match self.data {
             // Find node for text to be inserted into
             BufferNodeData::Branch(ref mut left, ref mut right) => {
@@ -356,7 +356,7 @@ impl BufferNode {
     
     
     /// Inserts a line break at the given grapheme position
-    pub fn insert_line_break_recursive(&mut self, ending: LineEnding, pos: uint) {
+    pub fn insert_line_break_recursive(&mut self, ending: LineEnding, pos: usize) {
         if ending == LineEnding::None {
             return;
         }
@@ -387,8 +387,8 @@ impl BufferNode {
         if do_split {
             // Insert line break
             let new_line = old_line.split(ending, pos);
-            let new_node_a = box BufferNode::new_from_line(old_line);
-            let new_node_b = box BufferNode::new_from_line(new_line);
+            let new_node_a = Box::new(BufferNode::new_from_line(old_line));
+            let new_node_b = Box::new(BufferNode::new_from_line(new_line));
             
             self.data = BufferNodeData::Branch(new_node_a, new_node_b);
             
@@ -404,12 +404,12 @@ impl BufferNode {
     /// Removes text between grapheme positions pos_a and pos_b.
     /// Returns true if a dangling left side remains from the removal.
     /// Returns false otherwise.
-    pub fn remove_text_recursive(&mut self, pos_a: uint, pos_b: uint, is_last: bool) -> bool {
+    pub fn remove_text_recursive(&mut self, pos_a: usize, pos_b: usize, is_last: bool) -> bool {
         let mut temp_node = BufferNode::new();
         let mut total_side_removal = false;
         let mut dangling_line = false;
         let mut do_merge_fix = false;
-        let mut merge_line_number: uint = 0;
+        let mut merge_line_number: usize = 0;
         
         match self.data {
             BufferNodeData::Branch(ref mut left, ref mut right) => {
@@ -509,8 +509,8 @@ impl BufferNode {
                 mem::swap(this_line, &mut other_line);
             }
             
-            let new_node_a = box BufferNode::new_from_line(other_line);
-            let new_node_b = box BufferNode::new_from_line(line);
+            let new_node_a = Box::new(BufferNode::new_from_line(other_line));
+            let new_node_b = Box::new(BufferNode::new_from_line(line));
             self.data = BufferNodeData::Branch(new_node_a, new_node_b);
         }
         
@@ -520,7 +520,7 @@ impl BufferNode {
     
     
     /// Removes lines in line number range [line_a, line_b)
-    pub fn remove_lines_recursive(&mut self, line_a: uint, line_b: uint) {
+    pub fn remove_lines_recursive(&mut self, line_a: usize, line_b: usize) {
         let mut remove_left = false;
         let mut remove_right = false;
         let mut temp_node = BufferNode::new();
@@ -573,7 +573,7 @@ impl BufferNode {
     }
     
     
-    pub fn merge_line_with_next_recursive(&mut self, line_number: uint, fetched_line: Option<&Line>) {
+    pub fn merge_line_with_next_recursive(&mut self, line_number: usize, fetched_line: Option<&Line>) {
         match fetched_line {
             None => {
                 let line: Option<Line> = self.pull_out_line_recursive(line_number + 1);
@@ -607,7 +607,7 @@ impl BufferNode {
     
     
     /// Removes a single line out of the text and returns it.
-    pub fn pull_out_line_recursive(&mut self, line_number: uint) -> Option<Line> {
+    pub fn pull_out_line_recursive(&mut self, line_number: usize) -> Option<Line> {
         let mut pulled_line = Line::new();
         let mut temp_node = BufferNode::new();
         let mut side_removal = false;
@@ -702,7 +702,7 @@ impl BufferNode {
     
     
     /// Creates an iterator at the given grapheme index
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> BufferNodeGraphemeIter<'a> {
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> BufferNodeGraphemeIter<'a> {
         let mut node_stack: Vec<&'a BufferNode> = Vec::new();
         let mut cur_node = self;
         let mut grapheme_i = index;
@@ -763,7 +763,7 @@ impl BufferNode {
     
     
     /// Creates a line iterator starting at the given line index
-    pub fn line_iter_at_index<'a>(&'a self, index: uint) -> BufferNodeLineIter<'a> {
+    pub fn line_iter_at_index<'a>(&'a self, index: usize) -> BufferNodeLineIter<'a> {
         let mut node_stack: Vec<&'a BufferNode> = Vec::new();
         let mut cur_node = self;
         let mut line_i = index;
@@ -841,7 +841,7 @@ impl<'a> BufferNodeGraphemeIter<'a> {
     // Skips the iterator n graphemes ahead.
     // If it runs out of graphemes before reaching the desired skip count,
     // returns false.  Otherwise returns true.
-    pub fn skip_graphemes(&mut self, n: uint) -> bool {
+    pub fn skip_graphemes(&mut self, n: usize) -> bool {
         // TODO: more efficient implementation
         for _ in range(0, n) {
             if let Option::None = self.next() {

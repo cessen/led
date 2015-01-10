@@ -5,12 +5,12 @@ use std::mem;
 use std::str::Graphemes;
 use string_utils::{grapheme_count, grapheme_pos_to_byte_pos, is_line_ending};
 
-const TAB_WIDTH: uint = 4;
+const TAB_WIDTH: usize = 4;
 
 
 /// Returns the visual width of a grapheme given a starting
 /// position on a line.
-fn grapheme_vis_width_at_vis_pos(g: &str, pos: uint, tab_width: uint) -> uint {
+fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize {
     match g {
         "\t" => {
             let ending_pos = ((pos / tab_width) + 1) * tab_width;
@@ -138,7 +138,7 @@ impl Line {
         };
         
         // Check for line ending
-        let mut le_size: uint = 0;
+        let mut le_size: usize = 0;
         let text_size = tl.text.len();
         if tl.text.len() >= 3 {
             match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-3))} {
@@ -216,7 +216,7 @@ impl Line {
     
     
     /// Returns the total number of unicode graphemes in the line
-    pub fn grapheme_count(&self) -> uint {
+    pub fn grapheme_count(&self) -> usize {
         let mut count = grapheme_count(self.as_str());
         match self.ending {
             LineEnding::None => {},
@@ -228,13 +228,13 @@ impl Line {
     
     /// Returns the total number of unicode graphemes in the line,
     /// not counting the line ending grapheme, if any.
-    pub fn grapheme_count_sans_line_ending(&self) -> uint {
+    pub fn grapheme_count_sans_line_ending(&self) -> usize {
         grapheme_count(self.as_str())
     }
     
     
     /// Returns the visual cell width of the line
-    pub fn vis_width(&self, tab_width: uint) -> uint {
+    pub fn vis_width(&self, tab_width: usize) -> usize {
         let mut width = 0;
         
         for g in self.as_str().graphemes(true) {
@@ -246,7 +246,7 @@ impl Line {
     }
     
     
-    pub fn grapheme_at_index<'a>(&'a self, index: uint) -> &'a str {
+    pub fn grapheme_at_index<'a>(&'a self, index: usize) -> &'a str {
         let mut iter = self.grapheme_iter();
         let mut i = 0;
         
@@ -264,7 +264,7 @@ impl Line {
     }
     
     
-    pub fn grapheme_width_at_index(&self, index: uint, tab_width: uint) -> uint {
+    pub fn grapheme_width_at_index(&self, index: usize, tab_width: usize) -> usize {
         let mut iter = self.grapheme_vis_iter(tab_width);
         let mut i = 0;
         
@@ -283,7 +283,7 @@ impl Line {
     
     
     /// Translates a grapheme index into a visual horizontal position
-    pub fn grapheme_index_to_closest_vis_pos(&self, index: uint, tab_width: uint) -> uint {
+    pub fn grapheme_index_to_closest_vis_pos(&self, index: usize, tab_width: usize) -> usize {
         let mut pos = 0;
         let mut iter = self.as_str().graphemes(true);
         
@@ -302,7 +302,7 @@ impl Line {
     
     
     /// Translates a visual horizontal position to the closest grapheme index
-    pub fn vis_pos_to_closest_grapheme_index(&self, vis_pos: uint, tab_width: uint) -> uint {
+    pub fn vis_pos_to_closest_grapheme_index(&self, vis_pos: usize, tab_width: usize) -> usize {
         let mut pos = 0;
         let mut i = 0;
         let mut iter = self.as_str().graphemes(true);
@@ -342,7 +342,7 @@ impl Line {
     
     /// Inserts `text` at grapheme index `pos`.
     /// NOTE: panics if it encounters a line ending in the text.
-    pub fn insert_text(&mut self, text: &str, pos: uint) {
+    pub fn insert_text(&mut self, text: &str, pos: usize) {
         // Find insertion position in bytes
         let byte_pos = grapheme_pos_to_byte_pos(self.as_str(), pos);
 
@@ -398,7 +398,7 @@ impl Line {
     
     
     /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
-    pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
+    pub fn remove_text(&mut self, pos_a: usize, pos_b: usize) {
         // Bounds checks
         if pos_a > pos_b {
             panic!("Line::remove_text(): pos_a must be less than or equal to pos_b.");
@@ -427,7 +427,7 @@ impl Line {
     /// Insert a line break into the line, splitting it into two.
     /// This line stays as the first part of the split.  The second
     /// part is returned.
-    pub fn split(&mut self, ending: LineEnding, pos: uint) -> Line {
+    pub fn split(&mut self, ending: LineEnding, pos: usize) -> Line {
         let mut other = Line::new();
         
         // Inserting at very beginning: special cased for efficiency
@@ -466,7 +466,7 @@ impl Line {
     
     
     /// Returns an iterator over the graphemes of the line
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> LineGraphemeIter<'a> {
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> LineGraphemeIter<'a> {
         let temp: &str = unsafe{mem::transmute(self.text.as_slice())};
         
         let mut iter = LineGraphemeIter {
@@ -484,7 +484,7 @@ impl Line {
     
     
     /// Returns an iterator over the graphemes of the line
-    pub fn grapheme_vis_iter<'a>(&'a self, tab_width: uint) -> LineGraphemeVisIter<'a> {
+    pub fn grapheme_vis_iter<'a>(&'a self, tab_width: usize) -> LineGraphemeVisIter<'a> {
         LineGraphemeVisIter {
             graphemes: self.grapheme_iter(),
             vis_pos: 0,
@@ -563,7 +563,7 @@ pub fn str_to_line_ending(g: &str) -> LineEnding {
 }
 
 pub fn line_ending_to_str(ending: LineEnding) -> &'static str {
-    LINE_ENDINGS[ending as uint]
+    LINE_ENDINGS[ending as usize]
 }
 
 /// An array of string literals corresponding to the possible
@@ -588,7 +588,7 @@ pub struct LineGraphemeIter<'a> {
 }
 
 impl<'a> LineGraphemeIter<'a> {
-    pub fn skip_graphemes(&mut self, n: uint) {
+    pub fn skip_graphemes(&mut self, n: usize) {
         for _ in range(0, n) {
             if let None = self.next() {
                 break;
@@ -616,7 +616,7 @@ impl<'a> Iterator for LineGraphemeIter<'a> {
                     return None;
                 }
                 else {
-                    return Some(LINE_ENDINGS[self.ending as uint]);
+                    return Some(LINE_ENDINGS[self.ending as usize]);
                 }
             }
         }
@@ -632,12 +632,12 @@ impl<'a> Iterator for LineGraphemeIter<'a> {
 /// visual width.
 pub struct LineGraphemeVisIter<'a> {
     graphemes: LineGraphemeIter<'a>,
-    vis_pos: uint,
-    tab_width: uint,
+    vis_pos: usize,
+    tab_width: usize,
 }
 
 impl<'a> LineGraphemeVisIter<'a> {
-    pub fn skip_graphemes(&mut self, n: uint) {
+    pub fn skip_graphemes(&mut self, n: usize) {
         for _ in range(0, n) {
             if let None = self.next() {
                 break;
@@ -647,7 +647,7 @@ impl<'a> LineGraphemeVisIter<'a> {
     
     // Skips at least n visual positions, and returns the number of excess
     // skipped visual positions beyond n.
-    pub fn skip_vis_positions(&mut self, n: uint) -> uint {
+    pub fn skip_vis_positions(&mut self, n: usize) -> usize {
         let mut i = 0;
         while i < n {
             if let Some((_, _, width)) = self.next() {
@@ -668,9 +668,9 @@ impl<'a> LineGraphemeVisIter<'a> {
 }
 
 impl<'a> Iterator for LineGraphemeVisIter<'a> {
-    type Item = (&'a str, uint, uint);
+    type Item = (&'a str, usize, usize);
     
-    fn next(&mut self) -> Option<(&'a str, uint, uint)> {
+    fn next(&mut self) -> Option<(&'a str, usize, usize)> {
         if let Some(g) = self.graphemes.next() {
             let pos = self.vis_pos;
             let width = grapheme_vis_width_at_vis_pos(g, self.vis_pos, self.tab_width);

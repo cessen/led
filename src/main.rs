@@ -1,5 +1,5 @@
 #![feature(old_orphan_check)]  // Temporary, get rid of this once the new orphan check works well
-#![feature(associated_types)]
+#![allow(unstable)]
 
 extern crate rustbox;
 extern crate docopt;

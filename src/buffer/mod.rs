@@ -30,17 +30,17 @@ impl Buffer {
     }
 
     
-    pub fn len(&self) -> uint {
+    pub fn len(&self) -> usize {
         self.text.grapheme_count
     }
 
     
-    pub fn line_count(&self) -> uint {
+    pub fn line_count(&self) -> usize {
         self.text.line_count
     }
     
     
-    pub fn get_grapheme<'a>(&'a self, index: uint) -> &'a str {
+    pub fn get_grapheme<'a>(&'a self, index: usize) -> &'a str {
         if index >= self.len() {
             panic!("Buffer::get_grapheme(): index past last grapheme.");
         }
@@ -50,7 +50,7 @@ impl Buffer {
     }
     
     
-    pub fn get_grapheme_width(&self, index: uint, tab_width: uint) -> uint {
+    pub fn get_grapheme_width(&self, index: usize, tab_width: usize) -> usize {
         if index >= self.len() {
             panic!("Buffer::get_grapheme_width(): index past last grapheme.");
         }
@@ -60,7 +60,7 @@ impl Buffer {
     }
     
     
-    pub fn get_line<'a>(&'a self, index: uint) -> &'a Line {
+    pub fn get_line<'a>(&'a self, index: usize) -> &'a Line {
         if index >= self.line_count() {
             panic!("get_line(): index out of bounds.");
         }
@@ -81,7 +81,7 @@ impl Buffer {
     
     
     /// Removes the lines in line indices [line_a, line_b).
-    pub fn remove_lines(&mut self, line_a: uint, line_b: uint) {
+    pub fn remove_lines(&mut self, line_a: usize, line_b: usize) {
         // Nothing to do
         if line_a == line_b {
             return;
@@ -107,12 +107,12 @@ impl Buffer {
     }
 
     
-    pub fn pos_2d_to_closest_1d(&self, pos: (uint, uint)) -> uint {
+    pub fn pos_2d_to_closest_1d(&self, pos: (usize, usize)) -> usize {
         return self.text.pos_2d_to_closest_1d_recursive(pos);
     }
 
 
-    pub fn pos_vis_2d_to_closest_1d(&self, pos: (uint, uint), tab_width: uint) -> uint {
+    pub fn pos_vis_2d_to_closest_1d(&self, pos: (usize, usize), tab_width: usize) -> usize {
         if pos.0 >= self.line_count() {
             return self.len();
         }
@@ -124,12 +124,12 @@ impl Buffer {
     }
 
     
-    pub fn pos_1d_to_closest_2d(&self, pos: uint) -> (uint, uint) {
+    pub fn pos_1d_to_closest_2d(&self, pos: usize) -> (usize, usize) {
         return self.text.pos_1d_to_closest_2d_recursive(pos);
     }
     
     
-    pub fn pos_1d_to_closest_vis_2d(&self, pos: uint, tab_width: uint) -> (uint, uint) {
+    pub fn pos_1d_to_closest_vis_2d(&self, pos: usize, tab_width: usize) -> (usize, usize) {
         let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
         let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
         return (v, vis_h);
@@ -137,13 +137,13 @@ impl Buffer {
 
     
     /// Insert 'text' at grapheme position 'pos'.
-    pub fn insert_text(&mut self, text: &str, pos: uint) {
+    pub fn insert_text(&mut self, text: &str, pos: usize) {
         self.text.insert_text(text, pos);
     }
 
     
     /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
-    pub fn remove_text(&mut self, pos_a: uint, pos_b: uint) {
+    pub fn remove_text(&mut self, pos_a: usize, pos_b: usize) {
         // Nothing to do
         if pos_a == pos_b {
             return;
@@ -182,7 +182,7 @@ impl Buffer {
     /// Creates an iterator starting at the specified grapheme index.
     /// If the index is past the end of the text, then the iterator will
     /// return None on next().
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: uint) -> BufferGraphemeIter<'a> {
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> BufferGraphemeIter<'a> {
         BufferGraphemeIter {
             gi: self.text.grapheme_iter_at_index(index)
         }
@@ -196,7 +196,7 @@ impl Buffer {
     }
     
     
-    pub fn line_iter_at_index<'a>(&'a self, index: uint) -> BufferLineIter<'a> {
+    pub fn line_iter_at_index<'a>(&'a self, index: usize) -> BufferLineIter<'a> {
         BufferLineIter {
             li: self.text.line_iter_at_index(index)
         }
@@ -230,12 +230,12 @@ impl<'a> BufferGraphemeIter<'a> {
     // Skips the iterator n graphemes ahead.
     // If it runs out of graphemes before reaching the desired skip count,
     // returns false.  Otherwise returns true.
-    pub fn skip_graphemes(&mut self, n: uint) -> bool {
+    pub fn skip_graphemes(&mut self, n: usize) -> bool {
         self.gi.skip_graphemes(n)
     }
     
-    pub fn skip_non_newline_graphemes(&mut self, n: uint) -> bool {
-        let mut i: uint = 0;
+    pub fn skip_non_newline_graphemes(&mut self, n: usize) -> bool {
+        let mut i: usize = 0;
         
         for g in self.gi {
             if is_line_ending(g) {
