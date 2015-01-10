@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::mem;
+use std::collections::DList;
 
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::line::{Line, LineEnding};
@@ -18,7 +19,7 @@ mod node;
 pub struct Buffer {
     text: BufferNode,
     pub line_ending_type: LineEnding,
-    undo_stack: Vec<Operation>,
+    undo_stack: DList<Operation>,
 }
 
 
@@ -27,7 +28,7 @@ impl Buffer {
         Buffer {
             text: BufferNode::new(),
             line_ending_type: LineEnding::LF,
-            undo_stack: Vec::new(),
+            undo_stack: DList::new(),
         }
     }
 
@@ -142,7 +143,7 @@ impl Buffer {
     pub fn insert_text(&mut self, text: &str, pos: usize) {
         self._insert_text(text, pos);
         
-        self.undo_stack.push(Operation::InsertText(String::from_str(text), pos));
+        self.undo_stack.push_back(Operation::InsertText(String::from_str(text), pos));
     }
     
     fn _insert_text(&mut self, text: &str, pos: usize) {
@@ -157,7 +158,7 @@ impl Buffer {
         self._remove_text(pos_a, pos_b);
         
         // Push operation to the undo stack
-        self.undo_stack.push(Operation::RemoveText(removed_text, pos_a));
+        self.undo_stack.push_back(Operation::RemoveText(removed_text, pos_a));
     }
     
     fn _remove_text(&mut self, pos_a: usize, pos_b: usize) {
@@ -191,7 +192,7 @@ impl Buffer {
     /// Undoes operations that were pushed to the undo stack, and returns a
     /// cursor position that the cursor should jump to, if any.
     pub fn undo(&mut self) -> Option<usize> {
-        if let Some(op) = self.undo_stack.pop() {
+        if let Some(op) = self.undo_stack.pop_back() {
             match op {
                 Operation::InsertText(ref s, p) => {
                     let size = grapheme_count(s.as_slice());
