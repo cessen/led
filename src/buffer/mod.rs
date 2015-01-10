@@ -1,14 +1,17 @@
 #![allow(dead_code)]
 
 use std::mem;
-use std::collections::DList;
 
-use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
+
 use self::line::{Line, LineEnding};
+use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
+use self::undo_stack::{UndoStack};
+use self::undo_stack::Operation::*;
 use string_utils::{is_line_ending, grapheme_count};
 
 pub mod line;
 mod node;
+mod undo_stack;
 
 
 //=============================================================
@@ -19,7 +22,7 @@ mod node;
 pub struct Buffer {
     text: BufferNode,
     pub line_ending_type: LineEnding,
-    undo_stack: DList<Operation>,
+    undo_stack: UndoStack,
 }
 
 
@@ -28,7 +31,7 @@ impl Buffer {
         Buffer {
             text: BufferNode::new(),
             line_ending_type: LineEnding::LF,
-            undo_stack: DList::new(),
+            undo_stack: UndoStack::new(),
         }
     }
 
@@ -57,7 +60,7 @@ impl Buffer {
     pub fn insert_text(&mut self, text: &str, pos: usize) {
         self._insert_text(text, pos);
         
-        self.undo_stack.push_back(Operation::InsertText(String::from_str(text), pos));
+        self.undo_stack.push(InsertText(String::from_str(text), pos));
     }
     
     fn _insert_text(&mut self, text: &str, pos: usize) {
@@ -72,7 +75,7 @@ impl Buffer {
         self._remove_text(pos_a, pos_b);
         
         // Push operation to the undo stack
-        self.undo_stack.push_back(Operation::RemoveText(removed_text, pos_a));
+        self.undo_stack.push(RemoveText(removed_text, pos_a));
     }
     
     fn _remove_text(&mut self, pos_a: usize, pos_b: usize) {
@@ -146,18 +149,49 @@ impl Buffer {
     /// Undoes operations that were pushed to the undo stack, and returns a
     /// cursor position that the cursor should jump to, if any.
     pub fn undo(&mut self) -> Option<usize> {
-        if let Some(op) = self.undo_stack.pop_back() {
+        if let Some(op) = self.undo_stack.prev() {
             match op {
-                Operation::InsertText(ref s, p) => {
+                InsertText(ref s, p) => {
                     let size = grapheme_count(s.as_slice());
                     self._remove_text(p, p+size);
                     return Some(p);
                 },
                 
-                Operation::RemoveText(ref s, p) => {
+                RemoveText(ref s, p) => {
                     let size = grapheme_count(s.as_slice());
                     self._insert_text(s.as_slice(), p);
                     return Some(p+size);
+                },
+                
+                _ => {
+                    return None;
+                },
+            }
+        }
+        
+        return None;
+    }
+    
+    
+    /// Redoes the last undone operation, and returns a cursor position that
+    /// the cursor should jump to, if any.
+    pub fn redo(&mut self) -> Option<usize> {
+        if let Some(op) = self.undo_stack.next() {
+            match op {
+                InsertText(ref s, p) => {
+                    let size = grapheme_count(s.as_slice());
+                    self._insert_text(s.as_slice(), p);
+                    return Some(p+size);
+                },
+                
+                RemoveText(ref s, p) => {
+                    let size = grapheme_count(s.as_slice());
+                    self._remove_text(p, p+size);
+                    return Some(p);
+                },
+                
+                _ => {
+                    return None;
                 },
             }
         }
@@ -380,24 +414,12 @@ impl<'a> Iterator for BufferLineIter<'a> {
 
 
 //================================================================
-// Buffer undo structures
-//================================================================
-
-enum Operation {
-    InsertText(String, usize),
-    RemoveText(String, usize),
-}
-
-
-
-
-//================================================================
 // TESTS
 //================================================================
 
 #[cfg(test)]
 mod tests {
-    use super::{Buffer, Operation, BufferGraphemeIter, BufferLineIter};
+    use super::{Buffer, BufferGraphemeIter, BufferLineIter};
 
     #[test]
     fn insert_text() {

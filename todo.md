@@ -17,8 +17,8 @@
         //- remove_text
         - move_text
     - Undo functionality:
-        - Undo
-        - Redo
+        //- Undo
+        //- Redo
         - Op section begin (for delimiting composite edit operations)
         - Op section end
     - Info:

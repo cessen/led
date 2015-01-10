@@ -25,6 +25,7 @@ const K_CTRL_L: u16 = 12;
 const K_CTRL_O: u16 = 15;
 const K_CTRL_Q: u16 = 17;
 const K_CTRL_S: u16 = 19;
+const K_CTRL_Y: u16 = 25;
 const K_CTRL_Z: u16 = 26;
 
 
@@ -101,6 +102,10 @@ impl TermUI {
                             
                             K_CTRL_Z => {
                                 self.editor.undo();
+                            },
+                            
+                            K_CTRL_Y => {
+                                self.editor.redo();
                             },
                             
                             K_CTRL_L => {

@@ -200,6 +200,17 @@ impl Editor {
     }
     
     
+    pub fn redo(&mut self) {
+        if let Some(pos) = self.buffer.redo() {
+            self.cursor.range.0 = pos;
+            self.cursor.range.1 = pos;
+            self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+            
+            self.move_view_to_cursor();
+        }
+    }
+    
+    
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
         let (v, h) = self.buffer.pos_1d_to_closest_vis_2d(self.cursor.range.0, self.tab_width);
