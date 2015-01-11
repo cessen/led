@@ -143,8 +143,11 @@ impl Buffer {
         }
         // All other cases
         else {
-            // TODO
-            return;
+            // TODO: a more efficient implementation that directly
+            // manipulates the node tree.
+            let s = self.string_from_range(pos_a, pos_b);
+            self.remove_text(pos_a, pos_b);
+            self.insert_text(s.as_slice(), pos_to);
         }
     }
     
