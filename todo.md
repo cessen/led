@@ -3,8 +3,8 @@
 - Line number display
 - File opening by entering path
 - UI that wraps editors, for split view.
-- Redo functionality
-
+- Persistent infinite undo
+- "Projects"
 
 - Clean up text buffer interface:
     - Editing (these are undoable):

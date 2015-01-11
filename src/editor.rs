@@ -377,10 +377,9 @@ impl Editor {
     }
     
     pub fn cursor_right(&mut self, n: usize) {
-        if self.cursor.range.1 <= (self.buffer.grapheme_count() - n) {
-            self.cursor.range.1 += n;
-        }
-        else {
+        self.cursor.range.1 += n;
+        
+        if self.cursor.range.1 > self.buffer.grapheme_count() {
             self.cursor.range.1 = self.buffer.grapheme_count();
         }
         
