@@ -10,14 +10,13 @@
     - Editing (these are undoable):
         //- insert_text
         //- remove_text
-        - move_text
+        //- move_text
     - Undo functionality:
         //- Undo
         //- Redo
         - Op section begin (for delimiting composite edit operations)
         - Op section end
     - Info:
-        - byte_count (useful when saving the file)
         //- grapheme_count
         //- line_count
     - Position conversions:
