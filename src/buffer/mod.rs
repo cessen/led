@@ -21,8 +21,9 @@ mod undo_stack;
 /// A text buffer
 pub struct Buffer {
     text: BufferNode,
-    pub line_ending_type: LineEnding,
     undo_stack: UndoStack,
+    pub line_ending_type: LineEnding,
+    pub tab_width: usize,
 }
 
 
@@ -30,8 +31,9 @@ impl Buffer {
     pub fn new() -> Buffer {
         Buffer {
             text: BufferNode::new(),
-            line_ending_type: LineEnding::LF,
             undo_stack: UndoStack::new(),
+            line_ending_type: LineEnding::LF,
+            tab_width: 4,
         }
     }
 
@@ -231,9 +233,9 @@ impl Buffer {
     ///
     /// If the index is off the end of the text, returns the visual line and
     /// column number of the last valid text position.
-    pub fn index_to_v2d(&self, pos: usize, tab_width: usize) -> (usize, usize) {
+    pub fn index_to_v2d(&self, pos: usize) -> (usize, usize) {
         let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
-        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
+        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, self.tab_width);
         return (v, vis_h);
     }
 
@@ -244,13 +246,13 @@ impl Buffer {
     /// index of the horizontally-closest valid position.  If the visual line
     /// number given is beyond the end of the buffer, returns the index of
     /// the buffer's last valid position.
-    pub fn v2d_to_index(&self, pos: (usize, usize), tab_width: usize) -> usize {
+    pub fn v2d_to_index(&self, pos: (usize, usize)) -> usize {
         if pos.0 >= self.line_count() {
             return self.grapheme_count();
         }
         else {
             let gs = self.line_col_to_index((pos.0, 0));
-            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, tab_width);
+            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, self.tab_width);
             return gs + h;
         }
     }
@@ -271,17 +273,17 @@ impl Buffer {
     }
     
     
-    pub fn get_grapheme_width(&self, index: usize, tab_width: usize) -> usize {
+    pub fn get_grapheme_width(&self, index: usize) -> usize {
         if index >= self.grapheme_count() {
             panic!("Buffer::get_grapheme_width(): index past last grapheme.");
         }
         else {
-            return self.text.get_grapheme_width_recursive(index, tab_width);
+            return self.text.get_grapheme_width_recursive(index, self.tab_width);
         }
     }
     
     
-    pub fn get_line<'a>(&'a self, index: usize) -> &'a Line {
+    fn get_line<'a>(&'a self, index: usize) -> &'a Line {
         if index >= self.line_count() {
             panic!("get_line(): index out of bounds.");
         }

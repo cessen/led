@@ -26,9 +26,9 @@ impl Cursor {
         }
     }
     
-    pub fn update_vis_start(&mut self, buf: &Buffer, tab_width: usize) {
-        let (v, h) = buf.index_to_line_col(self.range.0);
-        self.vis_start = buf.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
+    pub fn update_vis_start(&mut self, buf: &Buffer) {
+        let (v, h) = buf.index_to_v2d(self.range.0);
+        self.vis_start = h;
     }
 }
 
@@ -37,7 +37,6 @@ pub struct Editor {
     pub buffer: Buffer,
     pub file_path: Path,
     pub soft_tabs: bool,
-    pub tab_width: usize,
     pub dirty: bool,
     
     // The dimensions and position of the editor's view within the buffer
@@ -56,7 +55,6 @@ impl Editor {
             buffer: Buffer::new(),
             file_path: Path::new(""),
             soft_tabs: false,
-            tab_width: 4,
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
@@ -71,7 +69,6 @@ impl Editor {
             buffer: buf,
             file_path: path.clone(),
             soft_tabs: false,
-            tab_width: 4,
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
@@ -177,7 +174,7 @@ impl Editor {
             }
             
             self.soft_tabs = true;
-            self.tab_width = width;
+            self.buffer.tab_width = width;
         }
         else {
             self.soft_tabs = false;
@@ -193,7 +190,7 @@ impl Editor {
         if let Some(pos) = self.buffer.undo() {
             self.cursor.range.0 = pos;
             self.cursor.range.1 = pos;
-            self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+            self.cursor.update_vis_start(&(self.buffer));
             
             self.move_view_to_cursor();
         }
@@ -204,7 +201,7 @@ impl Editor {
         if let Some(pos) = self.buffer.redo() {
             self.cursor.range.0 = pos;
             self.cursor.range.1 = pos;
-            self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+            self.cursor.update_vis_start(&(self.buffer));
             
             self.move_view_to_cursor();
         }
@@ -213,7 +210,7 @@ impl Editor {
     
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
-        let (v, h) = self.buffer.index_to_v2d(self.cursor.range.0, self.tab_width);
+        let (v, h) = self.buffer.index_to_v2d(self.cursor.range.0);
         
         // Horizontal
         if h < self.view_pos.1 {
@@ -242,7 +239,7 @@ impl Editor {
         // Move cursor
         self.cursor.range.0 += str_len;
         self.cursor.range.1 += str_len;
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -252,8 +249,8 @@ impl Editor {
         if self.soft_tabs {
             // Figure out how many spaces to insert
             let (v, h) = self.buffer.index_to_line_col(self.cursor.range.0);
-            let vis_pos = self.buffer.get_line(v).grapheme_index_to_closest_vis_pos(h, self.tab_width);
-            let next_tab_stop = ((vis_pos / self.tab_width) + 1) * self.tab_width;
+            let (_, vis_pos) = self.buffer.index_to_v2d(self.cursor.range.0);
+            let next_tab_stop = ((vis_pos / self.buffer.tab_width) + 1) * self.buffer.tab_width;
             let space_count = min(next_tab_stop - vis_pos, 8);
             
             
@@ -265,7 +262,7 @@ impl Editor {
             // Move cursor
             self.cursor.range.0 += space_count;
             self.cursor.range.1 += space_count;
-            self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+            self.cursor.update_vis_start(&(self.buffer));
             
             // Adjust view
             self.move_view_to_cursor();
@@ -286,6 +283,11 @@ impl Editor {
     }
     
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: usize) {
+        // Do nothing if there's nothing to delete.
+        if self.cursor.range.0 == 0 {
+            return;
+        }
+        
         let pos_b = self.cursor.range.0;
         let pos_a = if pos_b >= grapheme_count {pos_b - grapheme_count} else {0};
         let tot_g = pos_b - pos_a;
@@ -297,13 +299,18 @@ impl Editor {
         // Move cursor
         self.cursor.range.0 -= tot_g;
         self.cursor.range.1 -= tot_g;
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: usize) {
+        // Do nothing if there's nothing to delete.
+        if self.cursor.range.0 == self.buffer.grapheme_count() {
+            return;
+        }
+        
         let pos_a = self.cursor.range.1;
         let pos_b = if (pos_a + grapheme_count) <= self.buffer.grapheme_count() {pos_a + grapheme_count} else {self.buffer.grapheme_count()};
         
@@ -312,7 +319,7 @@ impl Editor {
         self.dirty = true;
         
         // Move cursor
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -327,7 +334,7 @@ impl Editor {
         
         // Move cursor
         self.cursor.range.1 = self.cursor.range.0;
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -335,7 +342,7 @@ impl Editor {
     
     pub fn cursor_to_beginning_of_buffer(&mut self) {
         self.cursor.range = (0, 0);
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -344,7 +351,7 @@ impl Editor {
     pub fn cursor_to_end_of_buffer(&mut self) {
         let end = self.buffer.grapheme_count();
         self.cursor.range = (end, end);
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -359,7 +366,7 @@ impl Editor {
         }
         
         self.cursor.range.1 = self.cursor.range.0;
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -374,17 +381,17 @@ impl Editor {
         }
         
         self.cursor.range.0 = self.cursor.range.1;
-        self.cursor.update_vis_start(&(self.buffer), self.tab_width);
+        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn cursor_up(&mut self, n: usize) {
-        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0, self.tab_width);
+        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0);
         
         if v >= n {
-            self.cursor.range.0 = self.buffer.v2d_to_index((v - n, self.cursor.vis_start), self.tab_width);
+            self.cursor.range.0 = self.buffer.v2d_to_index((v - n, self.cursor.vis_start));
             self.cursor.range.1 = self.cursor.range.0;
         }
         else {
@@ -396,10 +403,10 @@ impl Editor {
     }
     
     pub fn cursor_down(&mut self, n: usize) {
-        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0, self.tab_width);
+        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0);
         
         if v < (self.buffer.line_count() - n) {
-            self.cursor.range.0 = self.buffer.v2d_to_index((v + n, self.cursor.vis_start), self.tab_width);
+            self.cursor.range.0 = self.buffer.v2d_to_index((v + n, self.cursor.vis_start));
             self.cursor.range.1 = self.cursor.range.0;
         }
         else {
@@ -457,8 +464,8 @@ impl Editor {
     
     pub fn jump_to_line(&mut self, n: usize) {
         let pos = self.buffer.line_col_to_index((n, 0));
-        let (v, _) = self.buffer.index_to_v2d(pos, self.tab_width);
-        self.cursor.range.0 = self.buffer.v2d_to_index((v, self.cursor.vis_start), self.tab_width);
+        let (v, _) = self.buffer.index_to_v2d(pos);
+        self.cursor.range.0 = self.buffer.v2d_to_index((v, self.cursor.vis_start));
         self.cursor.range.1 = self.cursor.range.0;
         
         // Adjust view
