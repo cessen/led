@@ -353,7 +353,7 @@ impl TermUI {
                 vis_col_num += excess;
                 print_col_num += excess;
                 
-                grapheme_index = editor.buffer.pos_vis_2d_to_closest_1d((vis_line_num, vis_col_num), editor.tab_width);
+                grapheme_index = editor.buffer.v2d_to_index((vis_line_num, vis_col_num), editor.tab_width);
                 
                 for (g, pos, width) in g_iter {
                     print_col_num = pos - editor.view_pos.1;
@@ -406,7 +406,7 @@ impl TermUI {
         // Print cursor if it's at the end of the text, and thus wasn't printed
         // already.
         if editor.cursor.range.0 >= editor.buffer.grapheme_count() {
-            let vis_cursor_pos = editor.buffer.pos_1d_to_closest_vis_2d(editor.cursor.range.0, editor.tab_width);
+            let vis_cursor_pos = editor.buffer.index_to_v2d(editor.cursor.range.0, editor.tab_width);
                 if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
                 let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0 + c1.0, vis_cursor_pos.1 - editor.view_pos.1 + c1.1);
                 

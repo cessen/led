@@ -205,32 +205,54 @@ impl Buffer {
     // Position conversions
     //------------------------------------------------------------------------
     
-    pub fn pos_2d_to_closest_1d(&self, pos: (usize, usize)) -> usize {
-        return self.text.pos_2d_to_closest_1d_recursive(pos);
-    }
-
-
-    pub fn pos_vis_2d_to_closest_1d(&self, pos: (usize, usize), tab_width: usize) -> usize {
-        if pos.0 >= self.line_count() {
-            return self.grapheme_count();
-        }
-        else {
-            let gs = self.pos_2d_to_closest_1d((pos.0, 0));
-            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, tab_width);
-            return gs + h;
-        }
-    }
-
-    
-    pub fn pos_1d_to_closest_2d(&self, pos: usize) -> (usize, usize) {
+    /// Converts a grapheme index into a line number and grapheme-column
+    /// number.
+    ///
+    /// If the index is off the end of the text, returns the line and column
+    /// number of the last valid text position.
+    pub fn index_to_line_col(&self, pos: usize) -> (usize, usize) {
         return self.text.pos_1d_to_closest_2d_recursive(pos);
     }
     
     
-    pub fn pos_1d_to_closest_vis_2d(&self, pos: usize, tab_width: usize) -> (usize, usize) {
+    /// Converts a line number and grapheme-column number into a grapheme
+    /// index.
+    ///
+    /// If the column number given is beyond the end of the line, returns the
+    /// index of the line's last valid position.  If the line number given is
+    /// beyond the end of the buffer, returns the index of the buffer's last
+    /// valid position.
+    pub fn line_col_to_index(&self, pos: (usize, usize)) -> usize {
+        return self.text.pos_2d_to_closest_1d_recursive(pos);
+    }
+
+
+    /// Converts a grapheme index into a visual line and column number.
+    ///
+    /// If the index is off the end of the text, returns the visual line and
+    /// column number of the last valid text position.
+    pub fn index_to_v2d(&self, pos: usize, tab_width: usize) -> (usize, usize) {
         let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
         let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
         return (v, vis_h);
+    }
+
+
+    /// Converts a visual line and column number into a grapheme index.
+    ///
+    /// If the visual column number given is outside of the text, returns the
+    /// index of the horizontally-closest valid position.  If the visual line
+    /// number given is beyond the end of the buffer, returns the index of
+    /// the buffer's last valid position.
+    pub fn v2d_to_index(&self, pos: (usize, usize), tab_width: usize) -> usize {
+        if pos.0 >= self.line_count() {
+            return self.grapheme_count();
+        }
+        else {
+            let gs = self.line_col_to_index((pos.0, 0));
+            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, tab_width);
+            return gs + h;
+        }
     }
     
     
@@ -1122,54 +1144,54 @@ mod tests {
     
     
     #[test]
-    fn pos_2d_to_closest_1d_1() {
+    fn line_col_to_index_1() {
         let mut buf = Buffer::new();
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
-        let pos = buf.pos_2d_to_closest_1d((2, 3));
+        let pos = buf.line_col_to_index((2, 3));
         
         assert!(pos == 12);
     }
     
     
     #[test]
-    fn pos_2d_to_closest_1d_2() {
+    fn line_col_to_index_2() {
         let mut buf = Buffer::new();
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
-        let pos = buf.pos_2d_to_closest_1d((2, 10));
+        let pos = buf.line_col_to_index((2, 10));
         
         assert!(pos == 15);
     }
     
     #[test]
-    fn pos_2d_to_closest_1d_3() {
+    fn line_col_to_index_3() {
         let mut buf = Buffer::new();
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
-        let pos = buf.pos_2d_to_closest_1d((10, 2));
+        let pos = buf.line_col_to_index((10, 2));
         
         assert!(pos == 29);
     }
     
     
     #[test]
-    fn pos_1d_to_closest_2d_1() {
+    fn index_to_line_col_1() {
         let mut buf = Buffer::new();
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
-        let pos = buf.pos_1d_to_closest_2d(5);
+        let pos = buf.index_to_line_col(5);
         
         assert!(pos == (1, 2));
     }
     
     
     #[test]
-    fn pos_1d_to_closest_2d_2() {
+    fn index_to_line_col_2() {
         let mut buf = Buffer::new();
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
-        let pos = buf.pos_1d_to_closest_2d(50);
+        let pos = buf.index_to_line_col(50);
         
         assert!(pos == (5, 6));
     }

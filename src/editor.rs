@@ -27,7 +27,7 @@ impl Cursor {
     }
     
     pub fn update_vis_start(&mut self, buf: &Buffer, tab_width: usize) {
-        let (v, h) = buf.pos_1d_to_closest_2d(self.range.0);
+        let (v, h) = buf.index_to_line_col(self.range.0);
         self.vis_start = buf.get_line(v).grapheme_index_to_closest_vis_pos(h, tab_width);
     }
 }
@@ -213,7 +213,7 @@ impl Editor {
     
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
-        let (v, h) = self.buffer.pos_1d_to_closest_vis_2d(self.cursor.range.0, self.tab_width);
+        let (v, h) = self.buffer.index_to_v2d(self.cursor.range.0, self.tab_width);
         
         // Horizontal
         if h < self.view_pos.1 {
@@ -251,7 +251,7 @@ impl Editor {
     pub fn insert_tab_at_cursor(&mut self) {
         if self.soft_tabs {
             // Figure out how many spaces to insert
-            let (v, h) = self.buffer.pos_1d_to_closest_2d(self.cursor.range.0);
+            let (v, h) = self.buffer.index_to_line_col(self.cursor.range.0);
             let vis_pos = self.buffer.get_line(v).grapheme_index_to_closest_vis_pos(h, self.tab_width);
             let next_tab_stop = ((vis_pos / self.tab_width) + 1) * self.tab_width;
             let space_count = min(next_tab_stop - vis_pos, 8);
@@ -381,10 +381,10 @@ impl Editor {
     }
     
     pub fn cursor_up(&mut self, n: usize) {
-        let (v, _) = self.buffer.pos_1d_to_closest_vis_2d(self.cursor.range.0, self.tab_width);
+        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0, self.tab_width);
         
         if v >= n {
-            self.cursor.range.0 = self.buffer.pos_vis_2d_to_closest_1d((v - n, self.cursor.vis_start), self.tab_width);
+            self.cursor.range.0 = self.buffer.v2d_to_index((v - n, self.cursor.vis_start), self.tab_width);
             self.cursor.range.1 = self.cursor.range.0;
         }
         else {
@@ -396,10 +396,10 @@ impl Editor {
     }
     
     pub fn cursor_down(&mut self, n: usize) {
-        let (v, _) = self.buffer.pos_1d_to_closest_vis_2d(self.cursor.range.0, self.tab_width);
+        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0, self.tab_width);
         
         if v < (self.buffer.line_count() - n) {
-            self.cursor.range.0 = self.buffer.pos_vis_2d_to_closest_1d((v + n, self.cursor.vis_start), self.tab_width);
+            self.cursor.range.0 = self.buffer.v2d_to_index((v + n, self.cursor.vis_start), self.tab_width);
             self.cursor.range.1 = self.cursor.range.0;
         }
         else {
@@ -456,9 +456,9 @@ impl Editor {
     }
     
     pub fn jump_to_line(&mut self, n: usize) {
-        let pos = self.buffer.pos_2d_to_closest_1d((n, 0));
-        let (v, _) = self.buffer.pos_1d_to_closest_vis_2d(pos, self.tab_width);
-        self.cursor.range.0 = self.buffer.pos_vis_2d_to_closest_1d((v, self.cursor.vis_start), self.tab_width);
+        let pos = self.buffer.line_col_to_index((n, 0));
+        let (v, _) = self.buffer.index_to_v2d(pos, self.tab_width);
+        self.cursor.range.0 = self.buffer.v2d_to_index((v, self.cursor.vis_start), self.tab_width);
         self.cursor.range.1 = self.cursor.range.0;
         
         // Adjust view
