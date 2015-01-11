@@ -225,7 +225,6 @@ impl Buffer {
                 },
                 
                 RemoveTextAfter(ref s, p) => {
-                    let size = grapheme_count(s.as_slice());
                     self._insert_text(s.as_slice(), p);
                     return Some(p);
                 },

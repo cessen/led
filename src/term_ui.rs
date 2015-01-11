@@ -219,7 +219,7 @@ impl TermUI {
             let mut e = self.rb.poll_event(); // Block until we get an event
             loop {
                 match e {
-                    Ok(rustbox::Event::KeyEvent(modifier, key, character)) => {
+                    Ok(rustbox::Event::KeyEvent(_, key, character)) => {
                         match key {
                             K_ESC => {
                                 cancel = true;

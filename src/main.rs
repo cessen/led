@@ -1,4 +1,3 @@
-#![feature(old_orphan_check)]  // Temporary, get rid of this once the new orphan check works well
 #![allow(unstable)]
 
 extern crate rustbox;
