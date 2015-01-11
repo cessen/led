@@ -193,6 +193,8 @@ impl Editor {
             self.cursor.update_vis_start(&(self.buffer));
             
             self.move_view_to_cursor();
+            
+            self.dirty = true;
         }
     }
     
@@ -204,6 +206,8 @@ impl Editor {
             self.cursor.update_vis_start(&(self.buffer));
             
             self.move_view_to_cursor();
+            
+            self.dirty = true;
         }
     }
     
