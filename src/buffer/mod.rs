@@ -70,14 +70,29 @@ impl Buffer {
     }
 
     
-    /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
-    pub fn remove_text(&mut self, pos_a: usize, pos_b: usize) {
-        let removed_text = self.string_from_range(pos_a, pos_b);
+    /// Remove the text before grapheme position 'pos' of length 'len'.
+    pub fn remove_text_before(&mut self, pos: usize, len: usize) {
+        if pos >= len {
+            let removed_text = self.string_from_range(pos - len, pos);
+        
+            self._remove_text(pos - len, pos);
+            
+            // Push operation to the undo stack
+            self.undo_stack.push(RemoveTextBefore(removed_text, pos - len));
+        }
+        else {
+            panic!("Buffer::remove_text_before(): attempt to remove text before beginning of buffer.");
+        }
+    }
     
-        self._remove_text(pos_a, pos_b);
+    /// Remove the text after grapheme position 'pos' of length 'len'.
+    pub fn remove_text_after(&mut self, pos: usize, len: usize) {
+        let removed_text = self.string_from_range(pos, pos + len);
+    
+        self._remove_text(pos, pos + len);
         
         // Push operation to the undo stack
-        self.undo_stack.push(RemoveText(removed_text, pos_a));
+        self.undo_stack.push(RemoveTextAfter(removed_text, pos));
     }
     
     fn _remove_text(&mut self, pos_a: usize, pos_b: usize) {
@@ -146,8 +161,8 @@ impl Buffer {
             // TODO: a more efficient implementation that directly
             // manipulates the node tree.
             let s = self.string_from_range(pos_a, pos_b);
-            self.remove_text(pos_a, pos_b);
-            self.insert_text(s.as_slice(), pos_to);
+            self._remove_text(pos_a, pos_b);
+            self._insert_text(s.as_slice(), pos_to);
         }
     }
     
@@ -203,10 +218,16 @@ impl Buffer {
                     return Some(p);
                 },
                 
-                RemoveText(ref s, p) => {
+                RemoveTextBefore(ref s, p) => {
                     let size = grapheme_count(s.as_slice());
                     self._insert_text(s.as_slice(), p);
                     return Some(p+size);
+                },
+                
+                RemoveTextAfter(ref s, p) => {
+                    let size = grapheme_count(s.as_slice());
+                    self._insert_text(s.as_slice(), p);
+                    return Some(p);
                 },
                 
                 MoveText(pa, pb, pto) => {
@@ -236,7 +257,7 @@ impl Buffer {
                     return Some(p+size);
                 },
                 
-                RemoveText(ref s, p) => {
+                RemoveTextBefore(ref s, p) | RemoveTextAfter(ref s, p) => {
                     let size = grapheme_count(s.as_slice());
                     self._remove_text(p, p+size);
                     return Some(p);
@@ -782,7 +803,7 @@ mod tests {
         assert!(buf.grapheme_count() == 29);
         assert!(buf.text.line_count == 6);
         
-        buf.remove_text(0, 3);
+        buf._remove_text(0, 3);
         
         let mut iter = buf.grapheme_iter();
         
@@ -826,7 +847,7 @@ mod tests {
         assert!(buf.grapheme_count() == 29);
         assert!(buf.text.line_count == 6);
         
-        buf.remove_text(0, 12);
+        buf._remove_text(0, 12);
         
         let mut iter = buf.grapheme_iter();
         
@@ -861,7 +882,7 @@ mod tests {
         assert!(buf.grapheme_count() == 29);
         assert!(buf.text.line_count == 6);
         
-        buf.remove_text(5, 17);
+        buf._remove_text(5, 17);
         
         let mut iter = buf.grapheme_iter();
         
@@ -896,7 +917,7 @@ mod tests {
         assert!(buf.grapheme_count() == 29);
         assert!(buf.text.line_count == 6);
         
-        buf.remove_text(23, 29);
+        buf._remove_text(23, 29);
         
         let mut iter = buf.grapheme_iter();
         
@@ -937,7 +958,7 @@ mod tests {
         assert!(buf.grapheme_count() == 29);
         assert!(buf.text.line_count == 6);
         
-        buf.remove_text(17, 29);
+        buf._remove_text(17, 29);
         
         let mut iter = buf.grapheme_iter();
         
@@ -972,7 +993,7 @@ mod tests {
         assert!(buf.grapheme_count() == 12);
         assert!(buf.text.line_count == 2);
         
-        buf.remove_text(3, 12);
+        buf._remove_text(3, 12);
         
         let mut iter = buf.grapheme_iter();
         
@@ -993,7 +1014,7 @@ mod tests {
         assert!(buf.grapheme_count() == 15);
         assert!(buf.text.line_count == 3);
         
-        buf.remove_text(5, 15);
+        buf._remove_text(5, 15);
         
         let mut iter = buf.grapheme_iter();
         
@@ -1016,7 +1037,7 @@ mod tests {
         assert!(buf.grapheme_count() == 12);
         assert!(buf.text.line_count == 2);
         
-        buf.remove_text(3, 11);
+        buf._remove_text(3, 11);
         
         let mut iter = buf.grapheme_iter();
         
@@ -1038,7 +1059,7 @@ mod tests {
         assert!(buf.grapheme_count() == 12);
         assert!(buf.text.line_count == 2);
         
-        buf.remove_text(8, 12);
+        buf._remove_text(8, 12);
         
         let mut iter = buf.grapheme_iter();
         
@@ -1064,7 +1085,7 @@ mod tests {
         assert!(buf.grapheme_count() == 11);
         assert!(buf.text.line_count == 4);
         
-        buf.remove_text(4, 11);
+        buf._remove_text(4, 11);
         
         let mut iter = buf.grapheme_iter();
         
@@ -1086,7 +1107,7 @@ mod tests {
         assert!(buf.grapheme_count() == 10);
         assert!(buf.text.line_count == 1);
         
-        buf.remove_text(9, 10);
+        buf._remove_text(9, 10);
         
         let mut iter = buf.grapheme_iter();
         

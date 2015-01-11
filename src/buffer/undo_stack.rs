@@ -5,7 +5,8 @@ use std::collections::DList;
 #[derive(Clone)]
 pub enum Operation {
     InsertText(String, usize),
-    RemoveText(String, usize),
+    RemoveTextBefore(String, usize),
+    RemoveTextAfter(String, usize),
     MoveText(usize, usize, usize),
     CompositeOp(Vec<Operation>),
 }

@@ -287,17 +287,15 @@ impl Editor {
             return;
         }
         
-        let pos_b = self.cursor.range.0;
-        let pos_a = if pos_b >= grapheme_count {pos_b - grapheme_count} else {0};
-        let tot_g = pos_b - pos_a;
+        let len = min(self.cursor.range.0, grapheme_count);
         
         // Remove text
-        self.buffer.remove_text(pos_a, pos_b);
+        self.buffer.remove_text_before(self.cursor.range.0, len);
         self.dirty = true;
         
         // Move cursor
-        self.cursor.range.0 -= tot_g;
-        self.cursor.range.1 -= tot_g;
+        self.cursor.range.0 -= len;
+        self.cursor.range.1 -= len;
         self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
@@ -310,11 +308,11 @@ impl Editor {
             return;
         }
         
-        let pos_a = self.cursor.range.1;
-        let pos_b = if (pos_a + grapheme_count) <= self.buffer.grapheme_count() {pos_a + grapheme_count} else {self.buffer.grapheme_count()};
+        let max_len = if self.buffer.grapheme_count() > self.cursor.range.1 {self.buffer.grapheme_count() - self.cursor.range.1} else {0};
+        let len = min(max_len, grapheme_count);
         
         // Remove text
-        self.buffer.remove_text(pos_a, pos_b);
+        self.buffer.remove_text_after(self.cursor.range.1, len);
         self.dirty = true;
         
         // Move cursor
@@ -327,7 +325,7 @@ impl Editor {
     pub fn remove_text_inside_cursor(&mut self) {
         // If selection, remove text
         if self.cursor.range.0 < self.cursor.range.1 {
-            self.buffer.remove_text(self.cursor.range.0, self.cursor.range.1);
+            self.buffer.remove_text_before(self.cursor.range.0, self.cursor.range.1 - self.cursor.range.0);
             self.dirty = true;
         }
         

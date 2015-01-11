@@ -9,7 +9,8 @@
 - Clean up text buffer interface:
     - Editing (these are undoable):
         //- insert_text
-        //- remove_text
+        //- remove_text_before
+        //- remove_text_after
         //- move_text
     - Undo functionality:
         //- Undo
