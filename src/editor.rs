@@ -27,7 +27,7 @@ impl Cursor {
     }
     
     pub fn update_vis_start(&mut self, buf: &Buffer) {
-        let (v, h) = buf.index_to_v2d(self.range.0);
+        let (_, h) = buf.index_to_v2d(self.range.0);
         self.vis_start = h;
     }
 }
@@ -248,7 +248,6 @@ impl Editor {
     pub fn insert_tab_at_cursor(&mut self) {
         if self.soft_tabs {
             // Figure out how many spaces to insert
-            let (v, h) = self.buffer.index_to_line_col(self.cursor.range.0);
             let (_, vis_pos) = self.buffer.index_to_v2d(self.cursor.range.0);
             let next_tab_stop = ((vis_pos / self.buffer.tab_width) + 1) * self.buffer.tab_width;
             let space_count = min(next_tab_stop - vis_pos, 8);

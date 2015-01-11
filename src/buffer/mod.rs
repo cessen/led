@@ -87,11 +87,11 @@ impl Buffer {
         }
         // Bounds error
         else if pos_a > pos_b {
-            panic!("Buffer::remove_text(): pos_a must be less than or equal to pos_b.");
+            panic!("Buffer::_remove_text(): pos_a must be less than or equal to pos_b.");
         }
         // Bounds error
         else if pos_b > self.grapheme_count() {
-            panic!("Buffer::remove_text(): attempt to remove text past the end of buffer.");
+            panic!("Buffer::_remove_text(): attempt to remove text past the end of buffer.");
         }
         // Complete removal of all text
         else if pos_a == 0 && pos_b == self.text.grapheme_count {
@@ -101,9 +101,50 @@ impl Buffer {
         // All other cases
         else {
             if self.text.remove_text_recursive(pos_a, pos_b, true) {
-                panic!("Buffer::remove_text(): dangling left side remains.  This should never happen!");
+                panic!("Buffer::_remove_text(): dangling left side remains.  This should never happen!");
             }
             self.text.set_last_line_ending_recursive();
+        }
+    }
+    
+    
+    /// Moves the text in [pos_a, pos_b) to begin at index pos_to.
+    ///
+    /// Note that pos_to is the desired index that the text will start at
+    /// _after_ the operation, not the index before the operation.  This is a
+    /// subtle but important distinction.
+    pub fn move_text(&mut self, pos_a: usize, pos_b: usize, pos_to: usize) {
+        self._move_text(pos_a, pos_b, pos_to);
+        
+        // Push operation to the undo stack
+        self.undo_stack.push(MoveText(pos_a, pos_b, pos_to));
+    }
+    
+    fn _move_text(&mut self, pos_a: usize, pos_b: usize, pos_to: usize) {
+        // Nothing to do
+        if pos_a == pos_b || pos_a == pos_to {
+            return;
+        }
+        // Bounds error
+        else if pos_a > pos_b {
+            panic!("Buffer::_move_text(): pos_a must be less than or equal to pos_b.");
+        }
+        // Bounds error
+        else if pos_b > self.grapheme_count() {
+            panic!("Buffer::_move_text(): specified text range is beyond end of buffer.");
+        }
+        // Bounds error
+        else if pos_to > (self.grapheme_count() - (pos_b - pos_a)) {
+            panic!("Buffer::_move_text(): specified text destination is beyond end of buffer.");
+        }
+        // Nothing to do, because entire text specified
+        else if pos_a == 0 && pos_b == self.grapheme_count() {
+            return;
+        }
+        // All other cases
+        else {
+            // TODO
+            return;
         }
     }
     
@@ -165,6 +206,12 @@ impl Buffer {
                     return Some(p+size);
                 },
                 
+                MoveText(pa, pb, pto) => {
+                    let size = pb - pa;
+                    self._move_text(pto, pto + size, pa);
+                    return Some(pa);
+                },
+                
                 _ => {
                     return None;
                 },
@@ -190,6 +237,11 @@ impl Buffer {
                     let size = grapheme_count(s.as_slice());
                     self._remove_text(p, p+size);
                     return Some(p);
+                },
+                
+                MoveText(pa, pb, pto) => {
+                    self._move_text(pa, pb, pto);
+                    return Some(pa);
                 },
                 
                 _ => {
@@ -1046,6 +1098,231 @@ mod tests {
         assert!(Some("7") == iter.next());
         assert!(Some("8") == iter.next());
         assert!(Some("9") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn move_text_1() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        buf.move_text(0, 3, 2);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.grapheme_count() == 29);
+        assert!(buf.text.line_count == 6);
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn move_text_2() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        buf.move_text(3, 8, 6);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.grapheme_count() == 29);
+        assert!(buf.text.line_count == 6);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn move_text_3() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        buf.move_text(12, 17, 6);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.grapheme_count() == 29);
+        assert!(buf.text.line_count == 6);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn move_text_4() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        buf.move_text(23, 29, 20);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.grapheme_count() == 29);
+        assert!(buf.text.line_count == 6);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn move_text_5() {
+        let mut buf = Buffer::new();
+        
+        buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
+        
+        buf.move_text(0, 29, 0);
+        
+        let mut iter = buf.grapheme_iter();
+        
+        assert!(buf.grapheme_count() == 29);
+        assert!(buf.text.line_count == 6);
+        assert!(Some("H") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("p") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("f") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("t") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("\n") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("l") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("!") == iter.next());
         assert!(None == iter.next());
     }
     
