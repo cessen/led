@@ -63,7 +63,10 @@ impl Editor {
     }
     
     pub fn new_from_file(path: &Path) -> Editor {
-        let buf = load_file_to_buffer(path).unwrap();
+        let buf = match load_file_to_buffer(path) {
+            Ok(b) => {b},
+            _ => {Buffer::new()}
+        };
         
         let mut ed = Editor {
             buffer: buf,
