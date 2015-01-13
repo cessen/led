@@ -44,7 +44,7 @@ pub struct Editor {
     pub view_pos: (usize, usize),  // (line, col)
     
     // The editing cursor position
-    pub cursor: Cursor,  
+    pub cursors: Vec<Cursor>,  
 }
 
 
@@ -58,7 +58,7 @@ impl Editor {
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
-            cursor: Cursor::new(),
+            cursors: vec!(Cursor::new()),
         }
     }
     
@@ -75,7 +75,7 @@ impl Editor {
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
-            cursor: Cursor::new(),
+            cursors: vec!(Cursor::new()),
         };
         
         ed.auto_detect_indentation_style();
@@ -190,10 +190,12 @@ impl Editor {
     
     
     pub fn undo(&mut self) {
+        // TODO: handle multiple cursors properly
         if let Some(pos) = self.buffer.undo() {
-            self.cursor.range.0 = pos;
-            self.cursor.range.1 = pos;
-            self.cursor.update_vis_start(&(self.buffer));
+            self.cursors.truncate(1);
+            self.cursors[0].range.0 = pos;
+            self.cursors[0].range.1 = pos;
+            self.cursors[0].update_vis_start(&(self.buffer));
             
             self.move_view_to_cursor();
             
@@ -203,10 +205,12 @@ impl Editor {
     
     
     pub fn redo(&mut self) {
+        // TODO: handle multiple cursors properly
         if let Some(pos) = self.buffer.redo() {
-            self.cursor.range.0 = pos;
-            self.cursor.range.1 = pos;
-            self.cursor.update_vis_start(&(self.buffer));
+            self.cursors.truncate(1);
+            self.cursors[0].range.0 = pos;
+            self.cursors[0].range.1 = pos;
+            self.cursors[0].update_vis_start(&(self.buffer));
             
             self.move_view_to_cursor();
             
@@ -217,7 +221,10 @@ impl Editor {
     
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
-        let (v, h) = self.buffer.index_to_v2d(self.cursor.range.0);
+        // TODO: handle multiple cursors properly.  Should only move if
+        // there are no cursors currently in view, and should jump to
+        // the closest cursor.
+        let (v, h) = self.buffer.index_to_v2d(self.cursors[0].range.0);
         
         // Horizontal
         if h < self.view_pos.1 {
@@ -238,15 +245,21 @@ impl Editor {
     
     pub fn insert_text_at_cursor(&mut self, text: &str) {
         let str_len = grapheme_count(text);
+        let mut offset = 0;
         
-        // Insert text
-        self.buffer.insert_text(text, self.cursor.range.0);
-        self.dirty = true;
-        
-        // Move cursor
-        self.cursor.range.0 += str_len;
-        self.cursor.range.1 += str_len;
-        self.cursor.update_vis_start(&(self.buffer));
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            // Insert text
+            self.buffer.insert_text(text, c.range.0 + offset);
+            self.dirty = true;
+            
+            // Move cursor
+            c.range.0 += str_len + offset;
+            c.range.1 += str_len + offset;
+            c.update_vis_start(&(self.buffer));
+            
+            // Update offset
+            offset += str_len;
+        }
         
         // Adjust view
         self.move_view_to_cursor();
@@ -254,21 +267,32 @@ impl Editor {
     
     pub fn insert_tab_at_cursor(&mut self) {
         if self.soft_tabs {
-            // Figure out how many spaces to insert
-            let (_, vis_pos) = self.buffer.index_to_v2d(self.cursor.range.0);
-            let next_tab_stop = ((vis_pos / self.buffer.tab_width) + 1) * self.buffer.tab_width;
-            let space_count = min(next_tab_stop - vis_pos, 8);
+            let mut offset = 0;
             
-            
-            // Insert spaces
-            let space_strs = ["", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        "];
-            self.buffer.insert_text(space_strs[space_count], self.cursor.range.0);
-            self.dirty = true;
-            
-            // Move cursor
-            self.cursor.range.0 += space_count;
-            self.cursor.range.1 += space_count;
-            self.cursor.update_vis_start(&(self.buffer));
+            for c in self.cursors.as_mut_slice().iter_mut() {
+                // Update cursor with offset
+                c.range.0 += offset;
+                c.range.1 += offset;
+                
+                // Figure out how many spaces to insert
+                let (_, vis_pos) = self.buffer.index_to_v2d(c.range.0);
+                let next_tab_stop = ((vis_pos / self.buffer.tab_width) + 1) * self.buffer.tab_width;
+                let space_count = min(next_tab_stop - vis_pos, 8);
+                
+                
+                // Insert spaces
+                let space_strs = ["", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        "];
+                self.buffer.insert_text(space_strs[space_count], c.range.0);
+                self.dirty = true;
+                
+                // Move cursor
+                c.range.0 += space_count;
+                c.range.1 += space_count;
+                c.update_vis_start(&(self.buffer));
+                    
+                // Update offset
+                offset += space_count;
+            }
             
             // Adjust view
             self.move_view_to_cursor();
@@ -289,64 +313,102 @@ impl Editor {
     }
     
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: usize) {
-        // Do nothing if there's nothing to delete.
-        if self.cursor.range.0 == 0 {
-            return;
+        let mut offset = 0;
+        
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            // Update cursor with offset
+            c.range.0 -= offset;
+            c.range.1 -= offset;
+            
+            // Do nothing if there's nothing to delete.
+            if c.range.0 == 0 {
+                continue;
+            }
+            
+            let len = min(c.range.0, grapheme_count);
+            
+            // Remove text
+            self.buffer.remove_text_before(c.range.0, len);
+            self.dirty = true;
+            
+            // Move cursor
+            c.range.0 -= len;
+            c.range.1 -= len;
+            c.update_vis_start(&(self.buffer));
+            
+            // Update offset
+            offset -= len;
         }
-        
-        let len = min(self.cursor.range.0, grapheme_count);
-        
-        // Remove text
-        self.buffer.remove_text_before(self.cursor.range.0, len);
-        self.dirty = true;
-        
-        // Move cursor
-        self.cursor.range.0 -= len;
-        self.cursor.range.1 -= len;
-        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: usize) {
-        // Do nothing if there's nothing to delete.
-        if self.cursor.range.0 == self.buffer.grapheme_count() {
-            return;
+        let mut offset = 0;
+        
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            // Update cursor with offset
+            c.range.0 -= min(c.range.0, offset);
+            c.range.1 -= min(c.range.1, offset);
+        
+            // Do nothing if there's nothing to delete.
+            if c.range.1 == self.buffer.grapheme_count() {
+                return;
+            }
+            
+            let max_len = if self.buffer.grapheme_count() > c.range.1 {self.buffer.grapheme_count() - c.range.1} else {0};
+            let len = min(max_len, grapheme_count);
+            
+            // Remove text
+            self.buffer.remove_text_after(c.range.1, len);
+            self.dirty = true;
+            
+            // Move cursor
+            c.update_vis_start(&(self.buffer));
+            
+            // Update offset
+            offset -= len;
         }
-        
-        let max_len = if self.buffer.grapheme_count() > self.cursor.range.1 {self.buffer.grapheme_count() - self.cursor.range.1} else {0};
-        let len = min(max_len, grapheme_count);
-        
-        // Remove text
-        self.buffer.remove_text_after(self.cursor.range.1, len);
-        self.dirty = true;
-        
-        // Move cursor
-        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn remove_text_inside_cursor(&mut self) {
-        // If selection, remove text
-        if self.cursor.range.0 < self.cursor.range.1 {
-            self.buffer.remove_text_before(self.cursor.range.0, self.cursor.range.1 - self.cursor.range.0);
-            self.dirty = true;
-        }
+        let mut offset = 0;
         
-        // Move cursor
-        self.cursor.range.1 = self.cursor.range.0;
-        self.cursor.update_vis_start(&(self.buffer));
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            // Update cursor with offset
+            c.range.0 -= min(c.range.0, offset);
+            c.range.1 -= min(c.range.1, offset);
+        
+            // If selection, remove text
+            if c.range.0 < c.range.1 {
+                let len = c.range.1 - c.range.0;
+                
+                self.buffer.remove_text_before(c.range.0, c.range.1 - c.range.0);
+                self.dirty = true;
+            
+                // Move cursor
+                c.range.1 = c.range.0;
+                
+                // Update offset
+                offset += len;
+            }
+            
+            c.update_vis_start(&(self.buffer));
+        }
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn cursor_to_beginning_of_buffer(&mut self) {
-        self.cursor.range = (0, 0);
-        self.cursor.update_vis_start(&(self.buffer));
+        self.cursors = vec!(Cursor::new());
+        
+        self.cursors[0].range = (0, 0);
+        self.cursors[0].update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -354,51 +416,60 @@ impl Editor {
     
     pub fn cursor_to_end_of_buffer(&mut self) {
         let end = self.buffer.grapheme_count();
-        self.cursor.range = (end, end);
-        self.cursor.update_vis_start(&(self.buffer));
+        
+        self.cursors = vec!(Cursor::new());
+        self.cursors[0].range = (end, end);
+        self.cursors[0].update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn cursor_left(&mut self, n: usize) {
-        if self.cursor.range.0 >= n {
-            self.cursor.range.0 -= n;
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            if c.range.0 >= n {
+                c.range.0 -= n;
+            }
+            else {
+                c.range.0 = 0;
+            }
+            
+            c.range.1 = c.range.0;
+            c.update_vis_start(&(self.buffer));
         }
-        else {
-            self.cursor.range.0 = 0;
-        }
-        
-        self.cursor.range.1 = self.cursor.range.0;
-        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn cursor_right(&mut self, n: usize) {
-        self.cursor.range.1 += n;
-        
-        if self.cursor.range.1 > self.buffer.grapheme_count() {
-            self.cursor.range.1 = self.buffer.grapheme_count();
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            c.range.1 += n;
+            
+            if c.range.1 > self.buffer.grapheme_count() {
+                c.range.1 = self.buffer.grapheme_count();
+            }
+            
+            c.range.0 = c.range.1;
+            c.update_vis_start(&(self.buffer));
         }
-        
-        self.cursor.range.0 = self.cursor.range.1;
-        self.cursor.update_vis_start(&(self.buffer));
         
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn cursor_up(&mut self, n: usize) {
-        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0);
-        
-        if v >= n {
-            self.cursor.range.0 = self.buffer.v2d_to_index((v - n, self.cursor.vis_start));
-            self.cursor.range.1 = self.cursor.range.0;
-        }
-        else {
-            self.cursor_to_beginning_of_buffer();
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            let (v, _) = self.buffer.index_to_v2d(c.range.0);
+            
+            if v >= n {
+                c.range.0 = self.buffer.v2d_to_index((v - n, c.vis_start));
+                c.range.1 = c.range.0;
+            }
+            else {
+                c.range = (0, 0);
+                c.update_vis_start(&(self.buffer));
+            }
         }
         
         // Adjust view
@@ -406,14 +477,18 @@ impl Editor {
     }
     
     pub fn cursor_down(&mut self, n: usize) {
-        let (v, _) = self.buffer.index_to_v2d(self.cursor.range.0);
-        
-        if v < (self.buffer.line_count() - n) {
-            self.cursor.range.0 = self.buffer.v2d_to_index((v + n, self.cursor.vis_start));
-            self.cursor.range.1 = self.cursor.range.0;
-        }
-        else {
-            self.cursor_to_end_of_buffer();
+        for c in self.cursors.as_mut_slice().iter_mut() {
+            let (v, _) = self.buffer.index_to_v2d(c.range.0);
+            
+            if v < (self.buffer.line_count() - n) {
+                c.range.0 = self.buffer.v2d_to_index((v + n, c.vis_start));
+                c.range.1 = c.range.0;
+            }
+            else {
+                let end = self.buffer.grapheme_count();
+                c.range = (end, end);
+                c.update_vis_start(&(self.buffer));
+            }
         }
         
         // Adjust view
@@ -441,7 +516,6 @@ impl Editor {
     }
     
     pub fn page_down(&mut self) {
-        // TODO
         let nlc = self.buffer.line_count() - 1;
         
         if self.view_pos.0 < nlc {
@@ -468,8 +542,9 @@ impl Editor {
     pub fn jump_to_line(&mut self, n: usize) {
         let pos = self.buffer.line_col_to_index((n, 0));
         let (v, _) = self.buffer.index_to_v2d(pos);
-        self.cursor.range.0 = self.buffer.v2d_to_index((v, self.cursor.vis_start));
-        self.cursor.range.1 = self.cursor.range.0;
+        self.cursors.truncate(1);
+        self.cursors[0].range.0 = self.buffer.v2d_to_index((v, self.cursors[0].vis_start));
+        self.cursors[0].range.1 = self.cursors[0].range.0;
         
         // Adjust view
         self.move_view_to_cursor();

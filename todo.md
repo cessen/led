@@ -7,7 +7,6 @@
 - Persistent infinite undo
 - Multiple cursors
 - "Projects"
-- Move undo/redo functionality into Editor instead of Buffer
 
 - Clean up text buffer interface:
     - //Editing (these are undoable):

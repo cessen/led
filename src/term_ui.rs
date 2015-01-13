@@ -301,8 +301,10 @@ impl TermUI {
         self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, name.as_slice());
         
         // Percentage position in document
+        // TODO: use view instead of cursor for calculation if there is more
+        // than one cursor.
         let percentage: usize = if editor.buffer.grapheme_count() > 0 {
-            (((editor.cursor.range.0 as f32) / (editor.buffer.grapheme_count() as f32)) * 100.0) as usize
+            (((editor.cursors[0].range.0 as f32) / (editor.buffer.grapheme_count() as f32)) * 100.0) as usize
         }
         else {
             100
@@ -355,11 +357,22 @@ impl TermUI {
                 
                 grapheme_index = editor.buffer.v2d_to_index((vis_line_num, vis_col_num));
                 
+                
+                
                 for (g, pos, width) in g_iter {
                     print_col_num = pos - editor.view_pos.1;
                     
+                    // Check if the character is within a cursor
+                    let mut at_cursor = false;
+                    for c in editor.cursors.as_slice().iter() {
+                        if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
+                            at_cursor = true;
+                        }
+                    }
+                    
+                    // Print to screen
                     if is_line_ending(g) {
-                        if grapheme_index == editor.cursor.range.0 {
+                        if at_cursor {
                             self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                         }
                     }
@@ -368,12 +381,12 @@ impl TermUI {
                             self.rb.print(i, print_line_num, rustbox::RB_NORMAL, Color::White, Color::Black, " ");
                         }
                         
-                        if grapheme_index == editor.cursor.range.0 {
+                        if at_cursor {
                             self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
                         }
                     }
                     else {
-                        if grapheme_index == editor.cursor.range.0 {
+                        if at_cursor {
                             self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, g);
                         }
                         else {
@@ -403,15 +416,17 @@ impl TermUI {
             }
         }
         
-        // Print cursor if it's at the end of the text, and thus wasn't printed
+        // Print cursor(s) if it's at the end of the text, and thus wasn't printed
         // already.
-        if editor.cursor.range.0 >= editor.buffer.grapheme_count() {
-            let vis_cursor_pos = editor.buffer.index_to_v2d(editor.cursor.range.0);
-                if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
-                let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0 + c1.0, vis_cursor_pos.1 - editor.view_pos.1 + c1.1);
-                
-                if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 <= c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 <= c2.1 {
-                    self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+        for c in editor.cursors.as_slice().iter() {
+            if c.range.0 >= editor.buffer.grapheme_count() {
+                let vis_cursor_pos = editor.buffer.index_to_v2d(c.range.0);
+                    if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
+                    let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0 + c1.0, vis_cursor_pos.1 - editor.view_pos.1 + c1.1);
+                    
+                    if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 <= c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 <= c2.1 {
+                        self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                    }
                 }
             }
         }
