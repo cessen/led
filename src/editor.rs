@@ -78,6 +78,12 @@ impl Editor {
             cursors: vec!(Cursor::new()),
         };
         
+        // // For multiple-cursor testing
+        // ed.cursors.push(Cursor::new());
+        // ed.cursors[1].range.0 = 30;
+        // ed.cursors[1].range.1 = 30;
+        // ed.cursors[1].update_vis_start(&(ed.buffer));
+        
         ed.auto_detect_indentation_style();
         
         return ed;
@@ -337,7 +343,7 @@ impl Editor {
             c.update_vis_start(&(self.buffer));
             
             // Update offset
-            offset -= len;
+            offset += len;
         }
         
         // Adjust view
@@ -368,7 +374,7 @@ impl Editor {
             c.update_vis_start(&(self.buffer));
             
             // Update offset
-            offset -= len;
+            offset += len;
         }
         
         // Adjust view
