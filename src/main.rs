@@ -3,6 +3,8 @@
 extern crate rustbox;
 extern crate docopt;
 extern crate "rustc-serialize" as rustc_serialize;
+extern crate freetype;
+extern crate sdl2;
 
 use std::path::Path;
 use docopt::Docopt;
@@ -14,6 +16,7 @@ mod buffer;
 mod files;
 mod editor;
 mod term_ui;
+mod font;
 
 
 
