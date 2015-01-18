@@ -364,7 +364,7 @@ impl TermUI {
                     
                     // Check if the character is within a cursor
                     let mut at_cursor = false;
-                    for c in editor.cursors.as_slice().iter() {
+                    for c in editor.cursors.iter() {
                         if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
                             at_cursor = true;
                         }
@@ -418,7 +418,7 @@ impl TermUI {
         
         // Print cursor(s) if it's at the end of the text, and thus wasn't printed
         // already.
-        for c in editor.cursors.as_slice().iter() {
+        for c in editor.cursors.iter() {
             if c.range.0 >= editor.buffer.grapheme_count() {
                 let vis_cursor_pos = editor.buffer.index_to_v2d(c.range.0);
                     if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {

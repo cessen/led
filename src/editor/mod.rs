@@ -5,32 +5,9 @@ use std::path::Path;
 use std::cmp::min;
 use files::{load_file_to_buffer, save_buffer_to_file};
 use string_utils::grapheme_count;
+use self::cursor::{Cursor, CursorSet};
 
-
-/// A text cursor.  Also represents selections when range.0 != range.1.
-///
-/// `range` is a pair of 1d grapheme indexes into the text.
-///
-/// `vis_start` is the visual 2d horizontal position of the cursor.  This
-/// doesn't affect editing operations at all, but is used for cursor movement.
-pub struct Cursor {
-    pub range: (usize, usize),  // start, end
-    pub vis_start: usize,  // start
-}
-
-impl Cursor {
-    pub fn new() -> Cursor {
-        Cursor {
-            range: (0, 0),
-            vis_start: 0,
-        }
-    }
-    
-    pub fn update_vis_start(&mut self, buf: &Buffer) {
-        let (_, h) = buf.index_to_v2d(self.range.0);
-        self.vis_start = h;
-    }
-}
+mod cursor;
 
 
 pub struct Editor {
@@ -44,7 +21,7 @@ pub struct Editor {
     pub view_pos: (usize, usize),  // (line, col)
     
     // The editing cursor position
-    pub cursors: Vec<Cursor>,  
+    pub cursors: CursorSet,  
 }
 
 
@@ -58,7 +35,7 @@ impl Editor {
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
-            cursors: vec!(Cursor::new()),
+            cursors: CursorSet::new(),
         }
     }
     
@@ -75,14 +52,15 @@ impl Editor {
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
-            cursors: vec!(Cursor::new()),
+            cursors: CursorSet::new(),
         };
         
-        // // For multiple-cursor testing
-        // ed.cursors.push(Cursor::new());
-        // ed.cursors[1].range.0 = 30;
-        // ed.cursors[1].range.1 = 30;
-        // ed.cursors[1].update_vis_start(&(ed.buffer));
+        // For multiple-cursor testing
+        let mut cur = Cursor::new();
+        cur.range.0 = 30;
+        cur.range.1 = 30;
+        cur.update_vis_start(&(ed.buffer));
+        ed.cursors.add_cursor(cur);
         
         ed.auto_detect_indentation_style();
         
@@ -206,6 +184,8 @@ impl Editor {
             self.move_view_to_cursor();
             
             self.dirty = true;
+            
+            self.cursors.make_consistent();
         }
     }
     
@@ -221,6 +201,8 @@ impl Editor {
             self.move_view_to_cursor();
             
             self.dirty = true;
+            
+            self.cursors.make_consistent();
         }
     }
     
@@ -250,10 +232,12 @@ impl Editor {
     }
     
     pub fn insert_text_at_cursor(&mut self, text: &str) {
+        self.cursors.make_consistent();
+        
         let str_len = grapheme_count(text);
         let mut offset = 0;
         
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             // Insert text
             self.buffer.insert_text(text, c.range.0 + offset);
             self.dirty = true;
@@ -272,10 +256,12 @@ impl Editor {
     }
     
     pub fn insert_tab_at_cursor(&mut self) {
+        self.cursors.make_consistent();
+        
         if self.soft_tabs {
             let mut offset = 0;
             
-            for c in self.cursors.as_mut_slice().iter_mut() {
+            for c in self.cursors.iter_mut() {
                 // Update cursor with offset
                 c.range.0 += offset;
                 c.range.1 += offset;
@@ -319,9 +305,11 @@ impl Editor {
     }
     
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: usize) {
+        self.cursors.make_consistent();
+        
         let mut offset = 0;
         
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             // Update cursor with offset
             c.range.0 -= offset;
             c.range.1 -= offset;
@@ -346,14 +334,18 @@ impl Editor {
             offset += len;
         }
         
+        self.cursors.make_consistent();
+        
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: usize) {
+        self.cursors.make_consistent();
+        
         let mut offset = 0;
         
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             // Update cursor with offset
             c.range.0 -= min(c.range.0, offset);
             c.range.1 -= min(c.range.1, offset);
@@ -377,14 +369,18 @@ impl Editor {
             offset += len;
         }
         
+        self.cursors.make_consistent();
+        
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn remove_text_inside_cursor(&mut self) {
+        self.cursors.make_consistent();
+        
         let mut offset = 0;
         
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             // Update cursor with offset
             c.range.0 -= min(c.range.0, offset);
             c.range.1 -= min(c.range.1, offset);
@@ -406,12 +402,14 @@ impl Editor {
             c.update_vis_start(&(self.buffer));
         }
         
+        self.cursors.make_consistent();
+        
         // Adjust view
         self.move_view_to_cursor();
     }
     
     pub fn cursor_to_beginning_of_buffer(&mut self) {
-        self.cursors = vec!(Cursor::new());
+        self.cursors = CursorSet::new();
         
         self.cursors[0].range = (0, 0);
         self.cursors[0].update_vis_start(&(self.buffer));
@@ -423,7 +421,7 @@ impl Editor {
     pub fn cursor_to_end_of_buffer(&mut self) {
         let end = self.buffer.grapheme_count();
         
-        self.cursors = vec!(Cursor::new());
+        self.cursors = CursorSet::new();
         self.cursors[0].range = (end, end);
         self.cursors[0].update_vis_start(&(self.buffer));
         
@@ -432,7 +430,7 @@ impl Editor {
     }
     
     pub fn cursor_left(&mut self, n: usize) {
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             if c.range.0 >= n {
                 c.range.0 -= n;
             }
@@ -449,7 +447,7 @@ impl Editor {
     }
     
     pub fn cursor_right(&mut self, n: usize) {
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             c.range.1 += n;
             
             if c.range.1 > self.buffer.grapheme_count() {
@@ -465,7 +463,7 @@ impl Editor {
     }
     
     pub fn cursor_up(&mut self, n: usize) {
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             let (v, _) = self.buffer.index_to_v2d(c.range.0);
             
             if v >= n {
@@ -483,7 +481,7 @@ impl Editor {
     }
     
     pub fn cursor_down(&mut self, n: usize) {
-        for c in self.cursors.as_mut_slice().iter_mut() {
+        for c in self.cursors.iter_mut() {
             let (v, _) = self.buffer.index_to_v2d(c.range.0);
             
             if v < (self.buffer.line_count() - n) {

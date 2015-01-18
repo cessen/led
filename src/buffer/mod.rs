@@ -2,7 +2,7 @@
 
 use std::mem;
 
-
+use font::Font;
 use self::line::{Line, LineEnding};
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::undo_stack::{UndoStack};
@@ -24,6 +24,7 @@ pub struct Buffer {
     undo_stack: UndoStack,
     pub line_ending_type: LineEnding,
     pub tab_width: usize,
+    pub font: Option<Font>,
 }
 
 
@@ -34,6 +35,7 @@ impl Buffer {
             undo_stack: UndoStack::new(),
             line_ending_type: LineEnding::LF,
             tab_width: 4,
+            font: None,
         }
     }
 
