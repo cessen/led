@@ -10,6 +10,7 @@ use std::path::Path;
 use docopt::Docopt;
 use editor::Editor;
 use term_ui::TermUI;
+use gui::GUI;
 
 mod string_utils;
 mod buffer;
@@ -17,16 +18,18 @@ mod files;
 mod editor;
 mod term_ui;
 mod font;
+mod gui;
 
 
 
 
 // Usage documentation string
 static USAGE: &'static str = "
-Usage: led [<file>]
+Usage: led [options] [<file>]
        led --help
 
 Options:
+    -g, --gui   Use a graphical user interface instead of a console UI
     -h, --help  Show this message
 ";
 
@@ -35,6 +38,7 @@ Options:
 #[derive(RustcDecodable, Show)]
     struct Args {
     arg_file: Option<String>,
+    flag_gui: bool,
     flag_help: bool,
 }
 
@@ -54,8 +58,18 @@ fn main() {
     };
         
     // Initialize and start UI
-    let mut ui = TermUI::new_from_editor(editor);
-    ui.main_ui_loop();
+    if args.flag_gui {
+        // GUI
+        sdl2::init(sdl2::INIT_VIDEO);
+        let mut ui = GUI::new_from_editor(editor);
+        ui.main_ui_loop();
+        sdl2::quit();
+    }
+    else {
+        // Console UI
+        let mut ui = TermUI::new_from_editor(editor);
+        ui.main_ui_loop();
+    }
     
     //println!("{}", editor.buffer.root.tree_height);
 }
