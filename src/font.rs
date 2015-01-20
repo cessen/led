@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::path::Path;
+use std::collections::HashMap;
 
 use freetype;
 use sdl2;
@@ -8,10 +9,22 @@ use sdl2;
 use sdl2::surface::Surface;
 use sdl2::rect::Rect;
 
+use string_utils::{is_line_ending};
+
+struct CachedGlyph {
+    texture: Option<sdl2::render::Texture>,
+    height: i32,
+    width: i32,
+    advance: i32,
+    bitmap_top: i32,
+    bitmap_left: i32,
+}
+
 
 pub struct Font {
     ftl: freetype::Library,
     face: freetype::Face,
+    glyph_cache: HashMap<char, CachedGlyph>,
 }
 
 impl Font {
@@ -23,52 +36,86 @@ impl Font {
         Font {
             ftl: lib,
             face: face,
+            glyph_cache: HashMap::new(),
         }
     }
     
     
-    pub fn draw_text(&mut self, text: &str, color: (u8, u8, u8), cx: i32, cy: i32, renderer: &sdl2::render::Renderer) {
+    pub fn line_height(&self) -> usize {
+        self.face.height() as usize
+    }
+    
+
+    pub fn draw_text(&mut self, text: &str, color: (u8, u8, u8), cx: i32, cy: i32, renderer: &sdl2::render::Renderer) -> usize {
         let mut x = cx;
-        let mut y = cy;
+        let y = cy;
         
         for grapheme in text.graphemes(true) {
-            for ch in grapheme.chars() {
-                let _ = self.face.load_char(ch as u64, freetype::face::RENDER);
-                let g = self.face.glyph();
-            
-                match (g.bitmap().width(), g.bitmap().rows()) {
-                    (0, _) | (_, 0) => {
-                    },
+            if is_line_ending(grapheme) {
+                continue;
+            }
+            else if grapheme == "\t" {
+                // TODO: handle tab characters
+            }
+            else {
+                let ch = grapheme.chars().next().unwrap();
+
+                // Generate and cache glyph if we haven't already
+                if !self.glyph_cache.contains_key(&ch) {
+                    let mut cg = CachedGlyph {
+                        texture: None,
+                        height: 0,
+                        width: 0,
+                        advance: 0,
+                        bitmap_top: 0,
+                        bitmap_left: 0,
+                    };
                     
-                    _ => {
-                        // Get the char's glyph bitmap as an sdl surface
+                    
+                    let _ = self.face.load_char(ch as u64, freetype::face::RENDER);
+                    let g = self.face.glyph();
+                
+                    match (g.bitmap().width(), g.bitmap().rows()) {
+                        (0, _) | (_, 0) => {
+                            cg.advance = (g.advance().x >> 6) as i32;
+                        },
                         
-                        let bitmap = g.bitmap();
-                        let width = g.bitmap().width() as isize;
-                        let height = g.bitmap().rows() as isize;
-                        let mut buf = Vec::with_capacity(bitmap.buffer().len() * 4);
-                        for b in bitmap.buffer().iter() {
-                            buf.push(*b);
-                            buf.push(color.2);
-                            buf.push(color.1);
-                            buf.push(color.0);
+                        _ => {
+                            // Get the char's glyph bitmap as an sdl surface
+                            let bitmap = g.bitmap();
+                            cg.width = g.bitmap().width();
+                            cg.height = g.bitmap().rows();
+                            cg.advance = (g.advance().x >> 6) as i32;
+                            cg.bitmap_left = g.bitmap_left();
+                            cg.bitmap_top = g.bitmap_top();
+                            
+                            let mut buf = Vec::with_capacity(bitmap.buffer().len() * 4);
+                            for b in bitmap.buffer().iter() {
+                                buf.push(*b);
+                                buf.push(color.2);
+                                buf.push(color.1);
+                                buf.push(color.0);
+                            }
+                            let gs = Surface::from_data(buf.as_mut_slice(), cg.width as isize, cg.height as isize, 32, (cg.width as isize) * 4, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF).unwrap();
+                            
+                            // Get glyph surface as a texture
+                            cg.texture = Some(renderer.create_texture_from_surface(&gs).unwrap());
                         }
-                        let gs = Surface::from_data(buf.as_mut_slice(), width, height, 32, width*4, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF).unwrap();
-                        
-                        // Get glyph surface as a texture
-                        let gt = renderer.create_texture_from_surface(&gs).unwrap();
-                        
-                        // Draw the glyph
-                        let _ = renderer.copy(&gt, Some(Rect{x:0, y:0, h:height as i32, w:width as i32}), Some(Rect{x:x+g.bitmap_left(), y:y-g.bitmap_top(), h:height as i32, w:width as i32}));
-                        
-                        
                     }
+                    
+                    self.glyph_cache.insert(ch, cg);
+                }
+
+                // Draw the glyph
+                let ref cg = self.glyph_cache[ch];
+                if let Some(ref tex) = cg.texture {
+                    let _ = renderer.copy(tex, Some(Rect{x:0, y:0, h:cg.height, w:cg.width}), Some(Rect{x:x+cg.bitmap_left, y:y-cg.bitmap_top, h:cg.height, w:cg.width}));
                 }
                 
-                x += (g.advance().x >> 6) as i32;
-                y += (g.advance().y >> 6) as i32;
-                break;
+                x += cg.advance;
             }
         }
+        
+        return (x - cx) as usize;
     }
 }
