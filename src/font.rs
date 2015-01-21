@@ -7,12 +7,13 @@ use freetype;
 use sdl2;
 
 use sdl2::surface::Surface;
+use sdl2::render::Texture;
 use sdl2::rect::Rect;
 
 use string_utils::{is_line_ending};
 
 struct CachedGlyph {
-    texture: Option<sdl2::render::Texture>,
+    texture: Option<Texture>,
     height: i32,
     width: i32,
     advance: i32,

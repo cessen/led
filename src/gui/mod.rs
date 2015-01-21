@@ -1,13 +1,19 @@
 #![allow(dead_code)]
 
+use std::cmp::min;
+
 use sdl2;
+use sdl2::event::WindowEventId;
+use sdl2::render::{Renderer, Texture};
+use sdl2::rect::Rect;
 
 use font::Font;
 use editor::Editor;
 
 
 pub struct GUI {
-    renderer: sdl2::render::Renderer,
+    renderer: Renderer,
+    draw_buf: Texture,
     font: Font,
     editor: Editor,
 }
@@ -19,12 +25,15 @@ impl GUI {
         // Get the window and renderer for sdl
         let window = sdl2::video::Window::new("Led Editor", sdl2::video::WindowPos::PosCentered, sdl2::video::WindowPos::PosCentered, 800, 600, sdl2::video::OPENGL | sdl2::video::RESIZABLE).unwrap();
         let renderer = sdl2::render::Renderer::from_window(window, sdl2::render::RenderDriverIndex::Auto, sdl2::render::ACCELERATED).unwrap();
+        let (w, h) = renderer.get_output_size().unwrap();
+        let draw_buf = renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
         
         let mut editor = Editor::new();
         editor.update_dim(renderer.get_output_size().unwrap().1 as usize, renderer.get_output_size().unwrap().0 as usize);
         
         GUI {
             renderer: renderer,
+            draw_buf: draw_buf,
             font: font,
             editor: editor,
         }
@@ -37,12 +46,15 @@ impl GUI {
         // Get the window and renderer for sdl
         let window = sdl2::video::Window::new("Led Editor", sdl2::video::WindowPos::PosCentered, sdl2::video::WindowPos::PosCentered, 800, 600, sdl2::video::OPENGL | sdl2::video::RESIZABLE).unwrap();
         let renderer = sdl2::render::Renderer::from_window(window, sdl2::render::RenderDriverIndex::Auto, sdl2::render::ACCELERATED).unwrap();
+        let (w, h) = renderer.get_output_size().unwrap();
+        let draw_buf = renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
         
         let mut editor = ed;
         editor.update_dim(renderer.get_output_size().unwrap().1 as usize, renderer.get_output_size().unwrap().0 as usize);
         
         GUI {
             renderer: renderer,
+            draw_buf: draw_buf,
             font: font,
             editor: editor,
         }
@@ -55,16 +67,57 @@ impl GUI {
                     sdl2::event::Event::Quit(_) => break,
                     sdl2::event::Event::KeyDown(_, _, key, _, _, _) => {
                         if key == sdl2::keycode::KeyCode::Escape {
-                            break
+                            break;
                         }
                     },
-                    sdl2::event::Event::Window(_, _, sdl2::event::WindowEventId::Exposed, _, _) => {
-                        let _ = self.renderer.set_draw_color(sdl2::pixels::Color::RGB(240, 240, 240));
+                    
+                    sdl2::event::Event::Window(_, _, WindowEventId::Exposed, _, _) => {
+                        // Remove other Exposed events from the queue, to avoid
+                        // clogging things up.
+                        sdl2::event::filter_events(filter_window_expose);
+                        
+                        // Get renderer size
+                        let (w, h) = self.renderer.get_output_size().unwrap();
+                        
+                        // Display last rendered contents to fill things in quickly
+                        match self.draw_buf.query() {
+                            Ok(tq) => {
+                                let wm = min(w, tq.width) as i32;
+                                let hm = min(h, tq.height) as i32;
+                                let _ = self.renderer.copy(&self.draw_buf, Some(Rect{x:0, y:0, h:hm, w:wm}), Some(Rect{x:0, y:0, h:hm, w:wm}));
+                                self.renderer.present();
+                            },
+                            
+                            _ => {
+                            }
+                        }
+                        
+                        
+                        // Make sure the texture still matches the render size
+                        match self.draw_buf.query() {
+                            Ok(tq) => {
+                                if tq.width != w || tq.height != h {
+                                    self.draw_buf = self.renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
+                                }
+                            },
+                            
+                            _ => {
+                                self.draw_buf = self.renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
+                            }
+                        }
+                        
+                        // Draw UI to texture
+                        let _ = self.renderer.set_render_target(Some(&self.draw_buf));
+                        let _ = self.renderer.set_draw_color(sdl2::pixels::Color::RGB(80, 80, 80));
                         let _ = self.renderer.clear();
-                        //self.font.draw_text("Hi there!  (How's it going???) { let b = 42; }", (0, 0, 0), 50, 50, &self.renderer);
                         self.draw_editor_text((50, 50), (300, 300));
+                        
+                        // Copy texture over
+                        let _ = self.renderer.set_render_target(None);
+                        let _ = self.renderer.copy(&self.draw_buf, Some(Rect{x:0, y:0, h:h as i32, w:w as i32}), Some(Rect{x:0, y:0, h:h as i32, w:w as i32}));
                         self.renderer.present();
-                    }
+                    },
+                    
                     _ => {}
                 }
             }
@@ -79,11 +132,20 @@ impl GUI {
         
         for line in line_iter {
             for g in line.grapheme_iter() {
-                x += self.font.draw_text(g, (0, 0, 0), x as i32, y as i32, &self.renderer);
+                x += self.font.draw_text(g, (255, 255, 255), x as i32, y as i32, &self.renderer);
             }
             
             x = c1.1;
             y += self.font.line_height() >> 6;
         }
+    }
+}
+
+
+// Used for removing WindowEventId::Exposed events from the queue
+extern "C" fn filter_window_expose(e: sdl2::event::Event) -> bool {
+    match e {
+        sdl2::event::Event::Window(_, _, WindowEventId::Exposed, _, _) => false,
+        _ => true,
     }
 }
