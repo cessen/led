@@ -12,6 +12,8 @@ use sdl2::rect::Rect;
 
 use string_utils::{is_line_ending};
 
+const SOURCE_CODE_PRO: &'static [u8] = include_bytes!("source_code_pro/SourceCodePro-Regular.ttf");
+
 struct CachedGlyph {
     texture: Option<Texture>,
     height: i32,
@@ -28,7 +30,23 @@ pub struct Font {
     glyph_cache: HashMap<char, CachedGlyph>,
 }
 
+
 impl Font {
+    /// Creates a new font from the default font (Source Code Pro)
+    pub fn new_default(size: u32) -> Font {
+        let lib = freetype::Library::init().unwrap();
+        let mut face = lib.new_memory_face(SOURCE_CODE_PRO, 0).unwrap();
+        let _ = face.set_pixel_sizes(0, size);
+        
+        Font {
+            ftl: lib,
+            face: face,
+            glyph_cache: HashMap::new(),
+        }
+    }
+
+    
+    /// Creates a new font from the given font file
     pub fn new_from_file(path: &Path, size: u32) -> Font {
         let lib = freetype::Library::init().unwrap();
         let mut face = lib.new_face(path.as_str().unwrap(), 0).unwrap();

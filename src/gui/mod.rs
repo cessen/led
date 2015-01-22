@@ -18,7 +18,7 @@ pub struct GUI {
 
 impl GUI {
     pub fn new() -> GUI {
-        let font = Font::new_from_file(&Path::new("./fonts/source_code_pro/SourceCodePro-Regular.ttf"), 14);
+        let font = Font::new_default(14);
         
         // Get the window and renderer for sdl
         let window = sdl2::video::Window::new("Led Editor", sdl2::video::WindowPos::PosCentered, sdl2::video::WindowPos::PosCentered, 800, 600, sdl2::video::OPENGL | sdl2::video::RESIZABLE).unwrap();
@@ -38,7 +38,7 @@ impl GUI {
     
 
     pub fn new_from_editor(ed: Editor) -> GUI {
-        let font = Font::new_from_file(&Path::new("./fonts/source_code_pro/SourceCodePro-Regular.ttf"), 14);
+        let font = Font::new_default(14);
         
         // Get the window and renderer for sdl
         let window = sdl2::video::Window::new("Led Editor", sdl2::video::WindowPos::PosCentered, sdl2::video::WindowPos::PosCentered, 800, 600, sdl2::video::OPENGL | sdl2::video::RESIZABLE).unwrap();
