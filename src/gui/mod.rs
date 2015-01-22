@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::cmp::min;
-
 use sdl2;
 use sdl2::event::WindowEventId;
 use sdl2::render::{Renderer, Texture};
@@ -25,8 +23,7 @@ impl GUI {
         // Get the window and renderer for sdl
         let window = sdl2::video::Window::new("Led Editor", sdl2::video::WindowPos::PosCentered, sdl2::video::WindowPos::PosCentered, 800, 600, sdl2::video::OPENGL | sdl2::video::RESIZABLE).unwrap();
         let renderer = sdl2::render::Renderer::from_window(window, sdl2::render::RenderDriverIndex::Auto, sdl2::render::ACCELERATED).unwrap();
-        let (w, h) = renderer.get_output_size().unwrap();
-        let draw_buf = renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
+        let draw_buf = renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, 1, 1).unwrap();
         
         let mut editor = Editor::new();
         editor.update_dim(renderer.get_output_size().unwrap().1 as usize, renderer.get_output_size().unwrap().0 as usize);
@@ -46,8 +43,7 @@ impl GUI {
         // Get the window and renderer for sdl
         let window = sdl2::video::Window::new("Led Editor", sdl2::video::WindowPos::PosCentered, sdl2::video::WindowPos::PosCentered, 800, 600, sdl2::video::OPENGL | sdl2::video::RESIZABLE).unwrap();
         let renderer = sdl2::render::Renderer::from_window(window, sdl2::render::RenderDriverIndex::Auto, sdl2::render::ACCELERATED).unwrap();
-        let (w, h) = renderer.get_output_size().unwrap();
-        let draw_buf = renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
+        let draw_buf = renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, 1, 1).unwrap();
         
         let mut editor = ed;
         editor.update_dim(renderer.get_output_size().unwrap().1 as usize, renderer.get_output_size().unwrap().0 as usize);
@@ -79,40 +75,25 @@ impl GUI {
                         // Get renderer size
                         let (w, h) = self.renderer.get_output_size().unwrap();
                         
-                        // Display last rendered contents to fill things in quickly
-                        match self.draw_buf.query() {
-                            Ok(tq) => {
-                                let wm = min(w, tq.width) as i32;
-                                let hm = min(h, tq.height) as i32;
-                                let _ = self.renderer.copy(&self.draw_buf, Some(Rect{x:0, y:0, h:hm, w:wm}), Some(Rect{x:0, y:0, h:hm, w:wm}));
-                                self.renderer.present();
-                            },
-                            
-                            _ => {
-                            }
+                        // Check if we should re-render the UI before blitting
+                        // it over.
+                        let redraw = match self.draw_buf.query() {
+                            Ok(tq) => tq.width != w || tq.height != h,
+                            _ => true,
+                        };
+                        
+                        if redraw {
+                            // Realloc texture to match renderer size
+                            self.draw_buf = self.renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
+                        
+                            // Draw UI to texture
+                            let _ = self.renderer.set_render_target(Some(&self.draw_buf));
+                            let _ = self.renderer.set_draw_color(sdl2::pixels::Color::RGB(80, 80, 80));
+                            let _ = self.renderer.clear();
+                            self.draw_editor_text((50, 50), (300, 300));
                         }
                         
-                        
-                        // Make sure the texture still matches the render size
-                        match self.draw_buf.query() {
-                            Ok(tq) => {
-                                if tq.width != w || tq.height != h {
-                                    self.draw_buf = self.renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
-                                }
-                            },
-                            
-                            _ => {
-                                self.draw_buf = self.renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, w, h).unwrap();
-                            }
-                        }
-                        
-                        // Draw UI to texture
-                        let _ = self.renderer.set_render_target(Some(&self.draw_buf));
-                        let _ = self.renderer.set_draw_color(sdl2::pixels::Color::RGB(80, 80, 80));
-                        let _ = self.renderer.clear();
-                        self.draw_editor_text((50, 50), (300, 300));
-                        
-                        // Copy texture over
+                        // Blit texture over
                         let _ = self.renderer.set_render_target(None);
                         let _ = self.renderer.copy(&self.draw_buf, Some(Rect{x:0, y:0, h:h as i32, w:w as i32}), Some(Rect{x:0, y:0, h:h as i32, w:w as i32}));
                         self.renderer.present();
