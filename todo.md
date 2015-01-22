@@ -1,3 +1,18 @@
+- Clean separation of text buffer from rest of code:
+    - Create a "BufferFormatter" trait that informs Buffer how its text
+      should be formatted.  Such formatters then determine how the
+      text buffer graphemes map to a 2d display (e.g. how tabs are handles,
+      glyph size, spacing, line wrapping, etc.).  Buffers then use
+      BufferFormatters for maintaing information necessary for
+      1d <-> 2d operations.
+    - Create BufferFormatters for console and for freetype, including
+      preferences for tab width (specified in spaces) and line wrapping.
+      The freetype formatter should not reference SDL at all, and should
+      have only the freetype library itself as a dependency.
+    - Possibly split the text buffer out into its own library...?  Would
+      likely be useful to other people as well, and would encourage me to
+      keep the API clean.
+
 - Custom line iterator code for file loading, because rust's built-in one
   only recognizes LF and CRLF.
 - Line number display
@@ -8,30 +23,3 @@
 - Multiple cursors
 - "Projects"
 
-- Clean up text buffer interface:
-    - //Editing (these are undoable):
-        - //insert_text
-        - //remove_text_before
-        - //remove_text_after
-        - //move_text
-    - Undo functionality:
-        - //Undo
-        - //Redo
-        - Edit transactions (for composite edit operations)
-    - Info:
-        - byte_count
-        - //grapheme_count
-        - //line_count
-    - Position conversions:
-        - //index -> line_col
-        - //line_col -> index
-        - //index -> vis_2d
-        - //vis_2d -> index
-        - index -> byte_index
-        - byte_index -> index
-    - Reading text:
-        - //grapheme at index (includes visual width in return)
-        - //Grapheme iterator (useful for search code, etc.)
-        - Byte iterator (useful for search code, etc.)
-        - Reverse byte iterator (useful for search code, etc.)
-        - //Line iterator (useful for display code)
