@@ -1,6 +1,7 @@
 use std::mem;
 use std::cmp::{min, max};
 
+use line_formatter::LineFormatter;
 use string_utils::is_line_ending;
 use super::line::{Line, LineEnding, LineGraphemeIter, str_to_line_ending};
 
@@ -15,27 +16,35 @@ pub struct BufferNode {
     
     pub grapheme_count: usize,
     pub line_count: usize,
+    
+    pub vis_dim: (usize, usize), // Height, width
 }
 
 impl BufferNode {
-    pub fn new() -> BufferNode {
+    pub fn new<T: LineFormatter>(f: &T) -> BufferNode {
+        let line = Line::new();
+        let dim = f.dimensions(&line);
+        
         BufferNode {
-            data: BufferNodeData::Leaf(Line::new()),
+            data: BufferNodeData::Leaf(line),
             tree_height: 1,
             grapheme_count: 0,
             line_count: 1,
+            vis_dim: dim,
         }
     }
     
     
-    pub fn new_from_line(line: Line) -> BufferNode {
+    pub fn new_from_line<T: LineFormatter>(f: &T, line: Line) -> BufferNode {
         let gc = line.grapheme_count();
+        let dim = f.dimensions(&line);
     
         BufferNode {
             data: BufferNodeData::Leaf(line),
             tree_height: 1,
             grapheme_count: gc,
             line_count: 1,
+            vis_dim: dim,
         }
     }
     
@@ -53,26 +62,28 @@ impl BufferNode {
     }
     
     
-    fn update_stats(&mut self) {
+    fn update_stats<T: LineFormatter>(&mut self, f: &T) {
         self.update_height();
         
         match self.data {
             BufferNodeData::Leaf(ref line) => {
                 self.grapheme_count = line.grapheme_count();
                 self.line_count = 1;
+                self.vis_dim = f.dimensions(line);
             },
             
             BufferNodeData::Branch(ref left, ref right) => {
                 self.grapheme_count = left.grapheme_count + right.grapheme_count;
                 self.line_count = left.line_count + right.line_count;
+                self.vis_dim = (left.vis_dim.0 + right.vis_dim.0, max(left.vis_dim.1, right.vis_dim.1));
             }
         }
     }
     
     
     /// Rotates the tree under the node left
-    fn rotate_left(&mut self) {
-        let mut temp = BufferNode::new();
+    fn rotate_left<T: LineFormatter>(&mut self, f: &T) {
+        let mut temp = BufferNode::new(f);
         
         if let BufferNodeData::Branch(_, ref mut right) = self.data {
             mem::swap(&mut temp, &mut (**right));
@@ -90,17 +101,17 @@ impl BufferNode {
         
         if let BufferNodeData::Branch(ref mut left, _) = temp.data {
             mem::swap(&mut (**left), self);
-            left.update_stats();
+            left.update_stats(f);
         }
         
         mem::swap(&mut temp, self);
-        self.update_stats();
+        self.update_stats(f);
     }
     
     
     /// Rotates the tree under the node right
-    fn rotate_right(&mut self) {
-        let mut temp = BufferNode::new();
+    fn rotate_right<T: LineFormatter>(&mut self, f: &T) {
+        let mut temp = BufferNode::new(f);
         
         if let BufferNodeData::Branch(ref mut left, _) = self.data {
             mem::swap(&mut temp, &mut (**left));
@@ -118,16 +129,16 @@ impl BufferNode {
         
         if let BufferNodeData::Branch(_, ref mut right) = temp.data {
             mem::swap(&mut (**right), self);
-            right.update_stats();
+            right.update_stats(f);
         }
         
         mem::swap(&mut temp, self);
-        self.update_stats();
+        self.update_stats(f);
     }
     
     
     /// Rebalances the tree under the node
-    fn rebalance(&mut self) {
+    fn rebalance<T: LineFormatter>(&mut self, f: &T) {
         loop {
             let mut rot: isize;
             
@@ -144,7 +155,7 @@ impl BufferNode {
                     }
                     
                     if child_rot {
-                        left.rotate_left();
+                        left.rotate_left(f);
                     }
                     
                     rot = 1;
@@ -159,7 +170,7 @@ impl BufferNode {
                     }
                     
                     if child_rot {
-                        right.rotate_right();
+                        right.rotate_right(f);
                     }
                     
                     rot = -1;
@@ -175,10 +186,10 @@ impl BufferNode {
             }
             
             if rot == 1 {
-                self.rotate_right();
+                self.rotate_right(f);
             }
             else if rot == -1 {
-                self.rotate_left();
+                self.rotate_left(f);
             }
         }
     }
@@ -196,24 +207,6 @@ impl BufferNode {
                 }
                 else {
                     return right.get_grapheme_recursive(index - left.grapheme_count);
-                }
-            }
-        }
-    }
-    
-    
-    pub fn get_grapheme_width_recursive(&self, index: usize, tab_width: usize) -> usize {
-        match self.data {
-            BufferNodeData::Leaf(ref line) => {
-                return line.grapheme_width_at_index(index, tab_width);
-            },
-            
-            BufferNodeData::Branch(ref left, ref right) => {
-                if index < left.grapheme_count {
-                    return left.get_grapheme_width_recursive(index, tab_width);
-                }
-                else {
-                    return right.get_grapheme_width_recursive(index - left.grapheme_count, tab_width);
                 }
             }
         }
@@ -293,7 +286,7 @@ impl BufferNode {
     
     
     /// Insert 'text' at grapheme position 'pos'.
-    pub fn insert_text(&mut self, text: &str, pos: usize) {
+    pub fn insert_text<T: LineFormatter>(&mut self, f: &T, text: &str, pos: usize) {
         // Byte indices
         let mut b1: usize = 0;
         let mut b2: usize = 0;
@@ -306,14 +299,14 @@ impl BufferNode {
         for grapheme in text.grapheme_indices(true) {
             if is_line_ending(grapheme.1) {
                 if g1 < g2 {
-                    self.insert_text_recursive(text.slice(b1, b2), pos + g1);
+                    self.insert_text_recursive(f, text.slice(b1, b2), pos + g1);
                 }
                 
                 g1 = g2;
                 b2 += grapheme.1.len();
                 g2 += 1;
                 
-                self.insert_line_break_recursive(str_to_line_ending(grapheme.1), pos + g1);
+                self.insert_line_break_recursive(f, str_to_line_ending(grapheme.1), pos + g1);
                 
                 b1 = b2;
                 g1 = g2;
@@ -325,22 +318,22 @@ impl BufferNode {
         }
         
         if g1 < g2 {
-            self.insert_text_recursive(text.slice(b1, b2), pos + g1);
+            self.insert_text_recursive(f, text.slice(b1, b2), pos + g1);
         }
     }
     
 
     /// Inserts the given text string at the given grapheme position.
     /// Note: this assumes the given text has no newline graphemes.
-    pub fn insert_text_recursive(&mut self, text: &str, pos: usize) {
+    pub fn insert_text_recursive<T: LineFormatter>(&mut self, f: &T, text: &str, pos: usize) {
         match self.data {
             // Find node for text to be inserted into
             BufferNodeData::Branch(ref mut left, ref mut right) => {
                 if pos < left.grapheme_count {
-                    left.insert_text_recursive(text, pos);
+                    left.insert_text_recursive(f, text, pos);
                 }
                 else {
-                    right.insert_text_recursive(text, pos - left.grapheme_count);
+                    right.insert_text_recursive(f, text, pos - left.grapheme_count);
                 }
                 
             },
@@ -351,12 +344,12 @@ impl BufferNode {
             },
         }
         
-        self.update_stats();
+        self.update_stats(f);
     }
     
     
     /// Inserts a line break at the given grapheme position
-    pub fn insert_line_break_recursive(&mut self, ending: LineEnding, pos: usize) {
+    pub fn insert_line_break_recursive<T: LineFormatter>(&mut self, f: &T, ending: LineEnding, pos: usize) {
         if ending == LineEnding::None {
             return;
         }
@@ -368,10 +361,10 @@ impl BufferNode {
             // Find node for the line break to be inserted into
             BufferNodeData::Branch(ref mut left, ref mut right) => {
                 if pos < left.grapheme_count {
-                    left.insert_line_break_recursive(ending, pos);
+                    left.insert_line_break_recursive(f, ending, pos);
                 }
                 else {
-                    right.insert_line_break_recursive(ending, pos - left.grapheme_count);
+                    right.insert_line_break_recursive(f, ending, pos - left.grapheme_count);
                 }
                 do_split = false;
             },
@@ -387,16 +380,16 @@ impl BufferNode {
         if do_split {
             // Insert line break
             let new_line = old_line.split(ending, pos);
-            let new_node_a = Box::new(BufferNode::new_from_line(old_line));
-            let new_node_b = Box::new(BufferNode::new_from_line(new_line));
+            let new_node_a = Box::new(BufferNode::new_from_line(f, old_line));
+            let new_node_b = Box::new(BufferNode::new_from_line(f, new_line));
             
             self.data = BufferNodeData::Branch(new_node_a, new_node_b);
             
-            self.update_stats();
+            self.update_stats(f);
         }
         else {
-            self.update_stats();
-            self.rebalance();
+            self.update_stats(f);
+            self.rebalance(f);
         }
     }
     
@@ -404,8 +397,8 @@ impl BufferNode {
     /// Removes text between grapheme positions pos_a and pos_b.
     /// Returns true if a dangling left side remains from the removal.
     /// Returns false otherwise.
-    pub fn remove_text_recursive(&mut self, pos_a: usize, pos_b: usize, is_last: bool) -> bool {
-        let mut temp_node = BufferNode::new();
+    pub fn remove_text_recursive<T: LineFormatter>(&mut self, f: &T, pos_a: usize, pos_b: usize, is_last: bool) -> bool {
+        let mut temp_node = BufferNode::new(f);
         let mut total_side_removal = false;
         let mut dangling_line = false;
         let mut do_merge_fix = false;
@@ -423,7 +416,7 @@ impl BufferNode {
                     if pos_b > left.grapheme_count {
                         let a = 0;
                         let b = pos_b - left.grapheme_count;
-                        right.remove_text_recursive(a, b, is_last);
+                        right.remove_text_recursive(f, a, b, is_last);
                     }
                     
                     total_side_removal = true;
@@ -434,7 +427,7 @@ impl BufferNode {
                     if pos_a < left.grapheme_count {
                         let a = pos_a;
                         let b = left.grapheme_count;
-                        dangling_line = left.remove_text_recursive(a, b, false);
+                        dangling_line = left.remove_text_recursive(f, a, b, false);
                     }
                     
                     if is_last && !dangling_line {
@@ -455,14 +448,14 @@ impl BufferNode {
                     if pos_b > left.grapheme_count {
                         let a = if pos_a > left.grapheme_count {pos_a - left.grapheme_count} else {0};
                         let b = pos_b - left.grapheme_count;
-                        dangling_line = right.remove_text_recursive(a, b, is_last) && !is_last;
+                        dangling_line = right.remove_text_recursive(f, a, b, is_last) && !is_last;
                     }
                     
                     // Left side
                     if pos_a < left.grapheme_count {
                         let a = pos_a;
                         let b = min(pos_b, left.grapheme_count);
-                        do_merge_fix = left.remove_text_recursive(a, b, false);
+                        do_merge_fix = left.remove_text_recursive(f, a, b, false);
                         merge_line_number = left.line_count - 1;
                     }
                 }
@@ -483,7 +476,7 @@ impl BufferNode {
         
         // Do the merge fix if necessary
         if do_merge_fix {
-            self.merge_line_with_next_recursive(merge_line_number, None);
+            self.merge_line_with_next_recursive(f, merge_line_number, None);
         }
         // If one of the sides was completely removed, replace self with the
         // remaining side.
@@ -491,39 +484,39 @@ impl BufferNode {
             mem::swap(&mut temp_node, self);
         }
         
-        self.update_stats();
-        self.rebalance();
+        self.update_stats(f);
+        self.rebalance(f);
         
         return dangling_line;
     }
     
     
-    pub fn append_line_unchecked_recursive(&mut self, line: Line) {
+    pub fn append_line_unchecked_recursive<T: LineFormatter>(&mut self, f: &T, line: Line) {
         let mut other_line = Line::new();
         
         if let BufferNodeData::Branch(_, ref mut right) = self.data {
-            right.append_line_unchecked_recursive(line);
+            right.append_line_unchecked_recursive(f, line);
         }
         else {
             if let BufferNodeData::Leaf(ref mut this_line) = self.data {
                 mem::swap(this_line, &mut other_line);
             }
             
-            let new_node_a = Box::new(BufferNode::new_from_line(other_line));
-            let new_node_b = Box::new(BufferNode::new_from_line(line));
+            let new_node_a = Box::new(BufferNode::new_from_line(f, other_line));
+            let new_node_b = Box::new(BufferNode::new_from_line(f, line));
             self.data = BufferNodeData::Branch(new_node_a, new_node_b);
         }
         
-        self.update_stats();
-        self.rebalance();
+        self.update_stats(f);
+        self.rebalance(f);
     }
     
     
     /// Removes lines in line number range [line_a, line_b)
-    pub fn remove_lines_recursive(&mut self, line_a: usize, line_b: usize) {
+    pub fn remove_lines_recursive<T: LineFormatter>(&mut self, f: &T, line_a: usize, line_b: usize) {
         let mut remove_left = false;
         let mut remove_right = false;
-        let mut temp_node = BufferNode::new();
+        let mut temp_node = BufferNode::new(f);
         
         if let BufferNodeData::Branch(ref mut left, ref mut right) = self.data {
             // Right node completely removed
@@ -534,7 +527,7 @@ impl BufferNode {
             else if line_b > left.line_count {
                 let a = if line_a > left.line_count {line_a - left.line_count} else {0};
                 let b = line_b - left.line_count;
-                right.remove_lines_recursive(a, b);
+                right.remove_lines_recursive(f, a, b);
             }
             
             // Left node completely removed
@@ -545,7 +538,7 @@ impl BufferNode {
             else if line_a < left.line_count {
                 let a = line_a;
                 let b = min(left.line_count, line_b);
-                left.remove_lines_recursive(a, b);
+                left.remove_lines_recursive(f, a, b);
             }
             
             // Set up for node removal
@@ -568,17 +561,17 @@ impl BufferNode {
             mem::swap(&mut temp_node, self);
         }
         
-        self.update_stats();
-        self.rebalance();
+        self.update_stats(f);
+        self.rebalance(f);
     }
     
     
-    pub fn merge_line_with_next_recursive(&mut self, line_number: usize, fetched_line: Option<&Line>) {
+    pub fn merge_line_with_next_recursive<T: LineFormatter>(&mut self, f: &T, line_number: usize, fetched_line: Option<&Line>) {
         match fetched_line {
             None => {
-                let line: Option<Line> = self.pull_out_line_recursive(line_number + 1);
+                let line: Option<Line> = self.pull_out_line_recursive(f, line_number + 1);
                 if let Some(ref l) = line {
-                    self.merge_line_with_next_recursive(line_number, Some(l));
+                    self.merge_line_with_next_recursive(f, line_number, Some(l));
                 }
             },
             
@@ -586,10 +579,10 @@ impl BufferNode {
                 match self.data {
                     BufferNodeData::Branch(ref mut left, ref mut right) => {
                         if line_number < left.line_count {
-                            left.merge_line_with_next_recursive(line_number, Some(line));
+                            left.merge_line_with_next_recursive(f, line_number, Some(line));
                         }
                         else {
-                            right.merge_line_with_next_recursive(line_number - left.line_count, Some(line));
+                            right.merge_line_with_next_recursive(f, line_number - left.line_count, Some(line));
                         }
                     },
                     
@@ -601,15 +594,15 @@ impl BufferNode {
             }
         }
         
-        self.update_stats();
-        self.rebalance();
+        self.update_stats(f);
+        self.rebalance(f);
     }
     
     
     /// Removes a single line out of the text and returns it.
-    pub fn pull_out_line_recursive(&mut self, line_number: usize) -> Option<Line> {
+    pub fn pull_out_line_recursive<T: LineFormatter>(&mut self, f: &T, line_number: usize) -> Option<Line> {
         let mut pulled_line = Line::new();
-        let mut temp_node = BufferNode::new();
+        let mut temp_node = BufferNode::new(f);
         let mut side_removal = false;
         
         match self.data {
@@ -621,7 +614,7 @@ impl BufferNode {
                         side_removal = true;
                     }
                     else {
-                        pulled_line = left.pull_out_line_recursive(line_number).unwrap();
+                        pulled_line = left.pull_out_line_recursive(f, line_number).unwrap();
                     }
                 }
                 else if line_number < self.line_count {
@@ -631,7 +624,7 @@ impl BufferNode {
                         side_removal = true;
                     }
                     else {
-                        pulled_line = right.pull_out_line_recursive(line_number - left.line_count).unwrap();
+                        pulled_line = right.pull_out_line_recursive(f, line_number - left.line_count).unwrap();
                     }
                 }
                 else {
@@ -649,8 +642,8 @@ impl BufferNode {
             mem::swap(&mut temp_node, self);
         }
         
-        self.update_stats();
-        self.rebalance();
+        self.update_stats(f);
+        self.rebalance(f);
         
         return Some(pulled_line);
     }
@@ -658,10 +651,10 @@ impl BufferNode {
     
     /// Ensures that the last line in the node tree has no
     /// ending line break.
-    pub fn set_last_line_ending_recursive(&mut self) {
+    pub fn set_last_line_ending_recursive<T: LineFormatter>(&mut self, f: &T) {
         match self.data {
             BufferNodeData::Branch(_, ref mut right) => {
-               right.set_last_line_ending_recursive();
+               right.set_last_line_ending_recursive(f);
             },
             
             BufferNodeData::Leaf(ref mut line) => {
@@ -669,7 +662,7 @@ impl BufferNode {
             },
         }
         
-        self.update_stats();
+        self.update_stats(f);
     }
 
 

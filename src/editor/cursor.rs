@@ -5,7 +5,7 @@ use std::ops::{Index, IndexMut};
 use std::cmp::Ordering;
 
 use buffer::Buffer;
-
+use line_formatter::LineFormatter;
 
 /// A text cursor.  Also represents selections when range.0 != range.1.
 ///
@@ -27,7 +27,7 @@ impl Cursor {
         }
     }
     
-    pub fn update_vis_start(&mut self, buf: &Buffer) {
+    pub fn update_vis_start<T: LineFormatter>(&mut self, buf: &Buffer<T>) {
         let (_, h) = buf.index_to_v2d(self.range.0);
         self.vis_start = h;
     }

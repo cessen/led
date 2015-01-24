@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
 use buffer::Buffer;
+use line_formatter::{LineFormatter, ConsoleLineFormatter};
+use line_formatter::RoundingBehavior::*;
 use std::path::Path;
 use std::cmp::min;
 use files::{load_file_to_buffer, save_buffer_to_file};
@@ -11,7 +13,7 @@ mod cursor;
 
 
 pub struct Editor {
-    pub buffer: Buffer,
+    pub buffer: Buffer<ConsoleLineFormatter>,
     pub file_path: Path,
     pub soft_tabs: bool,
     pub dirty: bool,
@@ -29,7 +31,7 @@ impl Editor {
     /// Create a new blank editor
     pub fn new() -> Editor {
         Editor {
-            buffer: Buffer::new(),
+            buffer: Buffer::new(ConsoleLineFormatter::new(4)),
             file_path: Path::new(""),
             soft_tabs: false,
             dirty: false,
@@ -40,9 +42,9 @@ impl Editor {
     }
     
     pub fn new_from_file(path: &Path) -> Editor {
-        let buf = match load_file_to_buffer(path) {
+        let buf = match load_file_to_buffer(path, ConsoleLineFormatter::new(4)) {
             Ok(b) => {b},
-            _ => {Buffer::new()}
+            _ => {Buffer::new(ConsoleLineFormatter::new(4))}
         };
         
         let mut ed = Editor {
@@ -161,7 +163,7 @@ impl Editor {
             }
             
             self.soft_tabs = true;
-            self.buffer.tab_width = width;
+            self.buffer.formatter.tab_width = width as u8;
         }
         else {
             self.soft_tabs = false;
@@ -268,7 +270,7 @@ impl Editor {
                 
                 // Figure out how many spaces to insert
                 let (_, vis_pos) = self.buffer.index_to_v2d(c.range.0);
-                let next_tab_stop = ((vis_pos / self.buffer.tab_width) + 1) * self.buffer.tab_width;
+                let next_tab_stop = ((vis_pos / self.buffer.formatter.tab_width as usize) + 1) * self.buffer.formatter.tab_width as usize;
                 let space_count = min(next_tab_stop - vis_pos, 8);
                 
                 
@@ -467,7 +469,7 @@ impl Editor {
             let (v, _) = self.buffer.index_to_v2d(c.range.0);
             
             if v >= n {
-                c.range.0 = self.buffer.v2d_to_index((v - n, c.vis_start));
+                c.range.0 = self.buffer.v2d_to_index((v - n, c.vis_start), (Floor, Floor));
                 c.range.1 = c.range.0;
             }
             else {
@@ -485,7 +487,7 @@ impl Editor {
             let (v, _) = self.buffer.index_to_v2d(c.range.0);
             
             if v < (self.buffer.line_count() - n) {
-                c.range.0 = self.buffer.v2d_to_index((v + n, c.vis_start));
+                c.range.0 = self.buffer.v2d_to_index((v + n, c.vis_start), (Floor, Floor));
                 c.range.1 = c.range.0;
             }
             else {
@@ -547,7 +549,7 @@ impl Editor {
         let pos = self.buffer.line_col_to_index((n, 0));
         let (v, _) = self.buffer.index_to_v2d(pos);
         self.cursors.truncate(1);
-        self.cursors[0].range.0 = self.buffer.v2d_to_index((v, self.cursors[0].vis_start));
+        self.cursors[0].range.0 = self.buffer.v2d_to_index((v, self.cursors[0].vis_start), (Floor, Floor));
         self.cursors[0].range.1 = self.cursors[0].range.0;
         
         // Adjust view

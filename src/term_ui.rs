@@ -7,6 +7,7 @@ use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
 use buffer::line::{line_ending_to_str, LineEnding};
+use line_formatter::LineFormatter;
 
 // Key codes
 const K_ENTER: u16 = 13;
@@ -325,7 +326,7 @@ impl TermUI {
             LineEnding::PS => "PS",
         };
         let soft_tabs_str = if editor.soft_tabs {"spaces"} else {"tabs"};
-        let info_line = format!("UTF8:{}  {}:{}", nl, soft_tabs_str, editor.buffer.tab_width);
+        let info_line = format!("UTF8:{}  {}:{}", nl, soft_tabs_str, editor.buffer.formatter.tab_width as usize);
         self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, info_line.as_slice());
 
         // Draw main text editing area
@@ -336,7 +337,7 @@ impl TermUI {
     fn draw_editor_text(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
         let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
         
-        let mut grapheme_index;
+        //let mut grapheme_index;
         
         let mut vis_line_num = editor.view_pos.0;
         let mut vis_col_num = editor.view_pos.1;
@@ -349,85 +350,14 @@ impl TermUI {
         
         loop {
             if let Some(line) = line_iter.next() {
-                let mut g_iter = line.grapheme_vis_iter(editor.buffer.tab_width);
-                let excess = g_iter.skip_vis_positions(editor.view_pos.1);
+                let mut g_iter = editor.buffer.formatter.vis_grapheme_iter(line);
                 
-                vis_col_num += excess;
-                print_col_num += excess;
-                
-                grapheme_index = editor.buffer.v2d_to_index((vis_line_num, vis_col_num));
-                
-                
-                
-                for (g, pos, width) in g_iter {
-                    print_col_num = pos - editor.view_pos.1;
-                    
-                    // Check if the character is within a cursor
-                    let mut at_cursor = false;
-                    for c in editor.cursors.iter() {
-                        if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
-                            at_cursor = true;
-                        }
-                    }
-                    
-                    // Print to screen
-                    if is_line_ending(g) {
-                        if at_cursor {
-                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-                        }
-                    }
-                    else if g == "\t" {
-                        for i in range(print_col_num, print_col_num + width) {
-                            self.rb.print(i, print_line_num, rustbox::RB_NORMAL, Color::White, Color::Black, " ");
-                        }
-                        
-                        if at_cursor {
-                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-                        }
-                    }
-                    else {
-                        if at_cursor {
-                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::Black, Color::White, g);
-                        }
-                        else {
-                            self.rb.print(print_col_num, print_line_num, rustbox::RB_NORMAL, Color::White, Color::Black, g);
-                        }
-                    }
-                    
-                    vis_col_num += width;
-                    grapheme_index += 1;
-                    print_col_num += width;
-                    
-                    if print_col_num > max_print_col {
-                        break;
-                    }
+                for (g, pos_y, pos_x) in g_iter {
+                   self.rb.print(pos_x, pos_y, rustbox::RB_NORMAL, Color::White, Color::Black, g);
                 }
             }
             else {
                 break;
-            }
-            
-            vis_line_num += 1;
-            print_line_num += 1;
-            vis_col_num = editor.view_pos.1;
-            
-            if print_line_num > max_print_line {
-                break;
-            }
-        }
-        
-        // Print cursor(s) if it's at the end of the text, and thus wasn't printed
-        // already.
-        for c in editor.cursors.iter() {
-            if c.range.0 >= editor.buffer.grapheme_count() {
-                let vis_cursor_pos = editor.buffer.index_to_v2d(c.range.0);
-                    if (vis_cursor_pos.0 >= editor.view_pos.0) && (vis_cursor_pos.1 >= editor.view_pos.1) {
-                    let print_cursor_pos = (vis_cursor_pos.0 - editor.view_pos.0 + c1.0, vis_cursor_pos.1 - editor.view_pos.1 + c1.1);
-                    
-                    if print_cursor_pos.0 >= c1.0 && print_cursor_pos.0 <= c2.0 && print_cursor_pos.1 >= c1.1 && print_cursor_pos.1 <= c2.1 {
-                        self.rb.print(print_cursor_pos.1, print_cursor_pos.0, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-                    }
-                }
             }
         }
     }

@@ -6,28 +6,6 @@ use std::str::Graphemes;
 use string_utils::{grapheme_count, grapheme_pos_to_byte_pos, is_line_ending};
 
 
-/// Returns the visual width of a grapheme given a starting
-/// position on a line.
-fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize {
-    match g {
-        "\t" => {
-            let ending_pos = ((pos / tab_width) + 1) * tab_width;
-            return ending_pos - pos;
-        },
-        
-        _ => {
-            if is_line_ending(g) {
-                return 1;
-            }
-            else {
-                return g.width(true);
-            }
-        }
-    }
-}
-
-
-
 /// A single line of text
 pub struct Line {
     text: Vec<u8>, // The text data, stored as UTF8
@@ -231,19 +209,6 @@ impl Line {
     }
     
     
-    /// Returns the visual cell width of the line
-    pub fn vis_width(&self, tab_width: usize) -> usize {
-        let mut width = 0;
-        
-        for g in self.as_str().graphemes(true) {
-            let w = grapheme_vis_width_at_vis_pos(g, width, tab_width);
-            width += w;
-        }
-        
-        return width;
-    }
-    
-    
     pub fn grapheme_at_index<'a>(&'a self, index: usize) -> &'a str {
         let mut iter = self.grapheme_iter();
         let mut i = 0;
@@ -260,75 +225,7 @@ impl Line {
         // Should never get here
         panic!("Line::grapheme_at_index(): index past end of line.");
     }
-    
-    
-    pub fn grapheme_width_at_index(&self, index: usize, tab_width: usize) -> usize {
-        let mut iter = self.grapheme_vis_iter(tab_width);
-        let mut i = 0;
         
-        for (_, _, width) in iter {
-            if i == index {
-                return width;
-            }
-            else {
-                i += 1;
-            }
-        }
-        
-        // Should never get here
-        panic!("Line::grapheme_at_index(): index past end of line.");
-    }
-    
-    
-    /// Translates a grapheme index into a visual horizontal position
-    pub fn grapheme_index_to_closest_vis_pos(&self, index: usize, tab_width: usize) -> usize {
-        let mut pos = 0;
-        let mut iter = self.as_str().graphemes(true);
-        
-        for _ in range(0, index) {
-            if let Some(g) = iter.next() {
-                let w = grapheme_vis_width_at_vis_pos(g, pos, tab_width);
-                pos += w;
-            }
-            else {
-                panic!("Line::grapheme_index_to_vis_pos(): index past end of line.");
-            }
-        }
-        
-        return pos;
-    }
-    
-    
-    /// Translates a visual horizontal position to the closest grapheme index
-    pub fn vis_pos_to_closest_grapheme_index(&self, vis_pos: usize, tab_width: usize) -> usize {
-        let mut pos = 0;
-        let mut i = 0;
-        let mut iter = self.as_str().graphemes(true);
-        
-        while pos < vis_pos {
-            if let Some(g) = iter.next() {
-                let w = grapheme_vis_width_at_vis_pos(g, pos, tab_width);
-                if (w + pos) > vis_pos {
-                    let d1 = vis_pos - pos;
-                    let d2 = (pos + w) - vis_pos;
-                    if d2 < d1 {
-                        i += 1;
-                    }
-                    break;
-                }
-                else {
-                    pos += w;
-                    i += 1;
-                }
-            }
-            else {
-                break;
-            }
-        }
-        
-        return i;
-    }
-    
     
     /// Returns an immutable string slice into the text block's memory
     pub fn as_str<'a>(&'a self) -> &'a str {
@@ -479,16 +376,6 @@ impl Line {
         
         return iter;
     }
-    
-    
-    /// Returns an iterator over the graphemes of the line
-    pub fn grapheme_vis_iter<'a>(&'a self, tab_width: usize) -> LineGraphemeVisIter<'a> {
-        LineGraphemeVisIter {
-            graphemes: self.grapheme_iter(),
-            vis_pos: 0,
-            tab_width: tab_width,
-        }
-    }
 }
 
 
@@ -624,73 +511,13 @@ impl<'a> Iterator for LineGraphemeIter<'a> {
 
 
 
-
-/// An iterator over the graphemes of a Line.  This iterator yields not just
-/// the grapheme, but also it's beginning visual position in the line and its
-/// visual width.
-pub struct LineGraphemeVisIter<'a> {
-    graphemes: LineGraphemeIter<'a>,
-    vis_pos: usize,
-    tab_width: usize,
-}
-
-impl<'a> LineGraphemeVisIter<'a> {
-    pub fn skip_graphemes(&mut self, n: usize) {
-        for _ in range(0, n) {
-            if let None = self.next() {
-                break;
-            }
-        }
-    }
-    
-    // Skips at least n visual positions, and returns the number of excess
-    // skipped visual positions beyond n.
-    pub fn skip_vis_positions(&mut self, n: usize) -> usize {
-        let mut i = 0;
-        while i < n {
-            if let Some((_, _, width)) = self.next() {
-                i += width;
-            }
-            else {
-                break;
-            }
-        }
-        
-        if i > n {
-            return i - n;
-        }
-        else {
-            return 0;
-        }
-    }
-}
-
-impl<'a> Iterator for LineGraphemeVisIter<'a> {
-    type Item = (&'a str, usize, usize);
-    
-    fn next(&mut self) -> Option<(&'a str, usize, usize)> {
-        if let Some(g) = self.graphemes.next() {
-            let pos = self.vis_pos;
-            let width = grapheme_vis_width_at_vis_pos(g, self.vis_pos, self.tab_width);
-            self.vis_pos += width;
-            return Some((g, pos, width));
-        }
-        else {
-            return None;
-        }
-    }
-}
-
-
-
-
 //=========================================================================
 // Line tests
 //=========================================================================
 
 #[cfg(test)]
 mod tests {
-    use super::{Line, LineEnding, LineGraphemeIter, LineGraphemeVisIter};
+    use super::{Line, LineEnding, LineGraphemeIter};
     const TAB_WIDTH: usize = 4;
 
 

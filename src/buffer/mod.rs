@@ -2,11 +2,11 @@
 
 use std::mem;
 
-use font::Font;
 use self::line::{Line, LineEnding};
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::undo_stack::{UndoStack};
 use self::undo_stack::Operation::*;
+use line_formatter::{LineFormatter, RoundingBehavior};
 use string_utils::{is_line_ending, grapheme_count};
 
 pub mod line;
@@ -19,23 +19,21 @@ mod undo_stack;
 //=============================================================
 
 /// A text buffer
-pub struct Buffer {
+pub struct Buffer<T: LineFormatter> {
     text: BufferNode,
     undo_stack: UndoStack,
     pub line_ending_type: LineEnding,
-    pub tab_width: usize,
-    pub font: Option<Font>,
+    pub formatter: T,
 }
 
 
-impl Buffer {
-    pub fn new() -> Buffer {
+impl<T: LineFormatter> Buffer<T> {
+    pub fn new(formatter: T) -> Buffer<T> {
         Buffer {
-            text: BufferNode::new(),
+            text: BufferNode::new(&formatter),
             undo_stack: UndoStack::new(),
             line_ending_type: LineEnding::LF,
-            tab_width: 4,
-            font: None,
+            formatter: formatter,
         }
     }
 
@@ -68,7 +66,7 @@ impl Buffer {
     }
     
     fn _insert_text(&mut self, text: &str, pos: usize) {
-        self.text.insert_text(text, pos);
+        self.text.insert_text(&self.formatter, text, pos);
     }
 
     
@@ -112,15 +110,15 @@ impl Buffer {
         }
         // Complete removal of all text
         else if pos_a == 0 && pos_b == self.text.grapheme_count {
-            let mut temp_node = BufferNode::new();
+            let mut temp_node = BufferNode::new(&self.formatter);
             mem::swap(&mut (self.text), &mut temp_node);
         }
         // All other cases
         else {
-            if self.text.remove_text_recursive(pos_a, pos_b, true) {
+            if self.text.remove_text_recursive(&self.formatter, pos_a, pos_b, true) {
                 panic!("Buffer::_remove_text(): dangling left side remains.  This should never happen!");
             }
-            self.text.set_last_line_ending_recursive();
+            self.text.set_last_line_ending_recursive(&self.formatter);
         }
     }
     
@@ -185,13 +183,13 @@ impl Buffer {
         }
         // Complete removal of all lines
         else if line_a == 0 && line_b == self.text.line_count {
-            let mut temp_node = BufferNode::new();
+            let mut temp_node = BufferNode::new(&self.formatter);
             mem::swap(&mut (self.text), &mut temp_node);
         }
         // All other cases
         else {
-            self.text.remove_lines_recursive(line_a, line_b);
-            self.text.set_last_line_ending_recursive();
+            self.text.remove_lines_recursive(&self.formatter, line_a, line_b);
+            self.text.set_last_line_ending_recursive(&self.formatter);
         }
     }
     
@@ -200,7 +198,7 @@ impl Buffer {
     /// doing any sanity checks.  This is primarily for efficient
     /// file loading.
     pub fn append_line_unchecked(&mut self, line: Line) {
-        self.text.append_line_unchecked_recursive(line);
+        self.text.append_line_unchecked_recursive(&self.formatter, line);
     }
     
     
@@ -311,9 +309,11 @@ impl Buffer {
     /// If the index is off the end of the text, returns the visual line and
     /// column number of the last valid text position.
     pub fn index_to_v2d(&self, pos: usize) -> (usize, usize) {
-        let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
-        let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, self.tab_width);
-        return (v, vis_h);
+        // TODO: update this to use the new LineFormatter stuff
+        //let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
+        //let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, self.tab_width);
+        //return (v, vis_h);
+        return (0, 0);
     }
 
 
@@ -323,15 +323,17 @@ impl Buffer {
     /// index of the horizontally-closest valid position.  If the visual line
     /// number given is beyond the end of the buffer, returns the index of
     /// the buffer's last valid position.
-    pub fn v2d_to_index(&self, pos: (usize, usize)) -> usize {
-        if pos.0 >= self.line_count() {
-            return self.grapheme_count();
-        }
-        else {
-            let gs = self.line_col_to_index((pos.0, 0));
-            let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, self.tab_width);
-            return gs + h;
-        }
+    pub fn v2d_to_index(&self, pos: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
+        // TODO: update this to use the new LineFormatter stuff
+        //if pos.0 >= self.line_count() {
+        //    return self.grapheme_count();
+        //}
+        //else {
+        //    let gs = self.line_col_to_index((pos.0, 0));
+        //    let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, self.tab_width);
+        //    return gs + h;
+        //}
+        return 0;
     }
     
     
@@ -346,16 +348,6 @@ impl Buffer {
         }
         else {
             return self.text.get_grapheme_recursive(index);
-        }
-    }
-    
-    
-    pub fn get_grapheme_width(&self, index: usize) -> usize {
-        if index >= self.grapheme_count() {
-            panic!("Buffer::get_grapheme_width(): index past last grapheme.");
-        }
-        else {
-            return self.text.get_grapheme_width_recursive(index, self.tab_width);
         }
     }
     
