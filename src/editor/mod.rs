@@ -7,7 +7,7 @@ use std::path::Path;
 use std::cmp::min;
 use files::{load_file_to_buffer, save_buffer_to_file};
 use string_utils::grapheme_count;
-use self::cursor::{Cursor, CursorSet};
+use self::cursor::CursorSet;
 
 mod cursor;
 
