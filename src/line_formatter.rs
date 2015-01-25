@@ -1,6 +1,7 @@
 use buffer::line::{Line, LineGraphemeIter};
 use string_utils::{is_line_ending};
 
+#[derive(Copy, PartialEq)]
 pub enum RoundingBehavior {
     Round,
     Floor,
@@ -8,6 +9,8 @@ pub enum RoundingBehavior {
 }
 
 pub trait LineFormatter {
+    fn single_line_height(&self) -> usize;
+
     fn dimensions(&self, line: &Line) -> (usize, usize);
     
     fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize);
@@ -36,8 +39,10 @@ impl<'a> Iterator for ConsoleLineFormatterVisIter<'a> {
     fn next(&mut self) -> Option<(&'a str, usize, usize)> {
         if let Some(g) = self.grapheme_iter.next() {
             let pos = self.pos;
+            
             let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
             self.pos = (self.pos.0, self.pos.1 + width);
+            
             return Some((g, pos.0, pos.1));
         }
         else {
@@ -84,6 +89,10 @@ impl ConsoleLineFormatter {
 
 
 impl<'a> LineFormatter for ConsoleLineFormatter {
+    fn single_line_height(&self) -> usize {
+        return 1;
+    }
+
     fn dimensions(&self, line: &Line) -> (usize, usize) {
         return (1, self.vis_width(line));
     }

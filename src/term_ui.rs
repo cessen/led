@@ -7,7 +7,7 @@ use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
 use buffer::line::{line_ending_to_str, LineEnding};
-use line_formatter::LineFormatter;
+use line_formatter::{LineFormatter, RoundingBehavior};
 
 // Key codes
 const K_ENTER: u16 = 13;
@@ -335,31 +335,67 @@ impl TermUI {
 
 
     fn draw_editor_text(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
-        let mut line_iter = editor.buffer.line_iter_at_index(editor.view_pos.0);
+        // Calculate all the starting info
+        let editor_corner_index = editor.buffer.v2d_to_index(editor.view_pos, (RoundingBehavior::Floor, RoundingBehavior::Floor));
+        let (starting_line, _) = editor.buffer.index_to_line_col(editor_corner_index);
+        let mut grapheme_index = editor.buffer.line_col_to_index((starting_line, 0));
+        let (vis_starting_line, _) = editor.buffer.index_to_v2d(grapheme_index);
+
+        let mut screen_line = c1.0 as isize + vis_starting_line as isize;
+        let screen_col = c1.1 as isize;
         
-        //let mut grapheme_index;
-        
-        let mut vis_line_num = editor.view_pos.0;
-        let mut vis_col_num = editor.view_pos.1;
-        
-        let mut print_line_num = c1.0;
-        let mut print_col_num = c1.1;
-        
-        let max_print_line = c2.0;
-        let max_print_col = c2.1;
-        
-        loop {
-            if let Some(line) = line_iter.next() {
-                let mut g_iter = editor.buffer.formatter.vis_grapheme_iter(line);
+        let mut line_iter = editor.buffer.line_iter_at_index(starting_line);
+        for line in line_iter {
+            let mut g_iter = editor.buffer.formatter.vis_grapheme_iter(line);
+            let mut last_y = 0;
+            
+            // Loop through the graphemes of the line and print them to
+            // the screen.
+            for (g, pos_y, pos_x) in g_iter {
+                last_y = pos_y;
                 
-                for (g, pos_y, pos_x) in g_iter {
-                   self.rb.print(pos_x, pos_y, rustbox::RB_NORMAL, Color::White, Color::Black, g);
+                // Calculate the cell coordinates at which to draw the grapheme
+                let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
+                let py = pos_y as isize + screen_line - editor.view_pos.0 as isize;
+                
+                // If we're off the bottom, we're done
+                if py > c2.0 as isize {
+                    return;
                 }
+                
+                // Draw the grapheme to the screen if it's in bounds
+                if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) {
+                    // Check if the character is within a cursor
+                    let mut at_cursor = false;
+                    for c in editor.cursors.iter() {
+                        if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
+                            at_cursor = true;
+                        }
+                    }
+                
+                    // Actually print the character
+                    if is_line_ending(g) || g == "\t" {
+                        if at_cursor {
+                            self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                        }
+                    }
+                    else {
+                        if at_cursor {
+                            self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, g);
+                        }
+                        else {
+                            self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::White, Color::Black, g);
+                        }
+                    }
+                }
+                
+                grapheme_index += 1;
             }
-            else {
-                break;
-            }
+            
+            screen_line += last_y as isize + 1;
         }
+        
+        // TODO: handle printing the cursor when it's at the end of the buffer.
     }
     
     

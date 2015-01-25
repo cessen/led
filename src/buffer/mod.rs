@@ -288,7 +288,7 @@ impl<T: LineFormatter> Buffer<T> {
     /// If the index is off the end of the text, returns the line and column
     /// number of the last valid text position.
     pub fn index_to_line_col(&self, pos: usize) -> (usize, usize) {
-        return self.text.pos_1d_to_closest_2d_recursive(pos);
+        return self.text.index_to_line_col_recursive(pos);
     }
     
     
@@ -300,7 +300,7 @@ impl<T: LineFormatter> Buffer<T> {
     /// beyond the end of the buffer, returns the index of the buffer's last
     /// valid position.
     pub fn line_col_to_index(&self, pos: (usize, usize)) -> usize {
-        return self.text.pos_2d_to_closest_1d_recursive(pos);
+        return self.text.line_col_to_index_recursive(pos);
     }
 
 
@@ -309,11 +309,11 @@ impl<T: LineFormatter> Buffer<T> {
     /// If the index is off the end of the text, returns the visual line and
     /// column number of the last valid text position.
     pub fn index_to_v2d(&self, pos: usize) -> (usize, usize) {
-        // TODO: update this to use the new LineFormatter stuff
-        //let (v, h) = self.text.pos_1d_to_closest_2d_recursive(pos);
-        //let vis_h = self.get_line(v).grapheme_index_to_closest_vis_pos(h, self.tab_width);
-        //return (v, vis_h);
-        return (0, 0);
+        let mut index = pos;
+        if index > self.grapheme_count() {
+            index = self.grapheme_count();
+        }
+        return self.text.index_to_v2d_recursive(&self.formatter, index);
     }
 
 
@@ -324,16 +324,7 @@ impl<T: LineFormatter> Buffer<T> {
     /// number given is beyond the end of the buffer, returns the index of
     /// the buffer's last valid position.
     pub fn v2d_to_index(&self, pos: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
-        // TODO: update this to use the new LineFormatter stuff
-        //if pos.0 >= self.line_count() {
-        //    return self.grapheme_count();
-        //}
-        //else {
-        //    let gs = self.line_col_to_index((pos.0, 0));
-        //    let h = self.get_line(pos.0).vis_pos_to_closest_grapheme_index(pos.1, self.tab_width);
-        //    return gs + h;
-        //}
-        return 0;
+        return self.text.v2d_to_index_recursive(&self.formatter, pos, rounding);
     }
     
     

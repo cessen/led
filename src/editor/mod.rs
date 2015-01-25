@@ -58,11 +58,11 @@ impl Editor {
         };
         
         // For multiple-cursor testing
-        let mut cur = Cursor::new();
-        cur.range.0 = 30;
-        cur.range.1 = 30;
-        cur.update_vis_start(&(ed.buffer));
-        ed.cursors.add_cursor(cur);
+        //let mut cur = Cursor::new();
+        //cur.range.0 = 30;
+        //cur.range.1 = 30;
+        //cur.update_vis_start(&(ed.buffer));
+        //ed.cursors.add_cursor(cur);
         
         ed.auto_detect_indentation_style();
         

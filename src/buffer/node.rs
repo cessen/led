@@ -1,7 +1,7 @@
 use std::mem;
 use std::cmp::{min, max};
 
-use line_formatter::LineFormatter;
+use line_formatter::{LineFormatter, RoundingBehavior};
 use string_utils::is_line_ending;
 use super::line::{Line, LineEnding, LineGraphemeIter, str_to_line_ending};
 
@@ -234,7 +234,26 @@ impl BufferNode {
     }
     
     
-    pub fn pos_2d_to_closest_1d_recursive(&self, pos: (usize, usize)) -> usize {
+    pub fn index_to_line_col_recursive(&self, index: usize) -> (usize, usize) {
+        match self.data {
+            BufferNodeData::Leaf(_) => {
+                return (0, min(index, self.grapheme_count));
+            },
+            
+            BufferNodeData::Branch(ref left, ref right) => {
+                if index < left.grapheme_count {
+                    return left.index_to_line_col_recursive(index);
+                }
+                else {
+                    let (v, h) = right.index_to_line_col_recursive((index - left.grapheme_count));
+                    return (v + left.line_count, h);
+                }
+            }
+        }
+    }
+    
+    
+    pub fn line_col_to_index_recursive(&self, pos: (usize, usize)) -> usize {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
                 if pos.0 != 0 {
@@ -256,29 +275,60 @@ impl BufferNode {
             
             BufferNodeData::Branch(ref left, ref right) => {
                 if pos.0 < left.line_count {
-                    return left.pos_2d_to_closest_1d_recursive(pos);
+                    return left.line_col_to_index_recursive(pos);
                 }
                 else {
-                    return left.grapheme_count + right.pos_2d_to_closest_1d_recursive((pos.0 - left.line_count, pos.1));
+                    return left.grapheme_count + right.line_col_to_index_recursive((pos.0 - left.line_count, pos.1));
                 }
             }
         }
     }
     
     
-    pub fn pos_1d_to_closest_2d_recursive(&self, pos: usize) -> (usize, usize) {
+    pub fn index_to_v2d_recursive<T: LineFormatter>(&self, f: &T, index: usize) -> (usize, usize) {
         match self.data {
-            BufferNodeData::Leaf(_) => {
-                return (0, min(pos, self.grapheme_count));
+            BufferNodeData::Leaf(ref line) => {
+                return f.index_to_v2d(line, index);
             },
             
             BufferNodeData::Branch(ref left, ref right) => {
-                if pos < left.grapheme_count {
-                    return left.pos_1d_to_closest_2d_recursive(pos);
+                if index < left.grapheme_count {
+                    return left.index_to_v2d_recursive(f, index);
                 }
                 else {
-                    let (v, h) = right.pos_1d_to_closest_2d_recursive((pos - left.grapheme_count));
-                    return (v + left.line_count, h);
+                    let (y, x) = right.index_to_v2d_recursive(f, (index - left.grapheme_count));
+                    return (y + left.vis_dim.0, x);
+                }
+            }
+        }
+    }
+    
+    
+    pub fn v2d_to_index_recursive<T: LineFormatter>(&self, f: &T, pos: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
+        match self.data {
+            BufferNodeData::Leaf(ref line) => {
+                return f.v2d_to_index(line, pos, rounding);
+            },
+            
+            BufferNodeData::Branch(ref left, ref right) => {
+                let lh = f.single_line_height();
+                
+                if rounding.0 == RoundingBehavior::Round {
+                    // TODO
+                    return 0;
+                    
+                }
+                else if rounding.0 == RoundingBehavior::Floor {
+                    if pos.0 < left.vis_dim.0 {
+                        return left.v2d_to_index_recursive(f, pos, rounding);
+                    }
+                    else {
+                        return left.grapheme_count + right.v2d_to_index_recursive(f, (pos.0 - left.vis_dim.0, pos.1), rounding);
+                    }
+                }
+                else { // RoundingBehavior::Ceiling
+                    // TODO
+                    return 0;
                 }
             }
         }
