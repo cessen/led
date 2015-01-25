@@ -761,34 +761,6 @@ mod tests {
         assert!(tl2.ending == LineEnding::CRLF);
     }
     
-    #[test]
-    fn grapheme_index_to_closest_vis_pos_1() {
-        let tl = Line::new_from_str("Hello!");
-        
-        assert!(tl.grapheme_index_to_closest_vis_pos(0, TAB_WIDTH) == 0);
-    }
-    
-    #[test]
-    fn grapheme_index_to_closest_vis_pos_2() {
-        let tl = Line::new_from_str("\tHello!");
-        
-        assert!(tl.grapheme_index_to_closest_vis_pos(1, TAB_WIDTH) == TAB_WIDTH);
-    }
-    
-    #[test]
-    fn vis_pos_to_closest_grapheme_index_1() {
-        let tl = Line::new_from_str("Hello!");
-        
-        assert!(tl.vis_pos_to_closest_grapheme_index(0, TAB_WIDTH) == 0);
-    }
-    
-    #[test]
-    fn vis_pos_to_closest_grapheme_index_2() {
-        let tl = Line::new_from_str("\tHello!");
-        
-        assert!(tl.vis_pos_to_closest_grapheme_index(TAB_WIDTH, TAB_WIDTH) == 1);
-    }
-    
     
     //=========================================================================
     // LineGraphemeIter tests

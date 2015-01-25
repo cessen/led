@@ -976,16 +976,18 @@ impl<'a> Iterator for BufferNodeLineIter<'a> {
 mod tests {
     use super::BufferNode;
     use super::super::line::LineEnding;
+    use super::super::line_formatter::TestLineFormatter;
 
     #[test]
     fn merge_line_with_next_recursive_1() {
-        let mut node = BufferNode::new();
-        node.insert_text("Hi\n there!", 0);
+        let f = TestLineFormatter::new();
+        let mut node = BufferNode::new(&f);
+        node.insert_text(&f, "Hi\n there!", 0);
         
         assert!(node.grapheme_count == 10);
         assert!(node.line_count == 2);
         
-        node.merge_line_with_next_recursive(0, None);
+        node.merge_line_with_next_recursive(&f, 0, None);
         
         let mut iter = node.grapheme_iter();
         
@@ -1006,13 +1008,14 @@ mod tests {
     
     #[test]
     fn merge_line_with_next_recursive_2() {
-        let mut node = BufferNode::new();
-        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        let f = TestLineFormatter::new();
+        let mut node = BufferNode::new(&f);
+        node.insert_text(&f, "Hi\n there\n people \nof the\n world!", 0);
         
         assert!(node.grapheme_count == 33);
         assert!(node.line_count == 5);
         
-        node.merge_line_with_next_recursive(2, None);
+        node.merge_line_with_next_recursive(&f, 2, None);
         
         let mut iter = node.grapheme_iter();
         
@@ -1056,13 +1059,14 @@ mod tests {
     
     #[test]
     fn merge_line_with_next_recursive_3() {
-        let mut node = BufferNode::new();
-        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        let f = TestLineFormatter::new();
+        let mut node = BufferNode::new(&f);
+        node.insert_text(&f, "Hi\n there\n people \nof the\n world!", 0);
         
         assert!(node.grapheme_count == 33);
         assert!(node.line_count == 5);
         
-        node.merge_line_with_next_recursive(0, None);
+        node.merge_line_with_next_recursive(&f, 0, None);
         
         let mut iter = node.grapheme_iter();
         
@@ -1106,13 +1110,14 @@ mod tests {
     
     #[test]
     fn pull_out_line_recursive_1() {
-        let mut node = BufferNode::new();
-        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        let f = TestLineFormatter::new();
+        let mut node = BufferNode::new(&f);
+        node.insert_text(&f, "Hi\n there\n people \nof the\n world!", 0);
         
         assert!(node.grapheme_count == 33);
         assert!(node.line_count == 5);
         
-        let line = node.pull_out_line_recursive(0).unwrap();
+        let line = node.pull_out_line_recursive(&f, 0).unwrap();
         assert!(line.as_str() == "Hi");
         assert!(line.ending == LineEnding::LF);
         
@@ -1156,13 +1161,14 @@ mod tests {
     
     #[test]
     fn pull_out_line_recursive_2() {
-        let mut node = BufferNode::new();
-        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        let f = TestLineFormatter::new();
+        let mut node = BufferNode::new(&f);
+        node.insert_text(&f, "Hi\n there\n people \nof the\n world!", 0);
         
         assert!(node.grapheme_count == 33);
         assert!(node.line_count == 5);
         
-        let line = node.pull_out_line_recursive(2).unwrap();
+        let line = node.pull_out_line_recursive(&f, 2).unwrap();
         assert!(line.as_str() == " people ");
         assert!(line.ending == LineEnding::LF);
         
@@ -1200,13 +1206,14 @@ mod tests {
     
     #[test]
     fn pull_out_line_recursive_3() {
-        let mut node = BufferNode::new();
-        node.insert_text("Hi\n there\n people \nof the\n world!", 0);
+        let f = TestLineFormatter::new();
+        let mut node = BufferNode::new(&f);
+        node.insert_text(&f, "Hi\n there\n people \nof the\n world!", 0);
         
         assert!(node.grapheme_count == 33);
         assert!(node.line_count == 5);
         
-        let line = node.pull_out_line_recursive(4).unwrap();
+        let line = node.pull_out_line_recursive(&f, 4).unwrap();
         assert!(line.as_str() == " world!");
         assert!(line.ending == LineEnding::None);
         
