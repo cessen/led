@@ -10,7 +10,9 @@ use std::path::Path;
 use docopt::Docopt;
 use editor::Editor;
 use term_ui::TermUI;
+use term_ui::formatter::ConsoleLineFormatter;
 use gui::GUI;
+use gui::formatter::GUILineFormatter;
 
 mod string_utils;
 mod buffer;
@@ -49,16 +51,17 @@ fn main() {
     // Get command-line arguments
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
     
-    // Load file, if specified    
-    let editor = if let Option::Some(s) = args.arg_file {
-        Editor::new_from_file(&Path::new(s.as_slice()))
-    }
-    else {
-        Editor::new()
-    };
-        
+    
     // Initialize and start UI
     if args.flag_gui {
+        // Load file, if specified    
+        let editor = if let Option::Some(s) = args.arg_file {
+            Editor::new_from_file(GUILineFormatter::new(4), &Path::new(s.as_slice()))
+        }
+        else {
+            Editor::new(GUILineFormatter::new(4))
+        };
+        
         // GUI
         sdl2::init(sdl2::INIT_VIDEO);
         let mut ui = GUI::new_from_editor(editor);
@@ -66,6 +69,14 @@ fn main() {
         sdl2::quit();
     }
     else {
+        // Load file, if specified    
+        let editor = if let Option::Some(s) = args.arg_file {
+            Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(s.as_slice()))
+        }
+        else {
+            Editor::new(ConsoleLineFormatter::new(4))
+        };
+        
         // Console UI
         let mut ui = TermUI::new_from_editor(editor);
         ui.main_ui_loop();

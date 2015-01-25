@@ -3,7 +3,6 @@
 use buffer::Buffer;
 use buffer::line_formatter::LineFormatter;
 use buffer::line_formatter::RoundingBehavior::*;
-use term_ui::formatter::ConsoleLineFormatter;
 use std::path::Path;
 use std::cmp::min;
 use files::{load_file_to_buffer, save_buffer_to_file};
@@ -13,8 +12,8 @@ use self::cursor::CursorSet;
 mod cursor;
 
 
-pub struct Editor {
-    pub buffer: Buffer<ConsoleLineFormatter>,
+pub struct Editor<T: LineFormatter> {
+    pub buffer: Buffer<T>,
     pub file_path: Path,
     pub soft_tabs: bool,
     pub dirty: bool,
@@ -28,11 +27,11 @@ pub struct Editor {
 }
 
 
-impl Editor {
+impl<T: LineFormatter> Editor<T> {
     /// Create a new blank editor
-    pub fn new() -> Editor {
+    pub fn new(formatter: T) -> Editor<T> {
         Editor {
-            buffer: Buffer::new(ConsoleLineFormatter::new(4)),
+            buffer: Buffer::new(formatter),
             file_path: Path::new(""),
             soft_tabs: false,
             dirty: false,
@@ -42,10 +41,11 @@ impl Editor {
         }
     }
     
-    pub fn new_from_file(path: &Path) -> Editor {
-        let buf = match load_file_to_buffer(path, ConsoleLineFormatter::new(4)) {
+    pub fn new_from_file(formatter: T, path: &Path) -> Editor<T> {
+        let buf = match load_file_to_buffer(path, formatter) {
             Ok(b) => {b},
-            _ => {Buffer::new(ConsoleLineFormatter::new(4))}
+            // TODO: handle un-openable file better
+            _ => panic!("Could not open file!"),
         };
         
         let mut ed = Editor {
@@ -163,11 +163,13 @@ impl Editor {
                 }
             }
             
-            self.soft_tabs = true;
-            self.buffer.formatter.tab_width = width as u8;
+            // TODO
+            //self.soft_tabs = true;
+            //self.buffer.formatter.tab_width = width as u8;
         }
         else {
-            self.soft_tabs = false;
+            // TODO
+            //self.soft_tabs = false;
         }
     }
     
@@ -271,7 +273,9 @@ impl Editor {
                 
                 // Figure out how many spaces to insert
                 let (_, vis_pos) = self.buffer.index_to_v2d(c.range.0);
-                let next_tab_stop = ((vis_pos / self.buffer.formatter.tab_width as usize) + 1) * self.buffer.formatter.tab_width as usize;
+                // TODO: handle tab settings
+                //let next_tab_stop = ((vis_pos / self.buffer.formatter.tab_width as usize) + 1) * self.buffer.formatter.tab_width as usize;
+                let next_tab_stop = ((vis_pos / 4) + 1) * 4 as usize;
                 let space_count = min(next_tab_stop - vis_pos, 8);
                 
                 

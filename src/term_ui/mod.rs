@@ -8,6 +8,7 @@ use std::time::duration::Duration;
 use string_utils::{is_line_ending};
 use buffer::line::{line_ending_to_str, LineEnding};
 use buffer::line_formatter::{LineFormatter, RoundingBehavior};
+use self::formatter::ConsoleLineFormatter;
 
 pub mod formatter;
 
@@ -34,7 +35,7 @@ const K_CTRL_Z: u16 = 26;
 
 pub struct TermUI {
     rb: rustbox::RustBox,
-    editor: Editor,
+    editor: Editor<ConsoleLineFormatter>,
     width: usize,
     height: usize,
 }
@@ -45,7 +46,7 @@ impl TermUI {
         let rb = rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap();
         let w = rb.width();
         let h = rb.height();
-        let mut editor = Editor::new();
+        let mut editor = Editor::new(ConsoleLineFormatter::new(4));
         editor.update_dim(h-1, w);
         
         TermUI {
@@ -56,7 +57,7 @@ impl TermUI {
         }
     }
     
-    pub fn new_from_editor(ed: Editor) -> TermUI {
+    pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
         let rb = rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap();
         let w = rb.width();
         let h = rb.height();
@@ -288,7 +289,7 @@ impl TermUI {
     }
     
     
-    fn draw_editor(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
+    fn draw_editor(&self, editor: &Editor<ConsoleLineFormatter>, c1: (usize, usize), c2: (usize, usize)) {
         let foreground = Color::Black;
         let background = Color::Cyan;
         
@@ -336,7 +337,7 @@ impl TermUI {
     }
 
 
-    fn draw_editor_text(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
+    fn draw_editor_text(&self, editor: &Editor<ConsoleLineFormatter>, c1: (usize, usize), c2: (usize, usize)) {
         // Calculate all the starting info
         let editor_corner_index = editor.buffer.v2d_to_index(editor.view_pos, (RoundingBehavior::Floor, RoundingBehavior::Floor));
         let (starting_line, _) = editor.buffer.index_to_line_col(editor_corner_index);

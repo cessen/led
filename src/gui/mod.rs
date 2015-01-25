@@ -7,13 +7,15 @@ use sdl2::rect::Rect;
 
 use font::Font;
 use editor::Editor;
+use self::formatter::GUILineFormatter;
 
+pub mod formatter;
 
 pub struct GUI {
     renderer: Renderer,
     draw_buf: Texture,
     font: Font,
-    editor: Editor,
+    editor: Editor<GUILineFormatter>,
 }
 
 impl GUI {
@@ -25,7 +27,7 @@ impl GUI {
         let renderer = sdl2::render::Renderer::from_window(window, sdl2::render::RenderDriverIndex::Auto, sdl2::render::ACCELERATED).unwrap();
         let draw_buf = renderer.create_texture(sdl2::pixels::PixelFormatFlag::RGBA8888, sdl2::render::TextureAccess::Target, 1, 1).unwrap();
         
-        let mut editor = Editor::new();
+        let mut editor = Editor::new(GUILineFormatter::new(4));
         editor.update_dim(renderer.get_output_size().unwrap().1 as usize, renderer.get_output_size().unwrap().0 as usize);
         
         GUI {
@@ -37,7 +39,7 @@ impl GUI {
     }
     
 
-    pub fn new_from_editor(ed: Editor) -> GUI {
+    pub fn new_from_editor(ed: Editor<GUILineFormatter>) -> GUI {
         let font = Font::new_default(14);
         
         // Get the window and renderer for sdl
