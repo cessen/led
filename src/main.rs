@@ -10,15 +10,15 @@ use std::path::Path;
 use docopt::Docopt;
 use editor::Editor;
 use term_ui::TermUI;
-//use gui::GUI;
+use gui::GUI;
 
 mod string_utils;
 mod buffer;
 mod files;
 mod editor;
 mod term_ui;
-//mod font;
-//mod gui;
+mod font;
+mod gui;
 
 
 
@@ -58,16 +58,16 @@ fn main() {
     };
         
     // Initialize and start UI
-    //if args.flag_gui {
-    //    // GUI
-    //    sdl2::init(sdl2::INIT_VIDEO);
-    //    let mut ui = GUI::new_from_editor(editor);
-    //    ui.main_ui_loop();
-    //    sdl2::quit();
-    //}
-    //else {
+    if args.flag_gui {
+        // GUI
+        sdl2::init(sdl2::INIT_VIDEO);
+        let mut ui = GUI::new_from_editor(editor);
+        ui.main_ui_loop();
+        sdl2::quit();
+    }
+    else {
         // Console UI
         let mut ui = TermUI::new_from_editor(editor);
         ui.main_ui_loop();
-    //}
+    }
 }
