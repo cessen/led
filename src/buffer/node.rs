@@ -307,7 +307,17 @@ impl BufferNode {
     pub fn v2d_to_index_recursive<T: LineFormatter>(&self, f: &T, pos: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
-                return f.v2d_to_index(line, pos, rounding);
+                let mut r = f.v2d_to_index(line, pos, rounding);
+                
+                // TODO: is this the right thing to do?  The idea is that
+                // the non-leaf branch code should put us in the right leaf
+                // anyway, and returning and index equal to the leaf's
+                // grapheme count is putting it on the next line instead of
+                // this one.
+                if r == self.grapheme_count && self.grapheme_count > 0 {
+                    r -= 1;
+                }
+                return r;
             },
             
             BufferNodeData::Branch(ref left, ref right) => {
