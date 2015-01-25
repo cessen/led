@@ -1,56 +1,10 @@
-use buffer::line::{Line, LineGraphemeIter};
 use string_utils::{is_line_ending};
+use buffer::line::{Line, LineGraphemeIter};
+use buffer::line_formatter::{LineFormatter, RoundingBehavior};
 
-#[derive(Copy, PartialEq)]
-pub enum RoundingBehavior {
-    Round,
-    Floor,
-    Ceiling,
-}
-
-pub trait LineFormatter {
-    fn single_line_height(&self) -> usize;
-
-    fn dimensions(&self, line: &Line) -> (usize, usize);
-    
-    fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize);
-    
-    fn v2d_to_index(&self, line: &Line, v2d: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize;
-}
-
-
-
-
-
-//============================================================
-// An implementation of the LineFormatter stuff for consoles
-
-pub struct ConsoleLineFormatterVisIter<'a> {
-    grapheme_iter: LineGraphemeIter<'a>,
-    f: &'a ConsoleLineFormatter,
-    pos: (usize, usize),
-}
-
-
-
-impl<'a> Iterator for ConsoleLineFormatterVisIter<'a> {
-    type Item = (&'a str, (usize, usize), usize);
-
-    fn next(&mut self) -> Option<(&'a str, (usize, usize), usize)> {
-        if let Some(g) = self.grapheme_iter.next() {
-            let pos = self.pos;
-            
-            let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
-            self.pos = (self.pos.0, self.pos.1 + width);
-            
-            return Some((g, (pos.0, pos.1), width));
-        }
-        else {
-            return None;
-        }
-    }
-}
-
+//===================================================================
+// LineFormatter implementation for terminals/consoles.
+//===================================================================
 
 pub struct ConsoleLineFormatter {
     pub tab_width: u8,
@@ -147,6 +101,41 @@ impl<'a> LineFormatter for ConsoleLineFormatter {
 }
 
 
+//===================================================================
+// An iterator that iterates over the graphemes in a line in a
+// manner consistent with the ConsoleFormatter.
+//===================================================================
+pub struct ConsoleLineFormatterVisIter<'a> {
+    grapheme_iter: LineGraphemeIter<'a>,
+    f: &'a ConsoleLineFormatter,
+    pos: (usize, usize),
+}
+
+
+
+impl<'a> Iterator for ConsoleLineFormatterVisIter<'a> {
+    type Item = (&'a str, (usize, usize), usize);
+
+    fn next(&mut self) -> Option<(&'a str, (usize, usize), usize)> {
+        if let Some(g) = self.grapheme_iter.next() {
+            let pos = self.pos;
+            
+            let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
+            self.pos = (self.pos.0, self.pos.1 + width);
+            
+            return Some((g, (pos.0, pos.1), width));
+        }
+        else {
+            return None;
+        }
+    }
+}
+
+
+
+//===================================================================
+// Helper functions
+//===================================================================
 
 /// Returns the visual width of a grapheme given a starting
 /// position on a line.

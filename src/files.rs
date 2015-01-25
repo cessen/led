@@ -3,7 +3,7 @@ use std::io::fs::File;
 use std::path::Path;
 
 use buffer::line::{Line, LineEnding, line_ending_to_str};
-use line_formatter::LineFormatter;
+use buffer::line_formatter::LineFormatter;
 use buffer::Buffer as TextBuffer;
 
 pub fn load_file_to_buffer<T: LineFormatter>(path: &Path, lf: T) -> IoResult<TextBuffer<T>> {

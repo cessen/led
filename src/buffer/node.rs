@@ -1,7 +1,7 @@
 use std::mem;
 use std::cmp::{min, max};
 
-use line_formatter::{LineFormatter, RoundingBehavior};
+use super::line_formatter::{LineFormatter, RoundingBehavior};
 use string_utils::is_line_ending;
 use super::line::{Line, LineEnding, LineGraphemeIter, str_to_line_ending};
 

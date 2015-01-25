@@ -6,10 +6,11 @@ use self::line::{Line, LineEnding};
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::undo_stack::{UndoStack};
 use self::undo_stack::Operation::*;
-use line_formatter::{LineFormatter, RoundingBehavior};
+use self::line_formatter::{LineFormatter, RoundingBehavior};
 use string_utils::{is_line_ending, grapheme_count};
 
 pub mod line;
+pub mod line_formatter;
 mod node;
 mod undo_stack;
 
@@ -503,11 +504,12 @@ impl<'a> Iterator for BufferLineIter<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::line_formatter::TestLineFormatter;
     use super::{Buffer, BufferGraphemeIter, BufferLineIter};
 
     #[test]
     fn insert_text() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello 世界!", 0);
         
@@ -530,7 +532,7 @@ mod tests {
     
     #[test]
     fn insert_text_with_newlines() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         
@@ -555,7 +557,7 @@ mod tests {
     
     #[test]
     fn insert_text_in_non_empty_buffer_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         buf.insert_text("Again ", 0);
@@ -587,7 +589,7 @@ mod tests {
     
     #[test]
     fn insert_text_in_non_empty_buffer_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         buf.insert_text(" again", 5);
@@ -619,7 +621,7 @@ mod tests {
     
     #[test]
     fn insert_text_in_non_empty_buffer_3() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         buf.insert_text("again", 6);
@@ -650,7 +652,7 @@ mod tests {
     
     #[test]
     fn insert_text_in_non_empty_buffer_4() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         buf.insert_text("again", 11);
@@ -681,7 +683,7 @@ mod tests {
     
     #[test]
     fn insert_text_in_non_empty_buffer_5() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         buf.insert_text("again", 2);
@@ -713,7 +715,7 @@ mod tests {
     
     #[test]
     fn insert_text_in_non_empty_buffer_6() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         buf.insert_text("again", 8);
@@ -745,7 +747,7 @@ mod tests {
     
     #[test]
     fn insert_text_in_non_empty_buffer_7() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\n 世界\r\n!", 0);
         buf.insert_text("\nag\n\nain\n", 2);
@@ -781,7 +783,7 @@ mod tests {
     
     #[test]
     fn remove_text_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -825,7 +827,7 @@ mod tests {
     
     #[test]
     fn remove_text_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -860,7 +862,7 @@ mod tests {
     
     #[test]
     fn remove_text_3() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -895,7 +897,7 @@ mod tests {
     
     #[test]
     fn remove_text_4() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -936,7 +938,7 @@ mod tests {
     
     #[test]
     fn remove_text_5() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -971,7 +973,7 @@ mod tests {
     
     #[test]
     fn remove_text_6() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\nworld!", 0);
         assert!(buf.grapheme_count() == 12);
@@ -992,7 +994,7 @@ mod tests {
     
     #[test]
     fn remove_text_7() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\nworld!", 0);
         assert!(buf.grapheme_count() == 15);
@@ -1015,7 +1017,7 @@ mod tests {
     
     #[test]
     fn remove_text_8() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\nworld!", 0);
         assert!(buf.grapheme_count() == 12);
@@ -1037,7 +1039,7 @@ mod tests {
     
     #[test]
     fn remove_text_9() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hello\nworld!", 0);
         assert!(buf.grapheme_count() == 12);
@@ -1063,7 +1065,7 @@ mod tests {
     
     #[test]
     fn remove_text_10() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("12\n34\n56\n78", 0);
         assert!(buf.grapheme_count() == 11);
@@ -1085,7 +1087,7 @@ mod tests {
     
     #[test]
     fn remove_text_11() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("1234567890", 0);
         assert!(buf.grapheme_count() == 10);
@@ -1112,7 +1114,7 @@ mod tests {
     
     #[test]
     fn move_text_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
@@ -1157,7 +1159,7 @@ mod tests {
     
     #[test]
     fn move_text_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
@@ -1202,7 +1204,7 @@ mod tests {
     
     #[test]
     fn move_text_3() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
@@ -1247,7 +1249,7 @@ mod tests {
     
     #[test]
     fn move_text_4() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
@@ -1292,7 +1294,7 @@ mod tests {
     
     #[test]
     fn move_text_5() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
@@ -1337,7 +1339,7 @@ mod tests {
     
     #[test]
     fn remove_lines_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -1368,7 +1370,7 @@ mod tests {
     
     #[test]
     fn remove_lines_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -1399,7 +1401,7 @@ mod tests {
     
     #[test]
     fn remove_lines_3() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
@@ -1432,7 +1434,7 @@ mod tests {
     
     #[test]
     fn line_col_to_index_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let pos = buf.line_col_to_index((2, 3));
@@ -1443,7 +1445,7 @@ mod tests {
     
     #[test]
     fn line_col_to_index_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let pos = buf.line_col_to_index((2, 10));
@@ -1453,7 +1455,7 @@ mod tests {
     
     #[test]
     fn line_col_to_index_3() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let pos = buf.line_col_to_index((10, 2));
@@ -1464,7 +1466,7 @@ mod tests {
     
     #[test]
     fn index_to_line_col_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let pos = buf.index_to_line_col(5);
@@ -1475,7 +1477,7 @@ mod tests {
     
     #[test]
     fn index_to_line_col_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let pos = buf.index_to_line_col(50);
@@ -1486,7 +1488,7 @@ mod tests {
     
     #[test]
     fn string_from_range_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let s = buf.string_from_range(1, 12);
@@ -1497,7 +1499,7 @@ mod tests {
     
     #[test]
     fn string_from_range_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let s = buf.string_from_range(0, 29);
@@ -1508,7 +1510,7 @@ mod tests {
     
     #[test]
     fn grapheme_iter_at_index_1() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let mut iter = buf.grapheme_iter_at_index(16);
@@ -1532,7 +1534,7 @@ mod tests {
     
     #[test]
     fn grapheme_iter_at_index_2() {
-        let mut buf = Buffer::new();
+        let mut buf = Buffer::new(TestLineFormatter::new());
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         
         let mut iter = buf.grapheme_iter_at_index(29);

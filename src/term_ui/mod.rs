@@ -7,7 +7,9 @@ use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
 use buffer::line::{line_ending_to_str, LineEnding};
-use line_formatter::{LineFormatter, RoundingBehavior};
+use buffer::line_formatter::{LineFormatter, RoundingBehavior};
+
+pub mod formatter;
 
 // Key codes
 const K_ENTER: u16 = 13;

@@ -14,7 +14,6 @@ use term_ui::TermUI;
 
 mod string_utils;
 mod buffer;
-mod line_formatter;
 mod files;
 mod editor;
 mod term_ui;
@@ -59,18 +58,16 @@ fn main() {
     };
         
     // Initialize and start UI
-//    if args.flag_gui {
-//        // GUI
-//        sdl2::init(sdl2::INIT_VIDEO);
-//        let mut ui = GUI::new_from_editor(editor);
-//        ui.main_ui_loop();
-//        sdl2::quit();
-//    }
-//    else {
+    //if args.flag_gui {
+    //    // GUI
+    //    sdl2::init(sdl2::INIT_VIDEO);
+    //    let mut ui = GUI::new_from_editor(editor);
+    //    ui.main_ui_loop();
+    //    sdl2::quit();
+    //}
+    //else {
         // Console UI
         let mut ui = TermUI::new_from_editor(editor);
         ui.main_ui_loop();
-//    }
-    
-    //println!("{}", editor.buffer.root.tree_height);
+    //}
 }

@@ -5,7 +5,7 @@ use std::ops::{Index, IndexMut};
 use std::cmp::Ordering;
 
 use buffer::Buffer;
-use line_formatter::LineFormatter;
+use buffer::line_formatter::LineFormatter;
 
 /// A text cursor.  Also represents selections when range.0 != range.1.
 ///

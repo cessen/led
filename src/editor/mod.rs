@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
 use buffer::Buffer;
-use line_formatter::{LineFormatter, ConsoleLineFormatter};
-use line_formatter::RoundingBehavior::*;
+use buffer::line_formatter::LineFormatter;
+use buffer::line_formatter::RoundingBehavior::*;
+use term_ui::formatter::ConsoleLineFormatter;
 use std::path::Path;
 use std::cmp::min;
 use files::{load_file_to_buffer, save_buffer_to_file};
