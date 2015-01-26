@@ -9,7 +9,7 @@
       preferences for tab width (specified in spaces) and line wrapping.
       The freetype formatter should not reference SDL at all, and should
       have only the freetype library itself as a dependency.
-    - Handle tab settings properly after the refactor
+    //- Handle tab settings properly after the refactor
     - Possibly split the text buffer out into its own library...?  Would
       likely be useful to other people as well, and would encourage me to
       keep the API clean.

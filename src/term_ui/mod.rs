@@ -329,7 +329,7 @@ impl TermUI {
             LineEnding::PS => "PS",
         };
         let soft_tabs_str = if editor.soft_tabs {"spaces"} else {"tabs"};
-        let info_line = format!("UTF8:{}  {}:{}", nl, soft_tabs_str, editor.buffer.formatter.tab_width as usize);
+        let info_line = format!("UTF8:{}  {}:{}", nl, soft_tabs_str, editor.soft_tab_width as usize);
         self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, info_line.as_slice());
 
         // Draw main text editing area

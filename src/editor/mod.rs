@@ -16,6 +16,7 @@ pub struct Editor<T: LineFormatter> {
     pub buffer: Buffer<T>,
     pub file_path: Path,
     pub soft_tabs: bool,
+    pub soft_tab_width: u8,
     pub dirty: bool,
     
     // The dimensions and position of the editor's view within the buffer
@@ -34,6 +35,7 @@ impl<T: LineFormatter> Editor<T> {
             buffer: Buffer::new(formatter),
             file_path: Path::new(""),
             soft_tabs: false,
+            soft_tab_width: 4,
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
@@ -52,6 +54,7 @@ impl<T: LineFormatter> Editor<T> {
             buffer: buf,
             file_path: path.clone(),
             soft_tabs: false,
+            soft_tab_width: 4,
             dirty: false,
             view_dim: (0, 0),
             view_pos: (0, 0),
@@ -163,13 +166,11 @@ impl<T: LineFormatter> Editor<T> {
                 }
             }
             
-            // TODO
-            //self.soft_tabs = true;
-            //self.buffer.formatter.tab_width = width as u8;
+            self.soft_tabs = true;
+            self.soft_tab_width = width as u8;
         }
         else {
-            // TODO
-            //self.soft_tabs = false;
+            self.soft_tabs = false;
         }
     }
     
@@ -274,8 +275,7 @@ impl<T: LineFormatter> Editor<T> {
                 // Figure out how many spaces to insert
                 let (_, vis_pos) = self.buffer.index_to_v2d(c.range.0);
                 // TODO: handle tab settings
-                //let next_tab_stop = ((vis_pos / self.buffer.formatter.tab_width as usize) + 1) * self.buffer.formatter.tab_width as usize;
-                let next_tab_stop = ((vis_pos / 4) + 1) * 4 as usize;
+                let next_tab_stop = ((vis_pos / self.soft_tab_width as usize) + 1) * self.soft_tab_width as usize;
                 let space_count = min(next_tab_stop - vis_pos, 8);
                 
                 
