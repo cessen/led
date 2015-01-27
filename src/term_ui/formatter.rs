@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use string_utils::{is_line_ending};
 use buffer::line::{Line, LineGraphemeIter};
 use buffer::line_formatter::{LineFormatter, RoundingBehavior};
@@ -8,6 +10,7 @@ use buffer::line_formatter::{LineFormatter, RoundingBehavior};
 
 pub struct ConsoleLineFormatter {
     pub tab_width: u8,
+    pub wrap_width: usize,
 }
 
 
@@ -15,6 +18,7 @@ impl ConsoleLineFormatter {
     pub fn new(tab_width: u8) -> ConsoleLineFormatter {
         ConsoleLineFormatter {
             tab_width: tab_width,
+            wrap_width: 40,
         }
     }
 
@@ -48,52 +52,48 @@ impl<'a> LineFormatter for ConsoleLineFormatter {
     }
 
     fn dimensions(&self, line: &Line) -> (usize, usize) {
-        return (1, self.vis_width(line));
+        let mut dim: (usize, usize) = (0, 0);
+        
+        for (_, pos, width) in self.vis_grapheme_iter(line) {            
+            dim = (max(dim.0, pos.0), max(dim.1, pos.1 + width));
+        }
+        
+        dim.0 += 1;
+        
+        return dim;
     }
     
     
     fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize) {
-        let mut pos = 0;
-        let mut iter = line.grapheme_iter();
+        let mut pos = (0, 0);
+        let mut iter = self.vis_grapheme_iter(line);
         
         for _ in range(0, index) {
-            if let Some(g) = iter.next() {
-                let w = grapheme_vis_width_at_vis_pos(g, pos, self.tab_width as usize);
-                pos += w;
+            if let Some((_, _pos, _)) = iter.next() {
+                pos = _pos;
             }
             else {
                 panic!("ConsoleLineFormatter::index_to_v2d(): index past end of line.");
             }
         }
         
-        return (0, pos);
+        return pos;
     }
     
     
     fn v2d_to_index(&self, line: &Line, v2d: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
-        let mut pos = 0;
+        // TODO: handle rounding modes
         let mut i = 0;
-        let mut iter = line.grapheme_iter();
         
-        while pos < v2d.1 {
-            if let Some(g) = iter.next() {
-                let w = grapheme_vis_width_at_vis_pos(g, pos, self.tab_width as usize);
-                if (w + pos) > v2d.1 {
-                    let d1 = v2d.1 - pos;
-                    let d2 = (pos + w) - v2d.1;
-                    if d2 < d1 {
-                        i += 1;
-                    }
-                    break;
-                }
-                else {
-                    pos += w;
-                    i += 1;
-                }
-            }
-            else {
+        for (_, pos, width) in self.vis_grapheme_iter(line) {
+            if pos.0 > v2d.0 {
                 break;
             }
+            else if pos.0 == v2d.0 && pos.1 > v2d.1 {
+                break;
+            }
+            
+            i += 1;
         }
         
         return i;
@@ -117,13 +117,19 @@ impl<'a> Iterator for ConsoleLineFormatterVisIter<'a> {
     type Item = (&'a str, (usize, usize), usize);
 
     fn next(&mut self) -> Option<(&'a str, (usize, usize), usize)> {
-        if let Some(g) = self.grapheme_iter.next() {
-            let pos = self.pos;
-            
+        if let Some(g) = self.grapheme_iter.next() {            
             let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
-            self.pos = (self.pos.0, self.pos.1 + width);
             
-            return Some((g, (pos.0, pos.1), width));
+            if (self.pos.1 + width) > self.f.wrap_width {
+                let pos = (self.pos.0 + 1, 0);
+                self.pos = (self.pos.0 + 1, width);
+                return Some((g, pos, width));
+            }
+            else {
+                let pos = self.pos;
+                self.pos = (self.pos.0, self.pos.1 + width);
+                return Some((g, pos, width));
+            }
         }
         else {
             return None;

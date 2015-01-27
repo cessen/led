@@ -311,7 +311,7 @@ impl BufferNode {
                 
                 // TODO: is this the right thing to do?  The idea is that
                 // the non-leaf branch code should put us in the right leaf
-                // anyway, and returning and index equal to the leaf's
+                // anyway, and returning an index equal to the leaf's
                 // grapheme count is putting it on the next line instead of
                 // this one.
                 if r == self.grapheme_count && self.grapheme_count > 0 {
