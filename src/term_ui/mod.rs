@@ -408,7 +408,8 @@ impl TermUI {
                 grapheme_index += 1;
             }
             
-            screen_line += last_y as isize + 1;
+            let (dim_y, _) = editor.buffer.formatter.dimensions(line);
+            screen_line += dim_y as isize; 
         }
         
         

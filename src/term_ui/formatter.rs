@@ -67,17 +67,19 @@ impl<'a> LineFormatter for ConsoleLineFormatter {
     fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize) {
         let mut pos = (0, 0);
         let mut i = 0;
+        let mut last_width = 0;
         
-        for (_, _pos, _) in self.vis_grapheme_iter(line) {
+        for (_, _pos, width) in self.vis_grapheme_iter(line) {
             pos = _pos;
+            last_width = width;
             i += 1;
             
             if i > index {
-                break;
+                return pos;
             }
         }
         
-        return pos;
+        return (pos.0, pos.1 + last_width);
     }
     
     
