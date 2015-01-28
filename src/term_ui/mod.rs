@@ -351,13 +351,10 @@ impl TermUI {
         
         for line in line_iter {
             let mut g_iter = editor.buffer.formatter.vis_grapheme_iter(line);
-            let mut last_y = 0;
             
             // Loop through the graphemes of the line and print them to
             // the screen.
             for (g, (pos_y, pos_x), width) in g_iter {
-                last_y = pos_y;
-                
                 // Calculate the cell coordinates at which to draw the grapheme
                 let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
                 let py = pos_y as isize + screen_line - editor.view_pos.0 as isize;

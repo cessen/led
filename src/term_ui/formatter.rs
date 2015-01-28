@@ -58,7 +58,7 @@ impl<'a> LineFormatter for ConsoleLineFormatter {
             dim = (max(dim.0, pos.0), max(dim.1, pos.1 + width));
         }
         
-        dim.0 += 1;
+        dim.0 += self.single_line_height();
         
         return dim;
     }

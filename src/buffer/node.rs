@@ -321,8 +321,6 @@ impl BufferNode {
             },
             
             BufferNodeData::Branch(ref left, ref right) => {
-                let lh = f.single_line_height();
-                
                 if rounding.0 == RoundingBehavior::Round {
                     // TODO
                     return 0;
