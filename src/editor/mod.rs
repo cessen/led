@@ -4,7 +4,7 @@ use buffer::Buffer;
 use buffer::line_formatter::LineFormatter;
 use buffer::line_formatter::RoundingBehavior::*;
 use std::path::Path;
-use std::cmp::min;
+use std::cmp::{min, max};
 use files::{load_file_to_buffer, save_buffer_to_file};
 use string_utils::grapheme_count;
 use self::cursor::CursorSet;
@@ -471,10 +471,11 @@ impl<T: LineFormatter> Editor<T> {
     
     pub fn cursor_up(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
+            let vmove = n * self.buffer.formatter.single_line_height();
             let (v, _) = self.buffer.index_to_v2d(c.range.0);
             
-            if v >= n {
-                c.range.0 = self.buffer.v2d_to_index((v - n, c.vis_start), (Floor, Floor));
+            if vmove <= v {
+                c.range.0 = self.buffer.v2d_to_index((v - vmove, c.vis_start), (Floor, Floor));
                 c.range.1 = c.range.0;
             }
             else {
@@ -489,10 +490,12 @@ impl<T: LineFormatter> Editor<T> {
     
     pub fn cursor_down(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
-            let (v, _) = self.buffer.index_to_v2d(c.range.0);
+            let vmove = n * self.buffer.formatter.single_line_height();
+            let (v, _) = self.buffer.index_to_v2d(c.range.0); 
+            let (h, _) = self.buffer.dimensions();
             
-            if v < (self.buffer.line_count() - n) {
-                c.range.0 = self.buffer.v2d_to_index((v + n, c.vis_start), (Floor, Floor));
+            if vmove < (h - v) {
+                c.range.0 = self.buffer.v2d_to_index((v + vmove, c.vis_start), (Floor, Floor));
                 c.range.1 = c.range.0;
             }
             else {
@@ -507,20 +510,18 @@ impl<T: LineFormatter> Editor<T> {
     }
     
     pub fn page_up(&mut self) {
+        let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
+        
         if self.view_pos.0 > 0 {
-            let move_amount = self.view_dim.0 - (self.view_dim.0 / 8);
             if self.view_pos.0 >= move_amount {
                 self.view_pos.0 -= move_amount;
             }
             else {
                 self.view_pos.0 = 0;
             }
-            
-            self.cursor_up(move_amount);
         }
-        else {
-            self.cursor_to_beginning_of_buffer();
-        }
+        
+        self.cursor_up(move_amount);
         
         // Adjust view
         self.move_view_to_cursor();
@@ -528,9 +529,9 @@ impl<T: LineFormatter> Editor<T> {
     
     pub fn page_down(&mut self) {
         let nlc = self.buffer.line_count() - 1;
+        let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
         
         if self.view_pos.0 < nlc {
-            let move_amount = self.view_dim.0 - (self.view_dim.0 / 8);
             let max_move = nlc - self.view_pos.0;
             
             if max_move >= move_amount {
@@ -540,11 +541,9 @@ impl<T: LineFormatter> Editor<T> {
                 self.view_pos.0 += max_move;
             }
             
-            self.cursor_down(move_amount);
         }
-        else {
-            self.cursor_to_end_of_buffer();
-        }
+        
+        self.cursor_down(move_amount);
         
         // Adjust view
         self.move_view_to_cursor();

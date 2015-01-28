@@ -54,6 +54,11 @@ impl<T: LineFormatter> Buffer<T> {
     }
     
     
+    pub fn dimensions(&self) -> (usize, usize) {
+        self.text.vis_dim
+    }
+    
+    
     
     //------------------------------------------------------------------------
     // Editing operations
