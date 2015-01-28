@@ -66,14 +66,14 @@ impl<'a> LineFormatter for ConsoleLineFormatter {
     
     fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize) {
         let mut pos = (0, 0);
-        let mut iter = self.vis_grapheme_iter(line);
+        let mut i = 0;
         
-        for _ in range(0, index) {
-            if let Some((_, _pos, _)) = iter.next() {
-                pos = _pos;
-            }
-            else {
-                panic!("ConsoleLineFormatter::index_to_v2d(): index past end of line.");
+        for (_, _pos, _) in self.vis_grapheme_iter(line) {
+            pos = _pos;
+            i += 1;
+            
+            if i > index {
+                break;
             }
         }
         
@@ -85,11 +85,11 @@ impl<'a> LineFormatter for ConsoleLineFormatter {
         // TODO: handle rounding modes
         let mut i = 0;
         
-        for (_, pos, width) in self.vis_grapheme_iter(line) {
+        for (_, pos, _) in self.vis_grapheme_iter(line) {
             if pos.0 > v2d.0 {
                 break;
             }
-            else if pos.0 == v2d.0 && pos.1 > v2d.1 {
+            else if pos.0 == v2d.0 && pos.1 >= v2d.1 {
                 break;
             }
             
