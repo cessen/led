@@ -1,5 +1,5 @@
-use std::io::{IoResult, BufferedReader, BufferedWriter};
-use std::io::fs::File;
+use std::old_io::{IoResult, BufferedReader, BufferedWriter};
+use std::old_io::fs::File;
 use std::path::Path;
 
 use buffer::line::{Line, LineEnding, line_ending_to_str};

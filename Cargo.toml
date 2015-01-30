@@ -8,8 +8,8 @@ authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 name = "led"
 path = "src/main.rs"
 
-[dependencies]
-sdl2 = "0.0.17"
+[dependencies.sdl2]
+git = "https://github.com/AngryLawyer/rust-sdl2.git"
 
 [dependencies.docopt]
 git = "https://github.com/docopt/docopt.rs.git"
@@ -19,3 +19,6 @@ git = "https://github.com/gchp/rustbox.git"
 
 [dependencies.freetype-rs]
 git = "https://github.com/PistonDevelopers/freetype-rs.git"
+
+[dependencies]
+rustc-serialize = "*"

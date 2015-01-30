@@ -43,7 +43,10 @@ pub struct TermUI {
 
 impl TermUI {
     pub fn new() -> TermUI {
-        let rb = rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap();
+        let rb = match rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]) {
+            Ok(rbox) => rbox,
+            Err(_) => panic!("Could not create Rustbox instance."),
+        };
         let w = rb.width();
         let h = rb.height();
         let mut editor = Editor::new(ConsoleLineFormatter::new(4));
@@ -58,7 +61,10 @@ impl TermUI {
     }
     
     pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
-        let rb = rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]).unwrap();
+        let rb = match rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]) {
+            Ok(rbox) => rbox,
+            Err(_) => panic!("Could not create Rustbox instance."),
+        };
         let w = rb.width();
         let h = rb.height();
         let mut editor = ed;
