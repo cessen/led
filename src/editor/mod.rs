@@ -159,7 +159,7 @@ impl<T: LineFormatter> Editor<T> {
         if space_blocks > (tab_blocks * 2) {
             let mut width = 0;
             let mut width_count = 0;
-            for i in range(0, 9) {
+            for i in 0us..9 {
                 if space_histogram[i] > width_count {
                     width = i;
                     width_count = space_histogram[i];

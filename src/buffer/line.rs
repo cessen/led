@@ -117,7 +117,7 @@ impl Line {
         let mut le_size: usize = 0;
         let text_size = tl.text.len();
         if tl.text.len() >= 3 {
-            match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-3))} {
+            match unsafe{mem::transmute::<&[u8], &str>(&tl.text[(text_size-3)..])} {
                 // LS
                 "\u{2028}" => {
                     tl.ending = LineEnding::LS;
@@ -135,7 +135,7 @@ impl Line {
         }
         
         if le_size == 0 && tl.text.len() >= 2 {
-            match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-2))} {
+            match unsafe{mem::transmute::<&[u8], &str>(&tl.text[(text_size-2)..])} {
                 // CRLF
                 "\u{000D}\u{000A}" => {
                     tl.ending = LineEnding::CRLF;
@@ -147,7 +147,7 @@ impl Line {
         }
         
         if le_size == 0 && tl.text.len() >= 1 {
-            match unsafe{mem::transmute::<&[u8], &str>(tl.text.slice_from(text_size-1))} {
+            match unsafe{mem::transmute::<&[u8], &str>(&tl.text[(text_size-1)..])} {
                 // LF
                 "\u{000A}" => {
                     tl.ending = LineEnding::LF;
@@ -230,7 +230,7 @@ impl Line {
     /// Returns an immutable string slice into the text block's memory
     pub fn as_str<'a>(&'a self) -> &'a str {
         unsafe {
-            mem::transmute(self.text.as_slice())
+            mem::transmute(&self.text[])
         }
     }
     
@@ -336,7 +336,7 @@ impl Line {
             let byte_pos = grapheme_pos_to_byte_pos(self.as_str(), pos);
             
             // Copy the elements after the split index to the second line
-            other.text.push_all(self.text.slice_from(byte_pos));
+            other.text.push_all(&self.text[byte_pos..]);
             
             // Truncate the first line
             self.text.truncate(byte_pos);
@@ -362,7 +362,7 @@ impl Line {
     
     /// Returns an iterator over the graphemes of the line
     pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> LineGraphemeIter<'a> {
-        let temp: &str = unsafe{mem::transmute(self.text.as_slice())};
+        let temp: &str = unsafe{mem::transmute(&self.text[])};
         
         let mut iter = LineGraphemeIter {
             graphemes: temp.graphemes(true),

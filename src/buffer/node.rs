@@ -357,7 +357,7 @@ impl BufferNode {
         for grapheme in text.grapheme_indices(true) {
             if is_line_ending(grapheme.1) {
                 if g1 < g2 {
-                    self.insert_text_recursive(f, text.slice(b1, b2), pos + g1);
+                    self.insert_text_recursive(f, &text[b1..b2], pos + g1);
                 }
                 
                 g1 = g2;
@@ -376,7 +376,7 @@ impl BufferNode {
         }
         
         if g1 < g2 {
-            self.insert_text_recursive(f, text.slice(b1, b2), pos + g1);
+            self.insert_text_recursive(f, &text[b1..b2], pos + g1);
         }
     }
     

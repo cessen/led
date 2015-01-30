@@ -170,7 +170,7 @@ impl TermUI {
                             // Character
                             0 => {
                                 if let Option::Some(c) = char::from_u32(character) {
-                                    self.editor.insert_text_at_cursor(c.to_string().as_slice());
+                                    self.editor.insert_text_at_cursor(&c.to_string()[]);
                                 }
                             },
                             
@@ -214,11 +214,11 @@ impl TermUI {
             // Draw the editor to screen
             self.rb.clear();
             self.draw_editor(&self.editor, (0, 0), (self.height-1, self.width-1));
-            for i in range(0, self.width) {
+            for i in 0..self.width {
                 self.rb.print(i, 0, rustbox::RB_NORMAL, foreground, background, " ");
             }
             self.rb.print(1, 0, rustbox::RB_NORMAL, foreground, background, prefix);
-            self.rb.print(prefix.len() + 1, 0, rustbox::RB_NORMAL, foreground, background, line.as_slice());
+            self.rb.print(prefix.len() + 1, 0, rustbox::RB_NORMAL, foreground, background, &line[]);
             self.rb.present();
             
             
@@ -300,7 +300,7 @@ impl TermUI {
         let background = Color::Cyan;
         
         // Fill in top row with info line color
-        for i in range(c1.1, c2.1 + 1) {
+        for i in c1.1..(c2.1 + 1) {
             self.rb.print(i, c1.0, rustbox::RB_NORMAL, foreground, background, " ");
         }
         
@@ -308,7 +308,7 @@ impl TermUI {
         let filename = editor.file_path.display();
         let dirty_char = if editor.dirty {"*"} else {""};
         let name = format!("{}{}", filename, dirty_char);
-        self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, name.as_slice());
+        self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, &name[]);
         
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
@@ -320,7 +320,7 @@ impl TermUI {
             100
         };
         let pstring = format!("{}%", percentage);
-        self.rb.print(c2.1 - pstring.len(), c1.0, rustbox::RB_NORMAL, foreground, background, pstring.as_slice());
+        self.rb.print(c2.1 - pstring.len(), c1.0, rustbox::RB_NORMAL, foreground, background, &pstring[]);
         
         // Text encoding info and tab style
         let nl = match editor.buffer.line_ending_type {
@@ -336,7 +336,7 @@ impl TermUI {
         };
         let soft_tabs_str = if editor.soft_tabs {"spaces"} else {"tabs"};
         let info_line = format!("UTF8:{}  {}:{}", nl, soft_tabs_str, editor.soft_tab_width as usize);
-        self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, info_line.as_slice());
+        self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, &info_line[]);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
@@ -387,7 +387,7 @@ impl TermUI {
                         }
                     }
                     else if g == "\t" {
-                        for i in range(0, width) {
+                        for i in 0..width {
                             let tpx = px as usize + i;
                             if tpx <= c2.1 {
                                 self.rb.print(tpx as usize, py as usize, rustbox::RB_NORMAL, Color::White, Color::Black, " ");

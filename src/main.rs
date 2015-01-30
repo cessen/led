@@ -1,4 +1,8 @@
-#![allow(unstable)]
+#![feature(core)]
+#![feature(io)]
+#![feature(collections)]
+#![feature(path)]
+#![feature(std_misc)]
 
 extern crate rustbox;
 extern crate docopt;
@@ -56,7 +60,7 @@ fn main() {
     if args.flag_gui {
         // // Load file, if specified    
         // let editor = if let Option::Some(s) = args.arg_file {
-        //     Editor::new_from_file(GUILineFormatter::new(4), &Path::new(s.as_slice()))
+        //     Editor::new_from_file(GUILineFormatter::new(4), &Path::new(&s[]))
         // }
         // else {
         //     Editor::new(GUILineFormatter::new(4))
@@ -71,7 +75,7 @@ fn main() {
     else {
         // Load file, if specified    
         let editor = if let Option::Some(s) = args.arg_file {
-            Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(s.as_slice()))
+            Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(&s[]))
         }
         else {
             Editor::new(ConsoleLineFormatter::new(4))
