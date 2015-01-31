@@ -149,7 +149,7 @@ impl TermUI {
                             },
                             
                             K_ENTER => {
-                                let nl = line_ending_to_str(self.editor.buffer.line_ending_type);
+                                let nl = line_ending_to_str(self.editor.line_ending_type);
                                 self.editor.insert_text_at_cursor(nl);
                             },
                             
@@ -327,7 +327,7 @@ impl TermUI {
         self.rb.print(c2.1 - pstring.len(), c1.0, rustbox::RB_NORMAL, foreground, background, &pstring[]);
         
         // Text encoding info and tab style
-        let nl = match editor.buffer.line_ending_type {
+        let nl = match editor.line_ending_type {
             LineEnding::None => "None",
             LineEnding::CRLF => "CRLF",
             LineEnding::LF => "LF",

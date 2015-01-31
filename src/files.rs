@@ -2,7 +2,7 @@ use std::old_io::{IoResult, BufferedReader, BufferedWriter};
 use std::old_io::fs::File;
 use std::path::Path;
 
-use buffer::line::{Line, LineEnding, line_ending_to_str};
+use buffer::line::{Line, line_ending_to_str};
 use buffer::line_formatter::LineFormatter;
 use buffer::Buffer as TextBuffer;
 
@@ -12,9 +12,6 @@ pub fn load_file_to_buffer<T: LineFormatter>(path: &Path, lf: T) -> IoResult<Tex
     
     for line in f.lines() {
         let l = Line::new_from_string_unchecked(line.unwrap());
-        if l.ending != LineEnding::None {
-            tb.line_ending_type = l.ending;
-        }
         tb.append_line_unchecked(l);
     }
     

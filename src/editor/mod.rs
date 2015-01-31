@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use buffer::Buffer;
+use buffer::line::LineEnding;
 use buffer::line_formatter::LineFormatter;
 use buffer::line_formatter::RoundingBehavior::*;
 use std::path::Path;
@@ -15,6 +16,7 @@ mod cursor;
 pub struct Editor<T: LineFormatter> {
     pub buffer: Buffer<T>,
     pub file_path: Path,
+    pub line_ending_type: LineEnding,
     pub soft_tabs: bool,
     pub soft_tab_width: u8,
     pub dirty: bool,
@@ -34,6 +36,7 @@ impl<T: LineFormatter> Editor<T> {
         Editor {
             buffer: Buffer::new(formatter),
             file_path: Path::new(""),
+            line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
             dirty: false,
@@ -53,6 +56,7 @@ impl<T: LineFormatter> Editor<T> {
         let mut ed = Editor {
             buffer: buf,
             file_path: path.clone(),
+            line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
             dirty: false,
@@ -68,6 +72,7 @@ impl<T: LineFormatter> Editor<T> {
         //cur.update_vis_start(&(ed.buffer));
         //ed.cursors.add_cursor(cur);
         
+        ed.auto_detect_line_ending();
         ed.auto_detect_indentation_style();
         
         return ed;
@@ -77,6 +82,74 @@ impl<T: LineFormatter> Editor<T> {
         if self.dirty && self.file_path != Path::new("") {
             let _ = save_buffer_to_file(&self.buffer, &self.file_path);
             self.dirty = false;
+        }
+    }
+    
+    pub fn auto_detect_line_ending(&mut self) {
+        let mut line_ending_histogram: [usize; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+        
+        // Collect statistics
+        let mut line_i: usize = 0;
+        for line in self.buffer.line_iter() {
+            match line.ending {
+                LineEnding::None => {
+                },
+                LineEnding::CRLF => {
+                    line_ending_histogram[0] += 1;
+                },
+                LineEnding::LF => {
+                    line_ending_histogram[1] += 1;
+                },
+                LineEnding::VT => {
+                    line_ending_histogram[2] += 1;
+                },
+                LineEnding::FF => {
+                    line_ending_histogram[3] += 1;
+                },
+                LineEnding::CR => {
+                    line_ending_histogram[4] += 1;
+                },
+                LineEnding::NEL => {
+                    line_ending_histogram[5] += 1;
+                },
+                LineEnding::LS => {
+                    line_ending_histogram[6] += 1;
+                },
+                LineEnding::PS => {
+                    line_ending_histogram[7] += 1;
+                },
+            }
+            
+            // Stop after 100 lines
+            line_i += 1;
+            if line_i > 100 {
+                break;
+            }
+        }
+        
+        // Analyze stats and make a determination
+        let mut lei = 0;
+        let mut le_count = 0;
+        for i in 0us..8 {
+            if line_ending_histogram[i] > le_count {
+                lei = i;
+                le_count = line_ending_histogram[i];
+            }
+        }
+        
+        if le_count > 0 {
+            self.line_ending_type = match lei {
+                0 => LineEnding::CRLF,
+                1 => LineEnding::LF,
+                2 => LineEnding::VT,
+                3 => LineEnding::FF,
+                4 => LineEnding::CR,
+                5 => LineEnding::NEL,
+                6 => LineEnding::LS,
+                7 => LineEnding::PS,
+                
+                _ => LineEnding::LF,
+            };
         }
     }
     

@@ -2,7 +2,7 @@
 
 use std::mem;
 
-use self::line::{Line, LineEnding};
+use self::line::Line;
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::undo_stack::{UndoStack};
 use self::undo_stack::Operation::*;
@@ -23,7 +23,6 @@ mod undo_stack;
 pub struct Buffer<T: LineFormatter> {
     text: BufferNode,
     undo_stack: UndoStack,
-    pub line_ending_type: LineEnding,
     pub formatter: T,
 }
 
@@ -33,7 +32,6 @@ impl<T: LineFormatter> Buffer<T> {
         Buffer {
             text: BufferNode::new(&formatter),
             undo_stack: UndoStack::new(),
-            line_ending_type: LineEnding::LF,
             formatter: formatter,
         }
     }

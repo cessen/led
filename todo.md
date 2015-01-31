@@ -25,10 +25,8 @@
   only recognizes LF and CRLF.
 - File loading is currently very slow.  Investigate.
 - Line number display
-- Line wrapping
 - File opening by entering path
 - UI that wraps editors, for split view.
 - Persistent infinite undo
-- Multiple cursors
 - "Projects"
 
