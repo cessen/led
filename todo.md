@@ -15,8 +15,8 @@
       The freetype formatter should not reference SDL at all, and should
       have only the freetype library itself as a dependency.
     //- Handle tab settings properly after the refactor
-    - Buffer needs a "reformat" method, which can be run after the formatter
-      is changed in some way (e.g. toggling line wrapping).
+    //- Buffer needs a "reformat" method, which can be run after the formatter
+    //  is changed in some way (e.g. toggling line wrapping).
     - Possibly split the text buffer out into its own library...?  Would
       likely be useful to other people as well, and would encourage me to
       keep the API clean.

@@ -195,6 +195,16 @@ impl BufferNode {
     }
     
     
+    pub fn reformat_recursive<T: LineFormatter>(&mut self, f: &T) {
+        if let BufferNodeData::Branch(ref mut left, ref mut right) = self.data {
+            left.update_stats(f);
+            right.update_stats(f);
+        }
+        
+        self.update_stats(f);
+    }
+    
+    
     pub fn get_grapheme_recursive<'a>(&'a self, index: usize) -> &'a str {
         match self.data {
             BufferNodeData::Leaf(ref line) => {
