@@ -196,12 +196,17 @@ impl BufferNode {
     
     
     pub fn reformat_recursive<T: LineFormatter>(&mut self, f: &T) {
-        if let BufferNodeData::Branch(ref mut left, ref mut right) = self.data {
-            left.update_stats(f);
-            right.update_stats(f);
+        match self.data {
+            BufferNodeData::Branch(ref mut left, ref mut right) => {
+                left.reformat_recursive(f);
+                right.reformat_recursive(f);
+                self.vis_dim = ((left.vis_dim.0 + right.vis_dim.0), max(left.vis_dim.1, right.vis_dim.1));
+            },
+            
+            BufferNodeData::Leaf(ref line) => {
+                self.vis_dim = f.dimensions(line);
+            }
         }
-        
-        self.update_stats(f);
     }
     
     

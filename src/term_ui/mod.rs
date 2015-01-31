@@ -184,7 +184,7 @@ impl TermUI {
                         self.width = w as usize;
                         self.height = h as usize;
                         self.editor.update_dim(self.height-1, self.width);
-                        self.editor.buffer.formatter.wrap_width = w as usize;
+                        self.editor.buffer.formatter.wrap_width = self.width;
                         self.editor.buffer.reformat();
                     },
                     

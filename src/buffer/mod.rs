@@ -210,7 +210,7 @@ impl<T: LineFormatter> Buffer<T> {
     
     /// Runs the formatter on all of the text.  Should be run whenever the
     /// formatter has been changed.
-    pub fn reformat<'a>(&'a mut self) {
+    pub fn reformat(&mut self) {
         self.text.reformat_recursive(&self.formatter);
     }
     
