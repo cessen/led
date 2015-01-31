@@ -123,8 +123,8 @@ impl<'a> Iterator for ConsoleLineFormatterVisIter<'a> {
             let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
             
             if (self.pos.1 + width) > self.f.wrap_width {
-                let pos = (self.pos.0 + 1, 0);
-                self.pos = (self.pos.0 + 1, width);
+                let pos = (self.pos.0 + self.f.single_line_height(), 0);
+                self.pos = (self.pos.0 + self.f.single_line_height(), width);
                 return Some((g, pos, width));
             }
             else {
