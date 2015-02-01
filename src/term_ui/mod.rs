@@ -81,6 +81,7 @@ impl TermUI {
     pub fn main_ui_loop(&mut self) {
         // Quitting flag
         let mut quit = false;
+        let mut resize: Option<(usize, usize)> = None;
     
         self.editor.update_dim(self.height-1, self.width);
         self.editor.buffer.formatter.wrap_width = self.width as usize;
@@ -181,11 +182,7 @@ impl TermUI {
                     },
                     
                     Ok(rustbox::Event::ResizeEvent(w, h)) => {
-                        self.width = w as usize;
-                        self.height = h as usize;
-                        self.editor.update_dim(self.height-1, self.width);
-                        self.editor.buffer.formatter.wrap_width = self.width;
-                        self.editor.buffer.reformat();
+                        resize = Some((h as usize, w as usize));
                     },
                     
                     _ => {
@@ -196,6 +193,15 @@ impl TermUI {
                 e = self.rb.peek_event(Duration::milliseconds(0)); // Get next event (if any)
             }
             
+            if let Some((h, w)) = resize {
+                self.width = w as usize;
+                self.height = h as usize;
+                self.editor.update_dim(self.height-1, self.width);
+                self.editor.buffer.formatter.wrap_width = self.width;
+                self.editor.buffer.reformat();
+                println!("Resized window!");
+            }
+            resize = None;
             
             // Quit if quit flag is set
             if quit {
