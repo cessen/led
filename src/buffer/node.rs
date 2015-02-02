@@ -49,6 +49,17 @@ impl BufferNode {
     }
     
     
+    pub fn new_from_line_with_count_unchecked<T: LineFormatter>(_: &T, line: Line, grapheme_count: usize) -> BufferNode {
+        BufferNode {
+            data: BufferNodeData::Leaf(line),
+            tree_height: 1,
+            grapheme_count: grapheme_count,
+            line_count: 1,
+            vis_dim: (1, grapheme_count),
+        }
+    }
+    
+    
     fn update_height(&mut self) {
         match self.data {
             BufferNodeData::Leaf(_) => {
@@ -578,6 +589,21 @@ impl BufferNode {
             let new_node_a = Box::new(BufferNode::new_from_line(f, other_line));
             let new_node_b = Box::new(BufferNode::new_from_line(f, line));
             self.data = BufferNodeData::Branch(new_node_a, new_node_b);
+        }
+        
+        self.update_stats(f);
+        self.rebalance(f);
+    }
+    
+    
+    pub fn append_leaf_node_unchecked_recursive<T: LineFormatter>(&mut self, f: &T, node: BufferNode) {        
+        if let BufferNodeData::Branch(_, ref mut right) = self.data {
+            right.append_leaf_node_unchecked_recursive(f, node);
+        }
+        else {
+            let mut new_left_node = BufferNode::new(f);
+            mem::swap(self, &mut new_left_node);
+            self.data = BufferNodeData::Branch(Box::new(new_left_node), Box::new(node));
         }
         
         self.update_stats(f);

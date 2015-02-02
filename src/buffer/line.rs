@@ -103,15 +103,14 @@ impl Line {
     }
     
     
-    /// Creates a new Line from a string.
-    /// Does not check to see if the string has internal newlines.
-    /// This is primarily used for efficient loading of files.
-    pub fn new_from_string_unchecked(text: String) -> Line {
+    pub fn new_from_str_unchecked(text: &str) -> Line {
         // Initialize Line
         let mut tl = Line {
-            text: text.into_bytes(),
+            text: Vec::new(),
             ending: LineEnding::None,
         };
+        
+        tl.text.push_all(text.as_bytes());
         
         // Check for line ending
         let mut le_size: usize = 0;
@@ -188,6 +187,14 @@ impl Line {
         
         // Done!
         return tl;
+    }
+    
+    
+    /// Creates a new Line from a string.
+    /// Does not check to see if the string has internal newlines.
+    /// This is primarily used for efficient loading of files.
+    pub fn new_from_string_unchecked(text: String) -> Line {
+        return Line::new_from_str_unchecked(text.as_slice());
     }
     
     

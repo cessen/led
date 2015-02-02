@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
 use std::mem;
+use std::path::Path;
+use std::old_io::fs::File;
+use std::old_io::{IoResult, BufferedReader};
 
 use self::line::Line;
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
@@ -22,6 +25,7 @@ mod undo_stack;
 /// A text buffer
 pub struct Buffer<T: LineFormatter> {
     text: BufferNode,
+    file_path: Option<Path>,
     undo_stack: UndoStack,
     pub formatter: T,
 }
@@ -31,9 +35,59 @@ impl<T: LineFormatter> Buffer<T> {
     pub fn new(formatter: T) -> Buffer<T> {
         Buffer {
             text: BufferNode::new(&formatter),
+            file_path: None,
             undo_stack: UndoStack::new(),
             formatter: formatter,
         }
+    }
+    
+    
+    pub fn new_from_file(formatter: T, path: &Path) -> IoResult<Buffer<T>> {
+        let mut f = BufferedReader::new(try!(File::open(path)));
+    
+        let mut buf = Buffer {
+            text: BufferNode::new(&formatter),
+            file_path: Some(path.clone()),
+            undo_stack: UndoStack::new(),
+            formatter: formatter,
+        };
+         
+        let string = f.read_to_string().unwrap();
+        let mut g_iter = string.as_slice().grapheme_indices(true);
+        let mut done = false;
+        let mut a = 0;
+        let mut b = 0;
+        
+        while !done {
+            let mut count = 0;
+            loop {
+                if let Some((i, g)) = g_iter.next() {
+                    count += 1;
+                    b = i + g.len();
+                    if is_line_ending(g) {
+                        break;
+                    }
+                }
+                else {
+                    done = true;
+                    break;
+                }
+            }
+            
+            if a != b {
+                let substr = &string[a..b];
+                let line = Line::new_from_str_unchecked(substr);
+                let node = BufferNode::new_from_line_with_count_unchecked(&buf.formatter, line, count);
+                buf.append_leaf_node_unchecked(node);
+            }
+            
+            a = b;
+        }
+    
+        // Remove initial blank line
+        buf.remove_lines(0, 1);
+    
+        return Ok(buf);
     }
 
     
@@ -203,6 +257,11 @@ impl<T: LineFormatter> Buffer<T> {
     /// file loading.
     pub fn append_line_unchecked(&mut self, line: Line) {
         self.text.append_line_unchecked_recursive(&self.formatter, line);
+    }
+    
+    
+    fn append_leaf_node_unchecked(&mut self, node: BufferNode) {
+        self.text.append_leaf_node_unchecked_recursive(&self.formatter, node);
     }
     
     

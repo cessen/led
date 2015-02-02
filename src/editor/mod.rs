@@ -6,7 +6,7 @@ use buffer::line_formatter::LineFormatter;
 use buffer::line_formatter::RoundingBehavior::*;
 use std::path::Path;
 use std::cmp::{min, max};
-use files::{load_file_to_buffer, save_buffer_to_file};
+use files::{save_buffer_to_file};
 use string_utils::grapheme_count;
 use self::cursor::CursorSet;
 
@@ -47,7 +47,8 @@ impl<T: LineFormatter> Editor<T> {
     }
     
     pub fn new_from_file(formatter: T, path: &Path) -> Editor<T> {
-        let buf = match load_file_to_buffer(path, formatter) {
+        //let buf = match load_file_to_buffer(path, formatter) {
+        let buf = match Buffer::new_from_file(formatter, path) {
             Ok(b) => {b},
             // TODO: handle un-openable file better
             _ => panic!("Could not open file!"),

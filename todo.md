@@ -48,8 +48,8 @@
     - Start with the emacs approach, and you can always migrate to something
       more sophisticated later.
 
-- Custom line iterator code for file loading, because rust's built-in one
-  only recognizes LF and CRLF.
+//- Custom line iterator code for file loading, because rust's built-in one
+//  only recognizes LF and CRLF.
 - File loading is currently very slow.  Investigate.
 - Both Emacs and Vim do line-wrapping extremely efficiently, even for very
   large files.  Investigate how they do this.
