@@ -354,79 +354,76 @@ impl<'a> TermUI<'a> {
     fn draw_editor_text(&self, editor: &Editor<ConsoleLineFormatter>, c1: (usize, usize), c2: (usize, usize)) {
         // TODO: update to new formatting code
         
-        //// Calculate all the starting info
-        //let editor_corner_index = editor.buffer.v2d_to_index(editor.view_pos, (RoundingBehavior::Floor, RoundingBehavior::Floor));
-        //let (starting_line, _) = editor.buffer.index_to_line_col(editor_corner_index);
-        //let mut grapheme_index = editor.buffer.line_col_to_index((starting_line, 0));
-        //let (vis_starting_line, _) = editor.buffer.index_to_v2d(grapheme_index);
-        //
-        //let mut screen_line = c1.0 as isize + vis_starting_line as isize;
-        //let screen_col = c1.1 as isize;
-        //
-        //let mut line_iter = editor.buffer.line_iter_at_index(starting_line);
-        //
-        //for line in line_iter {
-        //    let mut g_iter = editor.buffer.formatter.vis_grapheme_iter(line);
-        //    
-        //    // Loop through the graphemes of the line and print them to
-        //    // the screen.
-        //    for (g, (pos_y, pos_x), width) in g_iter {
-        //        // Calculate the cell coordinates at which to draw the grapheme
-        //        let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
-        //        let py = pos_y as isize + screen_line - editor.view_pos.0 as isize;
-        //        
-        //        // If we're off the bottom, we're done
-        //        if py > c2.0 as isize {
-        //            return;
-        //        }
-        //        
-        //        // Draw the grapheme to the screen if it's in bounds
-        //        if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) {
-        //            // Check if the character is within a cursor
-        //            let mut at_cursor = false;
-        //            for c in editor.cursors.iter() {
-        //                if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
-        //                    at_cursor = true;
-        //                }
-        //            }
-        //        
-        //            // Actually print the character
-        //            if is_line_ending(g) {
-        //                if at_cursor {
-        //                    self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-        //                }
-        //            }
-        //            else if g == "\t" {
-        //                for i in 0..width {
-        //                    let tpx = px as usize + i;
-        //                    if tpx <= c2.1 {
-        //                        self.rb.print(tpx as usize, py as usize, rustbox::RB_NORMAL, Color::White, Color::Black, " ");
-        //                    }
-        //                }
-        //                
-        //                if at_cursor {
-        //                    self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-        //                }
-        //            }
-        //            else {
-        //                if at_cursor {
-        //                    self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, g);
-        //                }
-        //                else {
-        //                    self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::White, Color::Black, g);
-        //                }
-        //            }
-        //        }
-        //        
-        //        grapheme_index += 1;
-        //    }
-        //    
-        //    let (dim_y, _) = editor.buffer.formatter.dimensions(line);
-        //    screen_line += dim_y as isize; 
-        //}
-        //
-        //
-        //
+        // Calculate all the starting info
+        let (starting_line, _) = editor.buffer.index_to_line_col(editor.view_pos.0);
+        let mut grapheme_index = editor.buffer.line_col_to_index((starting_line, 0));
+        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(starting_line), editor.view_pos.0 - grapheme_index);
+        
+        let mut screen_line = c1.0 as isize - vis_line_offset as isize;
+        let screen_col = c1.1 as isize;
+        
+        let mut line_iter = editor.buffer.line_iter_at_index(starting_line);
+        for line in line_iter {
+            let mut g_iter = editor.formatter.iter(line);
+            
+            // Loop through the graphemes of the line and print them to
+            // the screen.
+            for (g, (pos_y, pos_x), width) in g_iter {
+                // Calculate the cell coordinates at which to draw the grapheme
+                let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
+                let py = pos_y as isize + screen_line;
+                
+                // If we're off the bottom, we're done
+                if py > c2.0 as isize {
+                    return;
+                }
+                
+                // Draw the grapheme to the screen if it's in bounds
+                if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) {
+                    // Check if the character is within a cursor
+                    let mut at_cursor = false;
+                    for c in editor.cursors.iter() {
+                        if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
+                            at_cursor = true;
+                        }
+                    }
+                
+                    // Actually print the character
+                    if is_line_ending(g) {
+                        if at_cursor {
+                            self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                        }
+                    }
+                    else if g == "\t" {
+                        for i in 0..width {
+                            let tpx = px as usize + i;
+                            if tpx <= c2.1 {
+                                self.rb.print(tpx as usize, py as usize, rustbox::RB_NORMAL, Color::White, Color::Black, " ");
+                            }
+                        }
+                        
+                        if at_cursor {
+                            self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+                        }
+                    }
+                    else {
+                        if at_cursor {
+                            self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, g);
+                        }
+                        else {
+                            self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::White, Color::Black, g);
+                        }
+                    }
+                }
+                
+                grapheme_index += 1;
+            }
+            
+            let (dim_y, _) = editor.formatter.dimensions(line);
+            screen_line += dim_y as isize; 
+        }
+        
+
         //// If we get here, it means we reached the end of the text buffer
         //// without going off the bottom of the screen.  So draw the cursor
         //// at the end if needed.

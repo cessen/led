@@ -54,21 +54,21 @@ pub struct ConsoleLineFormatterVisIter<'a> {
 
 
 impl<'a> Iterator for ConsoleLineFormatterVisIter<'a> {
-    type Item = (&'a str, (usize, usize), (usize, usize));
+    type Item = (&'a str, (usize, usize), usize);
 
-    fn next(&mut self) -> Option<(&'a str, (usize, usize), (usize, usize))> {
+    fn next(&mut self) -> Option<(&'a str, (usize, usize), usize)> {
         if let Some(g) = self.grapheme_iter.next() {            
             let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
             
             if (self.pos.1 + width) > self.f.wrap_width {
                 let pos = (self.pos.0 + self.f.single_line_height(), 0);
                 self.pos = (self.pos.0 + self.f.single_line_height(), width);
-                return Some((g, pos, (1, width)));
+                return Some((g, pos, width));
             }
             else {
                 let pos = self.pos;
                 self.pos = (self.pos.0, self.pos.1 + width);
-                return Some((g, pos, (1, width)));
+                return Some((g, pos, width));
             }
         }
         else {

@@ -375,7 +375,7 @@ impl Buffer {
     }
     
     
-    fn get_line<'a>(&'a self, index: usize) -> &'a Line {
+    pub fn get_line<'a>(&'a self, index: usize) -> &'a Line {
         if index >= self.line_count() {
             panic!("get_line(): index out of bounds.");
         }
