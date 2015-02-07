@@ -3,7 +3,7 @@
 use rustbox;
 use rustbox::Color;
 use editor::Editor;
-use formatter::{LineFormatter, RoundingBehavior};
+use formatter::LineFormatter;
 use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};

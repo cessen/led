@@ -301,7 +301,7 @@ impl<'a, T: LineFormatter<'a>> Editor<'a, T> {
         // the closest cursor.
         
         let gi = self.cursors[0].range.0;
-        let vho = self.cursors[0].vis_start;
+        //let vho = self.cursors[0].vis_start;
         
         self.view_pos.0 = gi;
 

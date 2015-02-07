@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 use buffer::line::{Line, LineGraphemeIter};
-use std::cmp::{min, max};
+use std::cmp::max;
 
 #[derive(Copy, PartialEq)]
 pub enum RoundingBehavior {
@@ -134,7 +136,8 @@ impl<'a> LineFormatter<'a> for TestLineFormatter {
 
 
 mod tests {
-    use super::{LineFormatter, TestLineFormatter, TestLineFormatIter};
+    #![allow(unused_imports)]
+    use super::{TestLineFormatter, TestLineFormatIter};
     use buffer::line::Line;
     
     #[test]
