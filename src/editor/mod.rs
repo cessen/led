@@ -2,19 +2,18 @@
 
 use buffer::Buffer;
 use buffer::line::LineEnding;
-use self::formatter::LineFormatter;
-use self::formatter::RoundingBehavior::*;
+use formatter::LineFormatter;
+use formatter::RoundingBehavior::*;
 use std::path::Path;
 use std::cmp::{min, max};
 use files::{save_buffer_to_file};
 use string_utils::grapheme_count;
 use self::cursor::CursorSet;
 
-pub mod formatter;
 mod cursor;
 
 
-pub struct Editor<T: LineFormatter> {
+pub struct Editor<'a, T: LineFormatter<'a>> {
     pub buffer: Buffer,
     pub formatter: T,
     pub file_path: Path,
@@ -25,16 +24,16 @@ pub struct Editor<T: LineFormatter> {
     
     // The dimensions and position of the editor's view within the buffer
     pub view_dim: (usize, usize),  // (height, width)
-    pub view_pos: (usize, usize),  // (line, col)
+    pub view_pos: (usize, usize),  // (grapheme index, visual horizontal offset)
     
     // The editing cursor position
     pub cursors: CursorSet,  
 }
 
 
-impl<T: LineFormatter> Editor<T> {
+impl<'a, T: LineFormatter<'a>> Editor<'a, T> {
     /// Create a new blank editor
-    pub fn new(formatter: T) -> Editor<T> {
+    pub fn new(formatter: T) -> Editor<'a, T> {
         Editor {
             buffer: Buffer::new(),
             formatter: formatter,
@@ -48,6 +47,7 @@ impl<T: LineFormatter> Editor<T> {
             cursors: CursorSet::new(),
         }
     }
+    
     
     pub fn new_from_file(formatter: T, path: &Path) -> Editor<T> {
         let buf = match Buffer::new_from_file(path) {
@@ -82,12 +82,14 @@ impl<T: LineFormatter> Editor<T> {
         return ed;
     }
     
+    
     pub fn save_if_dirty(&mut self) {
         if self.dirty && self.file_path != Path::new("") {
             let _ = save_buffer_to_file(&self.buffer, &self.file_path);
             self.dirty = false;
         }
     }
+    
     
     pub fn auto_detect_line_ending(&mut self) {
         let mut line_ending_histogram: [usize; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -156,6 +158,7 @@ impl<T: LineFormatter> Editor<T> {
             };
         }
     }
+    
     
     pub fn auto_detect_indentation_style(&mut self) {
         let mut tab_blocks: usize = 0;
@@ -251,6 +254,7 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
     
+    
     pub fn update_dim(&mut self, h: usize, w: usize) {
         self.view_dim = (h, w);
     }
@@ -296,25 +300,15 @@ impl<T: LineFormatter> Editor<T> {
         // there are no cursors currently in view, and should jump to
         // the closest cursor.
         
-        // TODO: update to new formatting code
-        //let (v, h) = self.buffer.index_to_v2d(self.cursors[0].range.0);
-        //
-        //// Horizontal
-        //if h < self.view_pos.1 {
-        //    self.view_pos.1 = h;
-        //}
-        //else if h >= (self.view_pos.1 + self.view_dim.1) {
-        //    self.view_pos.1 = 1 + h - self.view_dim.1;
-        //}
-        //
-        //// Vertical
-        //if v < self.view_pos.0 {
-        //    self.view_pos.0 = v;
-        //}
-        //else if v >= (self.view_pos.0 + self.view_dim.0) {
-        //    self.view_pos.0 = 1 + v - self.view_dim.0;
-        //}
+        let gi = self.cursors[0].range.0;
+        let vho = self.cursors[0].vis_start;
+        
+        self.view_pos.0 = gi;
+
+        // TODO: horizontal offset
+        //self.view_pos.1 = vho;
     }
+    
     
     pub fn insert_text_at_cursor(&mut self, text: &str) {
         self.cursors.make_consistent();
@@ -339,6 +333,7 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
+    
     
     pub fn insert_tab_at_cursor(&mut self) {
         // TODO: update to new formatting code
@@ -382,15 +377,18 @@ impl<T: LineFormatter> Editor<T> {
         //}
     }
     
+    
     pub fn backspace_at_cursor(&mut self) {
         self.remove_text_behind_cursor(1);
     }
+    
     
     pub fn insert_text_at_grapheme(&mut self, text: &str, pos: usize) {
         self.dirty = true;
         let buf_len = self.buffer.grapheme_count();
         self.buffer.insert_text(text, if pos < buf_len {pos} else {buf_len});
     }
+    
     
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: usize) {
         self.cursors.make_consistent();
@@ -428,6 +426,7 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
     
+    
     pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: usize) {
         self.cursors.make_consistent();
         
@@ -463,6 +462,7 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
     
+    
     pub fn remove_text_inside_cursor(&mut self) {
         self.cursors.make_consistent();
         
@@ -496,6 +496,7 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
     
+    
     pub fn cursor_to_beginning_of_buffer(&mut self) {
         self.cursors = CursorSet::new();
         
@@ -505,6 +506,7 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
+    
     
     pub fn cursor_to_end_of_buffer(&mut self) {
         let end = self.buffer.grapheme_count();
@@ -516,6 +518,7 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
+    
     
     pub fn cursor_left(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
@@ -534,6 +537,7 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
     
+    
     pub fn cursor_right(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
             c.range.1 += n;
@@ -549,6 +553,7 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
+    
     
     pub fn cursor_up(&mut self, n: usize) {
         // TODO: update to new formatting code
@@ -570,6 +575,7 @@ impl<T: LineFormatter> Editor<T> {
         //// Adjust view
         //self.move_view_to_cursor();
     }
+    
     
     pub fn cursor_down(&mut self, n: usize) {
         // TODO: update to new formatting code
@@ -594,6 +600,7 @@ impl<T: LineFormatter> Editor<T> {
         //self.move_view_to_cursor();
     }
     
+    
     pub fn page_up(&mut self) {
         // TODO: update to new formatting code
         
@@ -613,6 +620,7 @@ impl<T: LineFormatter> Editor<T> {
         //// Adjust view
         //self.move_view_to_cursor();
     }
+    
     
     pub fn page_down(&mut self) {
         // TODO: update to new formatting code
@@ -637,6 +645,7 @@ impl<T: LineFormatter> Editor<T> {
         //// Adjust view
         //self.move_view_to_cursor();
     }
+    
     
     pub fn jump_to_line(&mut self, n: usize) {
         // TODO: update to new formatting code

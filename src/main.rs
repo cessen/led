@@ -20,6 +20,7 @@ use term_ui::formatter::ConsoleLineFormatter;
 
 mod string_utils;
 mod buffer;
+mod formatter;
 mod files;
 mod editor;
 mod term_ui;
@@ -56,7 +57,7 @@ fn main() {
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
     
     
-    // Initialize and start UI
+    //Initialize and start UI
     if args.flag_gui {
         // // Load file, if specified    
         // let editor = if let Option::Some(s) = args.arg_file {

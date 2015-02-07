@@ -3,7 +3,7 @@
 use rustbox;
 use rustbox::Color;
 use editor::Editor;
-use editor::formatter::{LineFormatter, RoundingBehavior};
+use formatter::{LineFormatter, RoundingBehavior};
 use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
@@ -33,16 +33,16 @@ const K_CTRL_Y: u16 = 25;
 const K_CTRL_Z: u16 = 26;
 
 
-pub struct TermUI {
+pub struct TermUI<'a> {
     rb: rustbox::RustBox,
-    editor: Editor<ConsoleLineFormatter>,
+    editor: Editor<'a, ConsoleLineFormatter>,
     width: usize,
     height: usize,
 }
 
 
-impl TermUI {
-    pub fn new() -> TermUI {
+impl<'a> TermUI<'a> {
+    pub fn new() -> TermUI<'a> {
         let rb = match rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]) {
             Ok(rbox) => rbox,
             Err(_) => panic!("Could not create Rustbox instance."),
