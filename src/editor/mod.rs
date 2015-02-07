@@ -2,19 +2,21 @@
 
 use buffer::Buffer;
 use buffer::line::LineEnding;
-use buffer::line_formatter::LineFormatter;
-use buffer::line_formatter::RoundingBehavior::*;
+use self::formatter::LineFormatter;
+use self::formatter::RoundingBehavior::*;
 use std::path::Path;
 use std::cmp::{min, max};
 use files::{save_buffer_to_file};
 use string_utils::grapheme_count;
 use self::cursor::CursorSet;
 
+pub mod formatter;
 mod cursor;
 
 
 pub struct Editor<T: LineFormatter> {
-    pub buffer: Buffer<T>,
+    pub buffer: Buffer,
+    pub formatter: T,
     pub file_path: Path,
     pub line_ending_type: LineEnding,
     pub soft_tabs: bool,
@@ -34,7 +36,8 @@ impl<T: LineFormatter> Editor<T> {
     /// Create a new blank editor
     pub fn new(formatter: T) -> Editor<T> {
         Editor {
-            buffer: Buffer::new(formatter),
+            buffer: Buffer::new(),
+            formatter: formatter,
             file_path: Path::new(""),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
@@ -47,8 +50,7 @@ impl<T: LineFormatter> Editor<T> {
     }
     
     pub fn new_from_file(formatter: T, path: &Path) -> Editor<T> {
-        //let buf = match load_file_to_buffer(path, formatter) {
-        let buf = match Buffer::new_from_file(formatter, path) {
+        let buf = match Buffer::new_from_file(path) {
             Ok(b) => {b},
             // TODO: handle un-openable file better
             _ => panic!("Could not open file!"),
@@ -56,6 +58,7 @@ impl<T: LineFormatter> Editor<T> {
         
         let mut ed = Editor {
             buffer: buf,
+            formatter: formatter,
             file_path: path.clone(),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
@@ -70,7 +73,7 @@ impl<T: LineFormatter> Editor<T> {
         //let mut cur = Cursor::new();
         //cur.range.0 = 30;
         //cur.range.1 = 30;
-        //cur.update_vis_start(&(ed.buffer));
+        //cur.update_vis_start(&(ed.buffer), &(ed.formatter));
         //ed.cursors.add_cursor(cur);
         
         ed.auto_detect_line_ending();
@@ -259,7 +262,7 @@ impl<T: LineFormatter> Editor<T> {
             self.cursors.truncate(1);
             self.cursors[0].range.0 = pos;
             self.cursors[0].range.1 = pos;
-            self.cursors[0].update_vis_start(&(self.buffer));
+            self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
             
             self.move_view_to_cursor();
             
@@ -276,7 +279,7 @@ impl<T: LineFormatter> Editor<T> {
             self.cursors.truncate(1);
             self.cursors[0].range.0 = pos;
             self.cursors[0].range.1 = pos;
-            self.cursors[0].update_vis_start(&(self.buffer));
+            self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
             
             self.move_view_to_cursor();
             
@@ -292,23 +295,25 @@ impl<T: LineFormatter> Editor<T> {
         // TODO: handle multiple cursors properly.  Should only move if
         // there are no cursors currently in view, and should jump to
         // the closest cursor.
-        let (v, h) = self.buffer.index_to_v2d(self.cursors[0].range.0);
         
-        // Horizontal
-        if h < self.view_pos.1 {
-            self.view_pos.1 = h;
-        }
-        else if h >= (self.view_pos.1 + self.view_dim.1) {
-            self.view_pos.1 = 1 + h - self.view_dim.1;
-        }
-        
-        // Vertical
-        if v < self.view_pos.0 {
-            self.view_pos.0 = v;
-        }
-        else if v >= (self.view_pos.0 + self.view_dim.0) {
-            self.view_pos.0 = 1 + v - self.view_dim.0;
-        }
+        // TODO: update to new formatting code
+        //let (v, h) = self.buffer.index_to_v2d(self.cursors[0].range.0);
+        //
+        //// Horizontal
+        //if h < self.view_pos.1 {
+        //    self.view_pos.1 = h;
+        //}
+        //else if h >= (self.view_pos.1 + self.view_dim.1) {
+        //    self.view_pos.1 = 1 + h - self.view_dim.1;
+        //}
+        //
+        //// Vertical
+        //if v < self.view_pos.0 {
+        //    self.view_pos.0 = v;
+        //}
+        //else if v >= (self.view_pos.0 + self.view_dim.0) {
+        //    self.view_pos.0 = 1 + v - self.view_dim.0;
+        //}
     }
     
     pub fn insert_text_at_cursor(&mut self, text: &str) {
@@ -325,7 +330,7 @@ impl<T: LineFormatter> Editor<T> {
             // Move cursor
             c.range.0 += str_len + offset;
             c.range.1 += str_len + offset;
-            c.update_vis_start(&(self.buffer));
+            c.update_vis_start(&(self.buffer), &(self.formatter));
             
             // Update offset
             offset += str_len;
@@ -336,43 +341,45 @@ impl<T: LineFormatter> Editor<T> {
     }
     
     pub fn insert_tab_at_cursor(&mut self) {
-        self.cursors.make_consistent();
+        // TODO: update to new formatting code
         
-        if self.soft_tabs {
-            let mut offset = 0;
-            
-            for c in self.cursors.iter_mut() {
-                // Update cursor with offset
-                c.range.0 += offset;
-                c.range.1 += offset;
-                
-                // Figure out how many spaces to insert
-                let (_, vis_pos) = self.buffer.index_to_v2d(c.range.0);
-                // TODO: handle tab settings
-                let next_tab_stop = ((vis_pos / self.soft_tab_width as usize) + 1) * self.soft_tab_width as usize;
-                let space_count = min(next_tab_stop - vis_pos, 8);
-                
-                
-                // Insert spaces
-                let space_strs = ["", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        "];
-                self.buffer.insert_text(space_strs[space_count], c.range.0);
-                self.dirty = true;
-                
-                // Move cursor
-                c.range.0 += space_count;
-                c.range.1 += space_count;
-                c.update_vis_start(&(self.buffer));
-                    
-                // Update offset
-                offset += space_count;
-            }
-            
-            // Adjust view
-            self.move_view_to_cursor();
-        }
-        else {
-            self.insert_text_at_cursor("\t");
-        }
+        //self.cursors.make_consistent();
+        //
+        //if self.soft_tabs {
+        //    let mut offset = 0;
+        //    
+        //    for c in self.cursors.iter_mut() {
+        //        // Update cursor with offset
+        //        c.range.0 += offset;
+        //        c.range.1 += offset;
+        //        
+        //        // Figure out how many spaces to insert
+        //        let (_, vis_pos) = self.buffer.index_to_v2d(c.range.0);
+        //        // TODO: handle tab settings
+        //        let next_tab_stop = ((vis_pos / self.soft_tab_width as usize) + 1) * self.soft_tab_width as usize;
+        //        let space_count = min(next_tab_stop - vis_pos, 8);
+        //        
+        //        
+        //        // Insert spaces
+        //        let space_strs = ["", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        "];
+        //        self.buffer.insert_text(space_strs[space_count], c.range.0);
+        //        self.dirty = true;
+        //        
+        //        // Move cursor
+        //        c.range.0 += space_count;
+        //        c.range.1 += space_count;
+        //        c.update_vis_start(&(self.buffer), &(self.formatter));
+        //            
+        //        // Update offset
+        //        offset += space_count;
+        //    }
+        //    
+        //    // Adjust view
+        //    self.move_view_to_cursor();
+        //}
+        //else {
+        //    self.insert_text_at_cursor("\t");
+        //}
     }
     
     pub fn backspace_at_cursor(&mut self) {
@@ -409,7 +416,7 @@ impl<T: LineFormatter> Editor<T> {
             // Move cursor
             c.range.0 -= len;
             c.range.1 -= len;
-            c.update_vis_start(&(self.buffer));
+            c.update_vis_start(&(self.buffer), &(self.formatter));
             
             // Update offset
             offset += len;
@@ -444,7 +451,7 @@ impl<T: LineFormatter> Editor<T> {
             self.dirty = true;
             
             // Move cursor
-            c.update_vis_start(&(self.buffer));
+            c.update_vis_start(&(self.buffer), &(self.formatter));
             
             // Update offset
             offset += len;
@@ -480,7 +487,7 @@ impl<T: LineFormatter> Editor<T> {
                 offset += len;
             }
             
-            c.update_vis_start(&(self.buffer));
+            c.update_vis_start(&(self.buffer), &(self.formatter));
         }
         
         self.cursors.make_consistent();
@@ -493,7 +500,7 @@ impl<T: LineFormatter> Editor<T> {
         self.cursors = CursorSet::new();
         
         self.cursors[0].range = (0, 0);
-        self.cursors[0].update_vis_start(&(self.buffer));
+        self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -504,7 +511,7 @@ impl<T: LineFormatter> Editor<T> {
         
         self.cursors = CursorSet::new();
         self.cursors[0].range = (end, end);
-        self.cursors[0].update_vis_start(&(self.buffer));
+        self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
         
         // Adjust view
         self.move_view_to_cursor();
@@ -520,7 +527,7 @@ impl<T: LineFormatter> Editor<T> {
             }
             
             c.range.1 = c.range.0;
-            c.update_vis_start(&(self.buffer));
+            c.update_vis_start(&(self.buffer), &(self.formatter));
         }
         
         // Adjust view
@@ -536,7 +543,7 @@ impl<T: LineFormatter> Editor<T> {
             }
             
             c.range.0 = c.range.1;
-            c.update_vis_start(&(self.buffer));
+            c.update_vis_start(&(self.buffer), &(self.formatter));
         }
         
         // Adjust view
@@ -544,93 +551,103 @@ impl<T: LineFormatter> Editor<T> {
     }
     
     pub fn cursor_up(&mut self, n: usize) {
-        for c in self.cursors.iter_mut() {
-            let vmove = n * self.buffer.formatter.single_line_height();
-            let (v, _) = self.buffer.index_to_v2d(c.range.0);
-            
-            if vmove <= v {
-                c.range.0 = self.buffer.v2d_to_index((v - vmove, c.vis_start), (Floor, Floor));
-                c.range.1 = c.range.0;
-            }
-            else {
-                c.range = (0, 0);
-                c.update_vis_start(&(self.buffer));
-            }
-        }
+        // TODO: update to new formatting code
         
-        // Adjust view
-        self.move_view_to_cursor();
+        //for c in self.cursors.iter_mut() {
+        //    let vmove = n * self.buffer.formatter.single_line_height();
+        //    let (v, _) = self.buffer.index_to_v2d(c.range.0);
+        //    
+        //    if vmove <= v {
+        //        c.range.0 = self.buffer.v2d_to_index((v - vmove, c.vis_start), (Floor, Floor));
+        //        c.range.1 = c.range.0;
+        //    }
+        //    else {
+        //        c.range = (0, 0);
+        //        c.update_vis_start(&(self.buffer), &(self.formatter));
+        //    }
+        //}
+        //
+        //// Adjust view
+        //self.move_view_to_cursor();
     }
     
     pub fn cursor_down(&mut self, n: usize) {
-        for c in self.cursors.iter_mut() {
-            let vmove = n * self.buffer.formatter.single_line_height();
-            let (v, _) = self.buffer.index_to_v2d(c.range.0); 
-            let (h, _) = self.buffer.dimensions();
-            
-            if vmove < (h - v) {
-                c.range.0 = self.buffer.v2d_to_index((v + vmove, c.vis_start), (Floor, Floor));
-                c.range.1 = c.range.0;
-            }
-            else {
-                let end = self.buffer.grapheme_count();
-                c.range = (end, end);
-                c.update_vis_start(&(self.buffer));
-            }
-        }
+        // TODO: update to new formatting code
         
-        // Adjust view
-        self.move_view_to_cursor();
+        //for c in self.cursors.iter_mut() {
+        //    let vmove = n * self.buffer.formatter.single_line_height();
+        //    let (v, _) = self.buffer.index_to_v2d(c.range.0); 
+        //    let (h, _) = self.buffer.dimensions();
+        //    
+        //    if vmove < (h - v) {
+        //        c.range.0 = self.buffer.v2d_to_index((v + vmove, c.vis_start), (Floor, Floor));
+        //        c.range.1 = c.range.0;
+        //    }
+        //    else {
+        //        let end = self.buffer.grapheme_count();
+        //        c.range = (end, end);
+        //        c.update_vis_start(&(self.buffer), &(self.formatter));
+        //    }
+        //}
+        //
+        //// Adjust view
+        //self.move_view_to_cursor();
     }
     
     pub fn page_up(&mut self) {
-        let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
+        // TODO: update to new formatting code
         
-        if self.view_pos.0 > 0 {
-            if self.view_pos.0 >= move_amount {
-                self.view_pos.0 -= move_amount;
-            }
-            else {
-                self.view_pos.0 = 0;
-            }
-        }
-        
-        self.cursor_up(move_amount);
-        
-        // Adjust view
-        self.move_view_to_cursor();
+        //let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
+        //
+        //if self.view_pos.0 > 0 {
+        //    if self.view_pos.0 >= move_amount {
+        //        self.view_pos.0 -= move_amount;
+        //    }
+        //    else {
+        //        self.view_pos.0 = 0;
+        //    }
+        //}
+        //
+        //self.cursor_up(move_amount);
+        //
+        //// Adjust view
+        //self.move_view_to_cursor();
     }
     
     pub fn page_down(&mut self) {
-        let nlc = self.buffer.line_count() - 1;
-        let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
+        // TODO: update to new formatting code
         
-        if self.view_pos.0 < nlc {
-            let max_move = nlc - self.view_pos.0;
-            
-            if max_move >= move_amount {
-                self.view_pos.0 += move_amount;
-            }
-            else {
-                self.view_pos.0 += max_move;
-            }
-            
-        }
-        
-        self.cursor_down(move_amount);
-        
-        // Adjust view
-        self.move_view_to_cursor();
+        //let nlc = self.buffer.line_count() - 1;
+        //let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
+        //
+        //if self.view_pos.0 < nlc {
+        //    let max_move = nlc - self.view_pos.0;
+        //    
+        //    if max_move >= move_amount {
+        //        self.view_pos.0 += move_amount;
+        //    }
+        //    else {
+        //        self.view_pos.0 += max_move;
+        //    }
+        //    
+        //}
+        //
+        //self.cursor_down(move_amount);
+        //
+        //// Adjust view
+        //self.move_view_to_cursor();
     }
     
     pub fn jump_to_line(&mut self, n: usize) {
-        let pos = self.buffer.line_col_to_index((n, 0));
-        let (v, _) = self.buffer.index_to_v2d(pos);
-        self.cursors.truncate(1);
-        self.cursors[0].range.0 = self.buffer.v2d_to_index((v, self.cursors[0].vis_start), (Floor, Floor));
-        self.cursors[0].range.1 = self.cursors[0].range.0;
+        // TODO: update to new formatting code
         
-        // Adjust view
-        self.move_view_to_cursor();
+        //let pos = self.buffer.line_col_to_index((n, 0));
+        //let (v, _) = self.buffer.index_to_v2d(pos);
+        //self.cursors.truncate(1);
+        //self.cursors[0].range.0 = self.buffer.v2d_to_index((v, self.cursors[0].vis_start), (Floor, Floor));
+        //self.cursors[0].range.1 = self.cursors[0].range.0;
+        //
+        //// Adjust view
+        //self.move_view_to_cursor();
     }
 }

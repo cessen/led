@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use string_utils::{is_line_ending};
 use buffer::line::{Line, LineGraphemeIter};
-use buffer::line_formatter::{LineFormatter, RoundingBehavior};
+use editor::formatter::{LineFormatter, RoundingBehavior};
 
 //===================================================================
 // LineFormatter implementation for terminals/consoles.
