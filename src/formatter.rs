@@ -39,7 +39,7 @@ pub trait LineFormatter {
     fn index_offset_vertical_v2d(&self, buf: &Buffer, index: usize, offset: isize, rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
         // TODO: handle rounding modes
         // TODO: do this with bidirectional line iterator
-        let (mut line_i, col_i) = buf.index_to_line_col(index);
+        let (mut line_i, mut col_i) = buf.index_to_line_col(index);
         let (mut y, x) = self.index_to_v2d(buf.get_line(line_i), col_i);
         let mut new_y = y as isize + offset;
         
@@ -54,7 +54,7 @@ pub trait LineFormatter {
                 break;
             }
             else {
-                if new_y < 0 {
+                if new_y > 0 {
                     // Check for off-the-end
                     if (line_i + 1) >= buf.line_count() {
                         return buf.grapheme_count();
@@ -63,14 +63,16 @@ pub trait LineFormatter {
                     line_i += 1;
                     new_y -= h as isize;
                 }
-                else if new_y > 0 {
+                else if new_y < 0 {
                     // Check for off-the-end
                     if line_i == 0 {
                         return 0;
                     }
                     
                     line_i -= 1;
-                    new_y -= h as isize;
+                    line = buf.get_line(line_i);
+                    let (h, _) = self.dimensions(line);
+                    new_y += h as isize;
                 }
                 else {
                     unreachable!();
@@ -80,7 +82,10 @@ pub trait LineFormatter {
         
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
-        let col_i = self.v2d_to_index(line, (y, x), rounding);
+        col_i = self.v2d_to_index(line, (y, x), rounding);
+        //if col_i >= line.grapheme_count() && line.grapheme_count() > 0 {
+        //    col_i = line.grapheme_count() - 1;
+        //}
         return buf.line_col_to_index((line_i, col_i));
     }
     
