@@ -8,7 +8,7 @@ use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
 use buffer::line::{line_ending_to_str, LineEnding};
-use self::formatter::{ConsoleLineFormatter, ConsoleLineFormatterVisIter};
+use self::formatter::ConsoleLineFormatter;
 
 pub mod formatter;
 
@@ -352,8 +352,6 @@ impl TermUI {
 
 
     fn draw_editor_text(&self, editor: &Editor<ConsoleLineFormatter>, c1: (usize, usize), c2: (usize, usize)) {
-        // TODO: update to new formatting code
-        
         // Calculate all the starting info
         let (starting_line, _) = editor.buffer.index_to_line_col(editor.view_pos.0);
         let mut grapheme_index = editor.buffer.line_col_to_index((starting_line, 0));
@@ -422,28 +420,29 @@ impl TermUI {
         }
         
 
-        //// If we get here, it means we reached the end of the text buffer
-        //// without going off the bottom of the screen.  So draw the cursor
-        //// at the end if needed.
-        //
-        //// Check if the character is within a cursor
-        //let mut at_cursor = false;
-        //for c in editor.cursors.iter() {
-        //    if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
-        //        at_cursor = true;
-        //    }
-        //}
-        //
-        //if at_cursor {
-        //    // Calculate the cell coordinates at which to draw the cursor
-        //    let (pos_y, pos_x) = editor.buffer.index_to_v2d(grapheme_index);
-        //    let px = pos_x as isize + c1.1 as isize - editor.view_pos.1 as isize;
-        //    let py = pos_y as isize + c1.0 as isize - editor.view_pos.0 as isize;
-        //    
-        //    if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) && (py <= c2.0 as isize) {
-        //        self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
-        //    }
-        //}
+        // If we get here, it means we reached the end of the text buffer
+        // without going off the bottom of the screen.  So draw the cursor
+        // at the end if needed.
+        
+        // Check if the character is within a cursor
+        let mut at_cursor = false;
+        for c in editor.cursors.iter() {
+            if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
+                at_cursor = true;
+            }
+        }
+        
+        if at_cursor {
+            // Calculate the cell coordinates at which to draw the cursor
+            let line = self.editor.buffer.get_line(self.editor.buffer.line_count()-1);
+            let (_, pos_x) = editor.formatter.index_to_v2d(line, line.grapheme_count());
+            let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
+            let py = screen_line - 1;
+            
+            if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) && (py <= c2.0 as isize) {
+                self.rb.print(px as usize, py as usize, rustbox::RB_NORMAL, Color::Black, Color::White, " ");
+            }
+        }
     }
     
     
