@@ -2,7 +2,6 @@
 
 use buffer::line::Line;
 use buffer::Buffer;
-use std::cmp::max;
 
 #[derive(Copy, PartialEq)]
 pub enum RoundingBehavior {
@@ -40,7 +39,7 @@ pub trait LineFormatter {
     fn index_offset_vertical_v2d(&self, buf: &Buffer, index: usize, offset: isize, rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
         // TODO: handle rounding modes
         // TODO: do this with bidirectional line iterator
-        let (mut line_i, mut col_i) = buf.index_to_line_col(index);
+        let (mut line_i, col_i) = buf.index_to_line_col(index);
         let (mut y, x) = self.index_to_v2d(buf.get_line(line_i), col_i);
         let mut new_y = y as isize + offset;
         
@@ -48,7 +47,7 @@ pub trait LineFormatter {
         let mut line;
         loop {
             line = buf.get_line(line_i);
-            let (mut h, _) = self.dimensions(line);
+            let (h, _) = self.dimensions(line);
             
             if new_y >= 0 && new_y < h as isize {
                 y = new_y as usize;
@@ -90,7 +89,7 @@ pub trait LineFormatter {
         let (line_i, col_i) = buf.index_to_line_col(index);
         let line = buf.get_line(line_i);
         
-        let (v, h) = self.index_to_v2d(line, col_i);
+        let (v, _) = self.index_to_v2d(line, col_i);
         let new_col_i = self.v2d_to_index(line, (v, horizontal), (RoundingBehavior::Floor, rounding));
         
         return (index + new_col_i) - col_i;

@@ -399,11 +399,10 @@ impl Buffer {
         
         let mut s = String::with_capacity(pos_b - pos_a);
         
-        let mut iter = self.grapheme_iter_at_index(pos_a);
         let mut i = 0;
         let i_end = pos_b - pos_a;
         
-        for g in iter {
+        for g in self.grapheme_iter_at_index(pos_a) {
             if i == i_end {
                 break;
             }

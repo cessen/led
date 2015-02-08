@@ -70,13 +70,11 @@ impl LineFormatter for ConsoleLineFormatter {
     }
     
     
-    fn v2d_to_index(&self, line: &Line, v2d: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
+    fn v2d_to_index(&self, line: &Line, v2d: (usize, usize), _: (RoundingBehavior, RoundingBehavior)) -> usize {
         // TODO: handle rounding modes
         let mut i = 0;
-        let mut pos = (0, 0);
         
-        for (_, _pos, _) in self.iter(line) {
-            pos = _pos;
+        for (_, pos, _) in self.iter(line) {
             if pos.0 > v2d.0 {
                 break;
             }

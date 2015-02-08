@@ -217,10 +217,9 @@ impl Line {
     
     
     pub fn grapheme_at_index<'a>(&'a self, index: usize) -> &'a str {
-        let mut iter = self.grapheme_iter();
         let mut i = 0;
         
-        for g in iter {
+        for g in self.grapheme_iter() {
             if i == index {
                 return g;
             }
