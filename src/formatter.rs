@@ -94,7 +94,12 @@ pub trait LineFormatter {
         
         let (v, _) = self.index_to_v2d(line, col_i);
         let mut new_col_i = self.v2d_to_index(line, (v, horizontal), (RoundingBehavior::Floor, rounding));
-        if new_col_i >= line.grapheme_count() && line.grapheme_count() > 0 {
+        
+        // Make sure we're not pushing the index off the end of the line
+        if (line_i + 1) < buf.line_count()
+        && new_col_i >= line.grapheme_count()
+        && line.grapheme_count() > 0
+        {
             new_col_i = line.grapheme_count() - 1;
         }
         

@@ -296,17 +296,24 @@ impl<T: LineFormatter> Editor<T> {
     
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
+        // TODO: account for the horizontal offset of the editor view.
+
         // TODO: handle multiple cursors properly.  Should only move if
         // there are no cursors currently in view, and should jump to
         // the closest cursor.
         
-        //let gi = self.cursors[0].range.0;
-        //let vho = self.cursors[0].vis_start;
-        
-        //self.view_pos.0 = gi;
+        // Find the first and last grapheme index visible within the editor.
+        let g_first = self.formatter.index_set_horizontal_v2d(&self.buffer, self.view_pos.0, 0, Floor);
+        let mut g_last = self.formatter.index_offset_vertical_v2d(&self.buffer, g_first, (self.view_dim.0 - 1) as isize, (Floor, Floor));
+        g_last = self.formatter.index_set_horizontal_v2d(&self.buffer, g_last, self.view_dim.1, Floor);
 
-        // TODO: horizontal offset
-        //self.view_pos.1 = vho;
+        // Adjust the view depending on where the cursor is        
+        if self.cursors[0].range.0 < g_first {
+            self.view_pos.0 = self.cursors[0].range.0;
+        }
+        else if self.cursors[0].range.0 > g_last {
+            self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer, self.cursors[0].range.0, -((self.view_dim.0 - 1) as isize), (Floor, Floor));
+        }
     }
     
     
