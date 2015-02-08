@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use string_utils::{is_line_ending};
 use buffer::line::{Line, LineGraphemeIter};
-use formatter::LineFormatter;
+use formatter::{LineFormatter, RoundingBehavior};
 
 //===================================================================
 // LineFormatter implementation for terminals/consoles.
@@ -21,22 +21,73 @@ impl ConsoleLineFormatter {
             wrap_width: 40,
         }
     }
-}
-
-
-impl<'a> LineFormatter<'a> for ConsoleLineFormatter {
-    type Iter = ConsoleLineFormatterVisIter<'a>;
-
-    fn single_line_height(&self) -> usize {
-        return 1;
-    }
     
-    fn iter(&'a self, line: &'a Line) -> ConsoleLineFormatterVisIter<'a> {
+    pub fn iter<'a>(&'a self, line: &'a Line) -> ConsoleLineFormatterVisIter<'a> {
         ConsoleLineFormatterVisIter {
             grapheme_iter: line.grapheme_iter(),
             f: self,
             pos: (0, 0),
         }
+    }
+}
+
+
+impl LineFormatter for ConsoleLineFormatter {
+    fn single_line_height(&self) -> usize {
+        return 1;
+    }
+    
+    
+    fn dimensions(&self, line: &Line) -> (usize, usize) {
+        let mut dim: (usize, usize) = (0, 0);
+        
+        for (_, pos, width) in self.iter(line) {       
+            dim = (max(dim.0, pos.0), max(dim.1, pos.1 + width));
+        }
+        
+        dim.0 += self.single_line_height();
+        
+        return dim;
+    }
+    
+    
+    fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize) {
+        let mut pos = (0, 0);
+        let mut i = 0;
+        let mut last_width = 0;
+        
+        for (_, _pos, width) in self.iter(line) {
+            pos = _pos;
+            last_width = width;
+            i += 1;
+            
+            if i > index {
+                return pos;
+            }
+        }
+        
+        return (pos.0, pos.1 + last_width);
+    }
+    
+    
+    fn v2d_to_index(&self, line: &Line, v2d: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize {
+        // TODO: handle rounding modes
+        let mut i = 0;
+        let mut pos = (0, 0);
+        
+        for (_, _pos, _) in self.iter(line) {
+            pos = _pos;
+            if pos.0 > v2d.0 {
+                break;
+            }
+            else if pos.0 == v2d.0 && pos.1 >= v2d.1 {
+                break;
+            }
+            
+            i += 1;
+        }
+        
+        return i;
     }
 }
 

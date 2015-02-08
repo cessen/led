@@ -10,7 +10,7 @@ extern crate "rustc-serialize" as rustc_serialize;
 //extern crate freetype;
 //extern crate sdl2;
 
-use std::path::Path;
+use std::old_path::Path;
 use docopt::Docopt;
 use editor::Editor;
 use term_ui::TermUI;

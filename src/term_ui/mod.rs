@@ -8,7 +8,7 @@ use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
 use buffer::line::{line_ending_to_str, LineEnding};
-use self::formatter::ConsoleLineFormatter;
+use self::formatter::{ConsoleLineFormatter, ConsoleLineFormatterVisIter};
 
 pub mod formatter;
 
@@ -33,16 +33,16 @@ const K_CTRL_Y: u16 = 25;
 const K_CTRL_Z: u16 = 26;
 
 
-pub struct TermUI<'a> {
+pub struct TermUI {
     rb: rustbox::RustBox,
-    editor: Editor<'a, ConsoleLineFormatter>,
+    editor: Editor<ConsoleLineFormatter>,
     width: usize,
     height: usize,
 }
 
 
-impl<'a> TermUI<'a> {
-    pub fn new() -> TermUI<'a> {
+impl TermUI {
+    pub fn new() -> TermUI {
         let rb = match rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]) {
             Ok(rbox) => rbox,
             Err(_) => panic!("Could not create Rustbox instance."),
@@ -288,7 +288,7 @@ impl<'a> TermUI<'a> {
             
             // Jump to line!
             if confirm {
-                if let Some(n) = line.parse() {
+                if let Ok(n) = line.parse() {
                     let n2: usize = n; // Weird work-around: the type of n wasn't being inferred
                     if n2 > 0 {
                         self.editor.jump_to_line(n2-1);

@@ -1,6 +1,6 @@
 use std::old_io::{IoResult, BufferedWriter};
 use std::old_io::fs::File;
-use std::path::Path;
+use std::old_path::Path;
 
 use buffer::line::{line_ending_to_str};
 use buffer::Buffer as TextBuffer;

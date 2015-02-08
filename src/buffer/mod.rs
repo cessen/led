@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::mem;
-use std::path::Path;
+use std::old_path::Path;
 use std::old_io::fs::File;
 use std::old_io::{IoResult, BufferedReader};
 
@@ -485,22 +485,22 @@ impl<'a> BufferGraphemeIter<'a> {
         self.gi.skip_graphemes(n)
     }
     
-    pub fn skip_non_newline_graphemes(&mut self, n: usize) -> bool {
-        let mut i: usize = 0;
-        
-        for g in self.gi {
-            if is_line_ending(g) {
-                return true;
-            }
-            
-            i += 1;
-            if i >= n {
-                break;
-            }
-        }
-        
-        return false;
-    }
+    //pub fn skip_non_newline_graphemes(&mut self, n: usize) -> bool {
+    //    let mut i: usize = 0;
+    //    
+    //    for g in self.gi {
+    //        if is_line_ending(g) {
+    //            return true;
+    //        }
+    //        
+    //        i += 1;
+    //        if i >= n {
+    //            break;
+    //        }
+    //    }
+    //    
+    //    return false;
+    //}
 }
 
 

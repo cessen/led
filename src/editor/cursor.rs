@@ -27,10 +27,8 @@ impl Cursor {
         }
     }
     
-    pub fn update_vis_start<'a, T: LineFormatter<'a>>(&mut self, buf: &Buffer, f: &T) {
-        // TODO
-        //let (_, h) = buf.index_to_v2d(self.range.0);
-        //self.vis_start = h;
+    pub fn update_vis_start<T: LineFormatter>(&mut self, buf: &Buffer, f: &T) {
+        self.vis_start = f.index_to_horizontal_v2d(buf, self.range.0);
     }
 }
 
