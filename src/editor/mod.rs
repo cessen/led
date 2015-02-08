@@ -6,7 +6,6 @@ use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
 use std::old_path::Path;
 use std::cmp::{min, max};
-use files::{save_buffer_to_file};
 use string_utils::grapheme_count;
 use self::cursor::CursorSet;
 
@@ -85,7 +84,7 @@ impl<T: LineFormatter> Editor<T> {
     
     pub fn save_if_dirty(&mut self) {
         if self.dirty && self.file_path != Path::new("") {
-            let _ = save_buffer_to_file(&self.buffer, &self.file_path);
+            let _ = self.buffer.save_to_file(&self.file_path);
             self.dirty = false;
         }
     }

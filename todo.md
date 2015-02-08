@@ -25,6 +25,4 @@
 - File opening by entering path
 - UI that wraps editors, for split view.
 - Persistent infinite undo
-- Saving/loading files to/from buffers should be the Buffer's job, since it
-  knows its own internals and can optimize things better.
 - "Projects"

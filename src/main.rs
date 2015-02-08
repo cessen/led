@@ -21,7 +21,6 @@ use term_ui::formatter::ConsoleLineFormatter;
 mod string_utils;
 mod buffer;
 mod formatter;
-mod files;
 mod editor;
 mod term_ui;
 //mod font;
