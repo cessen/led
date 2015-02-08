@@ -7,6 +7,7 @@
 extern crate rustbox;
 extern crate docopt;
 extern crate "rustc-serialize" as rustc_serialize;
+extern crate encoding;
 //extern crate freetype;
 //extern crate sdl2;
 
