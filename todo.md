@@ -10,17 +10,13 @@
       Or should there be an accompanying structure on the side for that?
     - What do other editors do?
 
-- Scripting:
-    - What language to use for scripting?  Javascript, Lua, Python, Scheme, ...
-      It should be something easy to integrate and small, so probably not
-      Python.  Javascript, Lua, and Scheme all have small implementations
-      that would be easy to integrate.  Scheme limits the target audience
-      somewhat, as does Lua.  So Javascript is probably the best idea,
-      even though it's not as simple/clean as lua or scheme.
-    - In the end, only hard-code the core editing operations, and leave the
-      rest to scripting.  If something ends up being too slow, you can always
-      move it to be hard-coded for performance later.
+- Text encoding support:
+    - Buffers need to know what encoding they represent.
+    - Loading/saving code for different encodings.
+    - Auto-detecting text encodings from file data (this one will be tricky).
 
+- Word wrap.
+- Get non-wrapping text working again.
 - Line number display
 - File opening by entering path
 - UI that wraps editors, for split view.
