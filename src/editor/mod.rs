@@ -596,61 +596,34 @@ impl<T: LineFormatter> Editor<T> {
     
     
     pub fn page_up(&mut self) {
-        // TODO: update to new formatting code
+        let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.formatter.single_line_height());
+        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer, self.view_pos.0, -1 * move_amount as isize, (Round, Round));
         
-        //let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
-        //
-        //if self.view_pos.0 > 0 {
-        //    if self.view_pos.0 >= move_amount {
-        //        self.view_pos.0 -= move_amount;
-        //    }
-        //    else {
-        //        self.view_pos.0 = 0;
-        //    }
-        //}
-        //
-        //self.cursor_up(move_amount);
-        //
-        //// Adjust view
-        //self.move_view_to_cursor();
+        self.cursor_up(move_amount);
+        
+        // Adjust view
+        self.move_view_to_cursor();
     }
     
     
     pub fn page_down(&mut self) {
-        // TODO: update to new formatting code
+        let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.formatter.single_line_height());
+        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer, self.view_pos.0, move_amount as isize, (Round, Round));
         
-        //let nlc = self.buffer.line_count() - 1;
-        //let move_amount = self.view_dim.0 - max((self.view_dim.0 / 8), self.buffer.formatter.single_line_height());
-        //
-        //if self.view_pos.0 < nlc {
-        //    let max_move = nlc - self.view_pos.0;
-        //    
-        //    if max_move >= move_amount {
-        //        self.view_pos.0 += move_amount;
-        //    }
-        //    else {
-        //        self.view_pos.0 += max_move;
-        //    }
-        //    
-        //}
-        //
-        //self.cursor_down(move_amount);
-        //
-        //// Adjust view
-        //self.move_view_to_cursor();
+        self.cursor_down(move_amount);
+        
+        // Adjust view
+        self.move_view_to_cursor();
     }
     
     
     pub fn jump_to_line(&mut self, n: usize) {
-        // TODO: update to new formatting code
+        let pos = self.buffer.line_col_to_index((n, 0));
+        self.cursors.truncate(1);
+        self.cursors[0].range.0 = self.formatter.index_set_horizontal_v2d(&self.buffer, pos, self.cursors[0].vis_start, Round);
+        self.cursors[0].range.1 = self.cursors[0].range.0;
         
-        //let pos = self.buffer.line_col_to_index((n, 0));
-        //let (v, _) = self.buffer.index_to_v2d(pos);
-        //self.cursors.truncate(1);
-        //self.cursors[0].range.0 = self.buffer.v2d_to_index((v, self.cursors[0].vis_start), (Floor, Floor));
-        //self.cursors[0].range.1 = self.cursors[0].range.0;
-        //
-        //// Adjust view
-        //self.move_view_to_cursor();
+        // Adjust view
+        self.move_view_to_cursor();
     }
 }

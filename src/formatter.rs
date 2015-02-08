@@ -83,9 +83,7 @@ pub trait LineFormatter {
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
         col_i = self.v2d_to_index(line, (y, x), rounding);
-        //if col_i >= line.grapheme_count() && line.grapheme_count() > 0 {
-        //    col_i = line.grapheme_count() - 1;
-        //}
+        
         return buf.line_col_to_index((line_i, col_i));
     }
     
@@ -95,7 +93,10 @@ pub trait LineFormatter {
         let line = buf.get_line(line_i);
         
         let (v, _) = self.index_to_v2d(line, col_i);
-        let new_col_i = self.v2d_to_index(line, (v, horizontal), (RoundingBehavior::Floor, rounding));
+        let mut new_col_i = self.v2d_to_index(line, (v, horizontal), (RoundingBehavior::Floor, rounding));
+        if new_col_i >= line.grapheme_count() && line.grapheme_count() > 0 {
+            new_col_i = line.grapheme_count() - 1;
+        }
         
         return (index + new_col_i) - col_i;
     }
