@@ -7,6 +7,7 @@ use formatter::LineFormatter;
 use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
+use utils::digit_count;
 use buffer::line::{line_ending_to_str, LineEnding};
 use self::formatter::ConsoleLineFormatter;
 
@@ -88,6 +89,8 @@ impl TermUI {
     
         loop {
             // Draw the editor to screen
+            self.editor.update_view_dim();
+            self.editor.formatter.wrap_width = self.editor.view_dim.1;
             self.rb.clear();
             self.draw_editor(&self.editor, (0, 0), (self.height-1, self.width-1));
             self.rb.present();
@@ -195,9 +198,7 @@ impl TermUI {
             if let Some((h, w)) = resize {
                 self.width = w as usize;
                 self.height = h as usize;
-                self.editor.update_dim(self.height-1, self.width);
-                self.editor.formatter.wrap_width = self.width;
-                println!("Resized window!");
+                self.editor.update_dim(self.height, self.width);
             }
             resize = None;
             
@@ -220,6 +221,8 @@ impl TermUI {
         
         loop {
             // Draw the editor to screen
+            self.editor.update_view_dim();
+            self.editor.formatter.wrap_width = self.editor.view_dim.1;
             self.rb.clear();
             self.draw_editor(&self.editor, (0, 0), (self.height-1, self.width-1));
             for i in 0..self.width {
@@ -353,14 +356,29 @@ impl TermUI {
 
     fn draw_editor_text(&self, editor: &Editor<ConsoleLineFormatter>, c1: (usize, usize), c2: (usize, usize)) {
         // Calculate all the starting info
+        let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
         let (starting_line, _) = editor.buffer.index_to_line_col(editor.view_pos.0);
         let mut grapheme_index = editor.buffer.line_col_to_index((starting_line, 0));
         let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(starting_line), editor.view_pos.0 - grapheme_index);
         
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
-        let screen_col = c1.1 as isize;
+        let screen_col = c1.1 as isize + gutter_width as isize;
         
+        // Fill in the gutter with the appropriate background
+        for y in c1.0..(c2.0+1) {
+            for x in c1.1..(c1.1+gutter_width-1) {
+                self.rb.print(x, y, rustbox::RB_NORMAL, Color::White, Color::Blue, " ");
+            }
+        }
+        
+        let mut line_num = starting_line + 1;
         for line in editor.buffer.line_iter_at_index(starting_line) {
+            // Print line number
+            let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
+            let lny = screen_line as usize;
+            if lny >= c1.0 && lny <= c2.0 {
+                self.rb.print(lnx, lny, rustbox::RB_NORMAL, Color::White, Color::Blue, format!("{}", line_num).as_slice());
+            }
             
             // Loop through the graphemes of the line and print them to
             // the screen.
@@ -417,6 +435,7 @@ impl TermUI {
             
             let (dim_y, _) = editor.formatter.dimensions(line);
             screen_line += dim_y as isize; 
+            line_num += 1;
         }
         
 

@@ -17,7 +17,6 @@
 
 - Word wrap.
 - Get non-wrapping text working again.
-- Line number display
 - File opening by entering path
 - UI that wraps editors, for split view.
 - Persistent infinite undo

@@ -7,6 +7,7 @@ use formatter::RoundingBehavior::*;
 use std::old_path::Path;
 use std::cmp::{min, max};
 use string_utils::grapheme_count;
+use utils::digit_count;
 use self::cursor::CursorSet;
 
 mod cursor;
@@ -21,7 +22,11 @@ pub struct Editor<T: LineFormatter> {
     pub soft_tab_width: u8,
     pub dirty: bool,
     
-    // The dimensions and position of the editor's view within the buffer
+    // The dimensions of the total editor in screen space, including the
+    // header, gutter, etc.
+    pub editor_dim: (usize, usize),
+    
+    // The dimensions and position of just the text view portion of the editor
     pub view_dim: (usize, usize),  // (height, width)
     pub view_pos: (usize, usize),  // (grapheme index, visual horizontal offset)
     
@@ -41,6 +46,7 @@ impl<T: LineFormatter> Editor<T> {
             soft_tabs: false,
             soft_tab_width: 4,
             dirty: false,
+            editor_dim: (0, 0),
             view_dim: (0, 0),
             view_pos: (0, 0),
             cursors: CursorSet::new(),
@@ -63,6 +69,7 @@ impl<T: LineFormatter> Editor<T> {
             soft_tabs: false,
             soft_tab_width: 4,
             dirty: false,
+            editor_dim: (0, 0),
             view_dim: (0, 0),
             view_pos: (0, 0),
             cursors: CursorSet::new(),
@@ -255,7 +262,19 @@ impl<T: LineFormatter> Editor<T> {
     
     
     pub fn update_dim(&mut self, h: usize, w: usize) {
-        self.view_dim = (h, w);
+        self.editor_dim = (h, w);
+        self.update_view_dim();
+    }
+    
+    
+    pub fn update_view_dim(&mut self) {
+        // TODO: generalize for non-terminal UI.  Maybe this isn't where it
+        // belongs, in fact.  But for now, this is the easiest place to put
+        // it.
+        let line_count_digits = digit_count(self.buffer.line_count() as u32, 10) as usize;
+        // Minus 1 vertically for the header, minus one more than the digits in
+        // the line count for the gutter.
+        self.view_dim = (self.editor_dim.0 - 1, self.editor_dim.1 - line_count_digits - 1);
     }
     
     

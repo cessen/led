@@ -20,6 +20,7 @@ use term_ui::formatter::ConsoleLineFormatter;
 //use gui::formatter::GUILineFormatter;
 
 mod string_utils;
+mod utils;
 mod buffer;
 mod formatter;
 mod editor;
