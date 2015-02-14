@@ -12,6 +12,7 @@ use self::undo_stack::Operation::*;
 use string_utils::{is_line_ending, grapheme_count};
 
 pub mod line;
+mod rope;
 mod node;
 mod undo_stack;
 
@@ -26,6 +27,7 @@ pub struct Buffer {
     file_path: Option<Path>,
     undo_stack: UndoStack,
 }
+
 
 
 impl Buffer {
