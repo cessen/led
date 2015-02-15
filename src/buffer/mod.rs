@@ -5,7 +5,7 @@ use std::old_path::Path;
 use std::old_io::fs::File;
 use std::old_io::{IoResult, BufferedReader, BufferedWriter};
 
-use self::line::{Line, line_ending_to_str};
+use self::line::Line;
 use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
 use self::undo_stack::{UndoStack};
 use self::undo_stack::Operation::*;
@@ -89,11 +89,11 @@ impl Buffer {
     
     
     pub fn save_to_file(&self, path: &Path) -> IoResult<()> {
+        // TODO: make more efficient
         let mut f = BufferedWriter::new(try!(File::create(path)));
         
-        for l in self.line_iter() {
-            let _ = f.write_str(l.as_str());
-            let _ = f.write_str(line_ending_to_str(l.ending));
+        for g in self.grapheme_iter() {
+            let _ = f.write_str(g);
         }
         
         return Ok(());

@@ -1,9 +1,10 @@
 use std::cmp::{min, max};
 use std::mem;
 use std::str::Graphemes;
-use string_utils::{grapheme_count, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index};
+use std::ops::Index;
+use string_utils::{grapheme_count, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index, grapheme_pos_to_byte_pos};
 
-const MIN_NODE_SIZE: usize = 1024;
+const MIN_NODE_SIZE: usize = 2048;
 const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
 
 
@@ -40,7 +41,7 @@ impl Rope {
             tree_height: 1,
         };
         
-        rope.split();
+        rope.split_if_too_large();
         
         return rope;
     }
@@ -55,7 +56,7 @@ impl Rope {
             tree_height: 1,
         };
         
-        rope.split();
+        rope.split_if_too_large();
         
         return rope;
     }
@@ -83,7 +84,7 @@ impl Rope {
         }
         
         self.update_stats();
-        self.split();
+        self.split_if_too_large();
         self.rebalance();
     }
     
@@ -115,19 +116,53 @@ impl Rope {
         }
         
         self.update_stats();
-        self.merge();
+        self.merge_if_too_small();
         self.rebalance();
     }
     
+    /// Splits a rope into two pieces from the given grapheme index.
+    /// The first piece remains in this rope, the second piece is returned
+    /// as a new rope.
+    pub fn split(&mut self, pos: usize) -> Rope {
+        // TODO: make more efficient.
+        let s = self.to_string();
+        let gc = self.grapheme_count();
+        let bp = grapheme_pos_to_byte_pos(s.as_slice(), pos);
+        self.remove_text_between_grapheme_indices(pos, gc);
+        
+        Rope::new_from_str(&s.as_slice()[bp..])
+    }
+
+    /// Appends another rope to the end of this one, consuming the other rope.    
+    pub fn append(&mut self, rope: Rope) {
+        // TODO: make more efficient.  Converting to a string and then
+        // inserting is pretty slow...
+        let s = rope.to_string();
+        let gc = self.grapheme_count();
+        self.insert_text_at_grapheme_index(s.as_slice(), gc);
+    }
     
-    /// Creates an iterator at the first grapheme of the rope
-    pub fn grapheme_iter<'a>(&'a self) -> RopeGraphemeIter<'a> {
-        self.grapheme_iter_at_index(0)
+    /// Makes a copy of the rope as a string
+    pub fn to_string(&self) -> String {
+        let mut s = String::new();
+
+        for chunk in self.chunk_iter() {
+            s.push_str(chunk);
+        }
+        
+        return s;
     }
     
     
-    /// Creates an iterator at the given grapheme index
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> RopeGraphemeIter<'a> {
+    /// Creates a chunk iterator for the rope
+    pub fn chunk_iter<'a>(&'a self) -> RopeChunkIter<'a> {
+        self.chunk_iter_at_index(0).1
+    }
+    
+    
+    /// Creates a chunk iter starting at the chunk containing the given
+    /// grapheme index.  Returns the chunk and its starting grapheme index.
+    pub fn chunk_iter_at_index<'a>(&'a self, index: usize) -> (usize, RopeChunkIter<'a>) {
         let mut node_stack: Vec<&'a Rope> = Vec::new();
         let mut cur_node = self;
         let mut grapheme_i = index;
@@ -136,6 +171,7 @@ impl Rope {
         loop {
             match cur_node.data {
                 RopeData::Leaf(_) => {
+                    node_stack.push(cur_node);
                     break;
                 },
                 
@@ -152,8 +188,22 @@ impl Rope {
             }
         }
         
+        (index - grapheme_i, RopeChunkIter {node_stack: node_stack})
+    }
+    
+    
+    /// Creates an iterator at the first grapheme of the rope
+    pub fn grapheme_iter<'a>(&'a self) -> RopeGraphemeIter<'a> {
+        self.grapheme_iter_at_index(0)
+    }
+    
+    
+    /// Creates an iterator at the given grapheme index
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> RopeGraphemeIter<'a> {
+        let (grapheme_i, mut chunk_iter) = self.chunk_iter_at_index(index);
+        
         // Create the grapheme iter for the current node
-        let mut gi = if let RopeData::Leaf(ref text) = cur_node.data {
+        let mut giter = if let Some(text) = chunk_iter.next() {
             text.as_slice().graphemes(true)
         }
         else {
@@ -161,14 +211,14 @@ impl Rope {
         };
         
         // Get to the right spot in the iter
-        for _ in 0..grapheme_i {
-            gi.next();
+        for _ in grapheme_i..index {
+            giter.next();
         }
         
         // Create the rope grapheme iter
         return RopeGraphemeIter {
-            node_stack: node_stack,
-            cur_chunk: gi,
+            chunk_iter: chunk_iter,
+            cur_chunk: giter,
         };
     }
     
@@ -208,7 +258,7 @@ impl Rope {
     // if lots of splits need to happen.  This version ends up re-scanning
     // the text quite a lot, as well as doing quite a few unnecessary
     // allocations.
-    fn split(&mut self) {
+    fn split_if_too_large(&mut self) {
         if self.grapheme_count_ > MAX_NODE_SIZE && self.is_leaf() {
             
             // Calculate split position and how large the left and right
@@ -229,8 +279,8 @@ impl Rope {
             // Recursively split
             nl.grapheme_count_ = new_gc_l;
             nr.grapheme_count_ = new_gc_r;
-            nl.split();
-            nr.split();
+            nl.split_if_too_large();
+            nr.split_if_too_large();
             
             // Update the new left and right node's stats
             nl.update_stats();
@@ -244,14 +294,14 @@ impl Rope {
     
     
     /// Merges a non-leaf node into a leaf node if it's too small
-    fn merge(&mut self) {
+    fn merge_if_too_small(&mut self) {
         if self.grapheme_count_ < MIN_NODE_SIZE && !self.is_leaf() {
             let mut merged_text = String::new();
             
             if let RopeData::Branch(ref mut left, ref mut right) = self.data {
                 // First, recursively merge the children
-                left.merge();
-                right.merge();
+                left.merge_if_too_small();
+                right.merge_if_too_small();
                 
                 // Then put their text into merged_text
                 if let RopeData::Leaf(ref mut text) = left.data {
@@ -386,42 +436,95 @@ impl Rope {
 }
 
 
+// Direct indexing to graphemes in the rope
+impl Index<usize> for Rope {
+    type Output = str;
+    
+    fn index<'a>(&'a self, index: &usize) -> &'a str {
+        if *index >= self.grapheme_count() {
+            panic!("Rope::Index: attempting to fetch grapheme that outside the bounds of the text.");
+        }
+        
+        match self.data {
+            RopeData::Leaf(ref text) => {
+                let mut i: usize = 0;
+                for g in text.graphemes(true) {
+                    if i == *index {
+                        return &g;
+                    }
+                    i += 1;
+                }
+                unreachable!();
+            },
+            
+            RopeData::Branch(ref left, ref right) => {
+                if *index < left.grapheme_count() {
+                    return &left[*index];
+                }
+                else {
+                    return &right[*index - left.grapheme_count()];
+                }
+            },
+        }
+    }
+}
+
+
 
 
 //=============================================================
 // Rope iterators
 //=============================================================
 
-/// An iterator over a text buffer's graphemes
-pub struct RopeGraphemeIter<'a> {
+/// An iterator over a rope's string chunks
+pub struct RopeChunkIter<'a> {
     node_stack: Vec<&'a Rope>,
-    cur_chunk: Graphemes<'a>,
+}
+
+impl<'a> Iterator for RopeChunkIter<'a> {
+    type Item = &'a str;
+    
+    fn next(&mut self) -> Option<&'a str> {
+        if let Some(next_chunk) = self.node_stack.pop() {
+            loop {
+                if let Option::Some(node) = self.node_stack.pop() {
+                    match node.data {
+                        RopeData::Leaf(_) => {
+                            self.node_stack.push(node);
+                            break;
+                        },
+                      
+                        RopeData::Branch(ref left, ref right) => {
+                            self.node_stack.push(&(**right));
+                            self.node_stack.push(&(**left));
+                            continue;
+                        }
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+            
+            if let RopeData::Leaf(ref text) = next_chunk.data {
+                return Some(text.as_slice());
+            }
+            else {
+                unreachable!();
+            }
+        }
+        else {
+            return None;
+        }
+    }
 }
 
 
-impl<'a> RopeGraphemeIter<'a> {
-    // Skips the iterator to the next chunk of the rope, if any.
-    pub fn next_chunk(&mut self) -> bool {
-        loop {
-            if let Option::Some(node) = self.node_stack.pop() {
-                match node.data {
-                    RopeData::Leaf(ref text) => {
-                        self.cur_chunk = text.as_slice().graphemes(true);
-                        return true;
-                    },
-                  
-                    RopeData::Branch(ref left, ref right) => {
-                        self.node_stack.push(&(**right));
-                        self.node_stack.push(&(**left));
-                        continue;
-                    }
-                }
-            }
-            else {
-                return false;
-            }
-        }
-    }
+
+/// An iterator over a rope's graphemes
+pub struct RopeGraphemeIter<'a> {
+    chunk_iter: RopeChunkIter<'a>,
+    cur_chunk: Graphemes<'a>,
 }
 
 
@@ -430,15 +533,16 @@ impl<'a> Iterator for RopeGraphemeIter<'a> {
     
     fn next(&mut self) -> Option<&'a str> {
         loop {
-            if let Option::Some(g) = self.cur_chunk.next() {
-                return Option::Some(g);
+            if let Some(g) = self.cur_chunk.next() {
+                return Some(g);
             }
             else {   
-                if self.next_chunk() {
+                if let Some(s) = self.chunk_iter.next() {
+                    self.cur_chunk = s.graphemes(true);
                     continue;
                 }
                 else {
-                    return Option::None;
+                    return None;
                 }
             }
         }
@@ -454,7 +558,7 @@ impl<'a> Iterator for RopeGraphemeIter<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Rope, RopeGraphemeIter};
+    use super::*;
 
 
     #[test]
@@ -506,6 +610,87 @@ mod tests {
         assert_eq!(Some("d"), iter.next());
         assert_eq!(Some("!"), iter.next());
         assert_eq!(None, iter.next());
+    }
+    
+    
+    #[test]
+    fn index() {
+        let rope = Rope::new_from_str("Hel世界lo world!");
+        
+        assert_eq!("H", &rope[0]);
+        assert_eq!("界", &rope[4]);
+    }
+    
+    
+    #[test]
+    fn to_string() {
+        let rope = Rope::new_from_str("Hello there good people of the world!");
+        let s = rope.to_string();
+        
+        assert_eq!("Hello there good people of the world!", s.as_slice());
+    }
+    
+    
+    #[test]
+    fn split_1() {
+        let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
+        let rope2 = rope1.split(18);
+        
+        assert_eq!("Hello there good p", rope1.to_string().as_slice());
+        assert_eq!("eople of the world!", rope2.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn split_2() {
+        let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
+        let rope2 = rope1.split(37);
+        
+        assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
+        assert_eq!("", rope2.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn split_3() {
+        let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
+        let rope2 = rope1.split(0);
+        
+        assert_eq!("", rope1.to_string().as_slice());
+        assert_eq!("Hello there good people of the world!", rope2.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn append_1() {
+        let mut rope1 = Rope::new_from_str("Hello there good p");
+        let rope2 = Rope::new_from_str("eople of the world!");
+        
+        rope1.append(rope2);
+        
+        assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn append_2() {
+        let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
+        let rope2 = Rope::new_from_str("");
+        
+        rope1.append(rope2);
+        
+        assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn append_3() {
+        let mut rope1 = Rope::new_from_str("");
+        let rope2 = Rope::new_from_str("Hello there good people of the world!");
+        
+        rope1.append(rope2);
+        
+        assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
     }
     
     
@@ -1017,4 +1202,5 @@ mod tests {
         assert!(Some("9") == iter.next());
         assert!(None == iter.next());
     }
+    
 }

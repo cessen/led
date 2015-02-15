@@ -582,11 +582,11 @@ impl BufferNode {
     }
     
     
-    pub fn merge_line_with_next_recursive(&mut self, line_number: usize, fetched_line: Option<&Line>) {
+    pub fn merge_line_with_next_recursive(&mut self, line_number: usize, fetched_line: Option<Line>) {
         match fetched_line {
             None => {
                 let line: Option<Line> = self.pull_out_line_recursive(line_number + 1);
-                if let Some(ref l) = line {
+                if let Some(l) = line {
                     self.merge_line_with_next_recursive(line_number, Some(l));
                 }
             },
@@ -603,8 +603,7 @@ impl BufferNode {
                     },
                     
                     BufferNodeData::Leaf(ref mut line2) => {
-                        line2.append_text(line.as_str());
-                        line2.ending = line.ending;
+                        line2.append(line);
                     }
                 }
             }
@@ -1069,7 +1068,7 @@ mod tests {
         assert!(node.line_count == 5);
         
         let line = node.pull_out_line_recursive(0).unwrap();
-        assert!(line.as_str() == "Hi");
+        assert!(line.to_string().as_slice() == "Hi");
         assert!(line.ending == LineEnding::LF);
         
         let mut iter = node.grapheme_iter();
@@ -1119,7 +1118,7 @@ mod tests {
         assert!(node.line_count == 5);
         
         let line = node.pull_out_line_recursive(2).unwrap();
-        assert!(line.as_str() == " people ");
+        assert!(line.to_string().as_slice() == " people ");
         assert!(line.ending == LineEnding::LF);
         
         let mut iter = node.grapheme_iter();
@@ -1163,7 +1162,7 @@ mod tests {
         assert!(node.line_count == 5);
         
         let line = node.pull_out_line_recursive(4).unwrap();
-        assert!(line.as_str() == " world!");
+        assert!(line.to_string().as_slice() == " world!");
         assert!(line.ending == LineEnding::None);
         
         let mut iter = node.grapheme_iter();

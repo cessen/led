@@ -1,14 +1,13 @@
 #![allow(dead_code)]
 
-use std::iter::repeat;
 use std::mem;
-use std::str::Graphemes;
-use string_utils::{grapheme_count, grapheme_pos_to_byte_pos, is_line_ending};
+use super::rope::{Rope, RopeGraphemeIter};
+use string_utils::is_line_ending;
 
 
 /// A single line of text
 pub struct Line {
-    text: Vec<u8>, // The text data, stored as UTF8
+    text: Rope, // The text data, stored as UTF8
     pub ending: LineEnding, // The type of line ending, if any
 }
 
@@ -17,7 +16,7 @@ impl Line {
     /// Creates a new empty Line
     pub fn new() -> Line {
         Line {
-            text: Vec::new(),
+            text: Rope::new(),
             ending: LineEnding::None,
         }
     }
@@ -25,14 +24,11 @@ impl Line {
     
     /// Creates a new Line from a str.
     pub fn new_from_str(text: &str) -> Line {
-        // Initialize Line
-        let mut tl = Line {
-            text: Vec::with_capacity(text.len()),
-            ending: LineEnding::None,
-        };
+        let mut ending = LineEnding::None;
+        let mut end_pos = 0;
         
-        // Copy text data, stopping on a line ending if any is found
-        for g in text.graphemes(true) {        
+        // Find the slice before the line ending, if any
+        for g in text.graphemes(true) {
             match g {
                 //==============
                 // Line endings
@@ -40,49 +36,49 @@ impl Line {
                 
                 // CRLF
                 "\u{000D}\u{000A}" => {
-                    tl.ending = LineEnding::CRLF;
+                    ending = LineEnding::CRLF;
                     break;
                 },
                 
                 // LF
                 "\u{000A}" => {
-                    tl.ending = LineEnding::LF;
+                    ending = LineEnding::LF;
                     break;
                 },
                 
                 // VT
                 "\u{000B}" => {
-                    tl.ending = LineEnding::VT;
+                    ending = LineEnding::VT;
                     break;
                 },
                 
                 // FF
                 "\u{000C}" => {
-                    tl.ending = LineEnding::FF;
+                    ending = LineEnding::FF;
                     break;
                 },
                 
                 // CR
                 "\u{000D}" => {
-                    tl.ending = LineEnding::CR;
+                    ending = LineEnding::CR;
                     break;
                 },
                 
                 // NEL
                 "\u{0085}" => {
-                    tl.ending = LineEnding::NEL;
+                    ending = LineEnding::NEL;
                     break;
                 },
                 
                 // LS
                 "\u{2028}" => {
-                    tl.ending = LineEnding::LS;
+                    ending = LineEnding::LS;
                     break;
                 },
                 
                 // PS
                 "\u{2029}" => {
-                    tl.ending = LineEnding::PS;
+                    ending = LineEnding::PS;
                     break;
                 },
                 
@@ -91,41 +87,38 @@ impl Line {
                 //==================
                 
                 _ => {
-                    for b in g.bytes() {
-                        tl.text.push(b);
-                    }
+                    end_pos += g.len();
                 }
             }
         }
         
-        // Done!
-        return tl;
+        // Create and return Line
+        return Line {
+            text: Rope::new_from_str(&text[..end_pos]),
+            ending: ending,
+        };
     }
     
     
     pub fn new_from_str_unchecked(text: &str) -> Line {
-        // Initialize Line
-        let mut tl = Line {
-            text: Vec::new(),
-            ending: LineEnding::None,
-        };
+        let mut ending = LineEnding::None;
         
-        tl.text.push_all(text.as_bytes());
+        let bytes = text.as_bytes();
         
         // Check for line ending
         let mut le_size: usize = 0;
-        let text_size = tl.text.len();
-        if tl.text.len() >= 3 {
-            match unsafe{mem::transmute::<&[u8], &str>(&tl.text[(text_size-3)..])} {
+        let text_size = text.len();
+        if text.len() >= 3 {
+            match &text[(text_size-3)..] {
                 // LS
                 "\u{2028}" => {
-                    tl.ending = LineEnding::LS;
+                    ending = LineEnding::LS;
                     le_size = 3;
                 },
                 
                 // PS
                 "\u{2029}" => {
-                    tl.ending = LineEnding::PS;
+                    ending = LineEnding::PS;
                     le_size = 3;
                 },
                 
@@ -133,11 +126,11 @@ impl Line {
             }
         }
         
-        if le_size == 0 && tl.text.len() >= 2 {
-            match unsafe{mem::transmute::<&[u8], &str>(&tl.text[(text_size-2)..])} {
+        if le_size == 0 && text.len() >= 2 {
+            match &text[(text_size-2)..] {
                 // CRLF
                 "\u{000D}\u{000A}" => {
-                    tl.ending = LineEnding::CRLF;
+                    ending = LineEnding::CRLF;
                     le_size = 2;
                 },
                 
@@ -145,35 +138,35 @@ impl Line {
             }
         }
         
-        if le_size == 0 && tl.text.len() >= 1 {
-            match unsafe{mem::transmute::<&[u8], &str>(&tl.text[(text_size-1)..])} {
+        if le_size == 0 && text.len() >= 1 {
+            match &text[(text_size-1)..] {
                 // LF
                 "\u{000A}" => {
-                    tl.ending = LineEnding::LF;
+                    ending = LineEnding::LF;
                     le_size = 1;
                 },
                 
                 // VT
                 "\u{000B}" => {
-                    tl.ending = LineEnding::VT;
+                    ending = LineEnding::VT;
                     le_size = 1;
                 },
                 
                 // FF
                 "\u{000C}" => {
-                    tl.ending = LineEnding::FF;
+                    ending = LineEnding::FF;
                     le_size = 1;
                 },
                 
                 // CR
                 "\u{000D}" => {
-                    tl.ending = LineEnding::CR;
+                    ending = LineEnding::CR;
                     le_size = 1;
                 },
                 
                 // NEL
                 "\u{0085}" => {
-                    tl.ending = LineEnding::NEL;
+                    ending = LineEnding::NEL;
                     le_size = 1;
                 },
                 
@@ -181,12 +174,11 @@ impl Line {
             }
         }
         
-        // Truncate off the line ending, if any
-        let trunc_size = text_size - le_size;
-        tl.text.truncate(trunc_size);
-        
-        // Done!
-        return tl;
+        // Create and return Line
+        return Line {
+            text: Rope::new_from_str(&text[..(bytes.len()-le_size)]),
+            ending: ending,
+        };
     }
     
     
@@ -194,13 +186,16 @@ impl Line {
     /// Does not check to see if the string has internal newlines.
     /// This is primarily used for efficient loading of files.
     pub fn new_from_string_unchecked(text: String) -> Line {
+        // TODO: this can be smarter, and can pass the string
+        // directly to the Rope after taking off any line
+        // endings.
         return Line::new_from_str_unchecked(text.as_slice());
     }
     
     
     /// Returns the total number of unicode graphemes in the line
     pub fn grapheme_count(&self) -> usize {
-        let mut count = grapheme_count(self.as_str());
+        let mut count = self.text.grapheme_count();
         match self.ending {
             LineEnding::None => {},
             _ => {count += 1;}
@@ -212,11 +207,13 @@ impl Line {
     /// Returns the total number of unicode graphemes in the line,
     /// not counting the line ending grapheme, if any.
     pub fn grapheme_count_sans_line_ending(&self) -> usize {
-        grapheme_count(self.as_str())
+        self.text.grapheme_count()
     }
     
     
     pub fn grapheme_at_index<'a>(&'a self, index: usize) -> &'a str {
+        // TODO: we don't have to iterate over the entire line
+        // anymore because we're using a rope now.  Update.
         let mut i = 0;
         
         for g in self.grapheme_iter() {
@@ -233,45 +230,25 @@ impl Line {
     }
         
     
-    /// Returns an immutable string slice into the text block's memory
-    pub fn as_str<'a>(&'a self) -> &'a str {
-        unsafe {
-            mem::transmute(&self.text[])
-        }
+    /// Returns a string containing the line's text
+    pub fn to_string(&self) -> String {
+        let s = self.text.to_string();
+        return s;
     }
     
     
     /// Inserts `text` at grapheme index `pos`.
     /// NOTE: panics if it encounters a line ending in the text.
     pub fn insert_text(&mut self, text: &str, pos: usize) {
-        // Find insertion position in bytes
-        let byte_pos = grapheme_pos_to_byte_pos(self.as_str(), pos);
-
-        // Grow data size        
-        self.text.extend(repeat(0).take(text.len()));
-        
-        // Move old bytes forward
-        let mut from = self.text.len() - text.len();
-        let mut to = self.text.len();
-        while from > byte_pos {
-            from -= 1;
-            to -= 1;
-            
-            self.text[to] = self.text[from];
-        }
-        
-        // Copy new bytes in
-        let mut i = byte_pos;
+        // Check for line endings
         for g in text.graphemes(true) {
             if is_line_ending(g) {
                 panic!("Line::insert_text(): line ending in inserted text.");
             }
-            
-            for b in g.bytes() {
-                self.text[i] = b;
-                i += 1
-            }
         }
+        
+        // Insert text
+        self.text.insert_text_at_grapheme_index(text, pos);
     }
     
     
@@ -279,49 +256,22 @@ impl Line {
     /// any).
     /// NOTE: panics if it encounters a line ending in the text.
     pub fn append_text(&mut self, text: &str) {
-        let mut i = self.text.len();
-    
-        // Grow data size        
-        self.text.extend(repeat(0).take(text.len()));
-        
-        // Copy new bytes in
+        // Check for line endings
         for g in text.graphemes(true) {
             if is_line_ending(g) {
                 panic!("Line::append_text(): line ending in inserted text.");
             }
-            
-            for b in g.bytes() {
-                self.text[i] = b;
-                i += 1
-            }
         }
+        
+        // Append text
+        let gc = self.text.grapheme_count();
+        self.text.insert_text_at_grapheme_index(text, gc);
     }
     
     
     /// Remove the text between grapheme positions 'pos_a' and 'pos_b'.
     pub fn remove_text(&mut self, pos_a: usize, pos_b: usize) {
-        // Bounds checks
-        if pos_a > pos_b {
-            panic!("Line::remove_text(): pos_a must be less than or equal to pos_b.");
-        }
-        
-        // Find removal positions in bytes
-        let byte_pos_a = grapheme_pos_to_byte_pos(self.as_str(), pos_a);
-        let byte_pos_b = grapheme_pos_to_byte_pos(self.as_str(), pos_b);
-        
-        // Move bytes to fill in the gap left by the removed bytes
-        let mut from = byte_pos_b;
-        let mut to = byte_pos_a;
-        while from < self.text.len() {
-            self.text[to] = self.text[from];
-            
-            from += 1;
-            to += 1;
-        }
-        
-        // Remove data from the end
-        let final_text_size = self.text.len() + byte_pos_a - byte_pos_b;
-        self.text.truncate(final_text_size);
+        self.text.remove_text_between_grapheme_indices(pos_a, pos_b);
     }
     
     
@@ -329,6 +279,7 @@ impl Line {
     /// This line stays as the first part of the split.  The second
     /// part is returned.
     pub fn split(&mut self, ending: LineEnding, pos: usize) -> Line {
+        // TODO: change code to use Rope
         let mut other = Line::new();
         
         // Inserting at very beginning: special cased for efficiency
@@ -338,14 +289,8 @@ impl Line {
         }
         // Otherwise, general case
         else {
-            // Find the byte index to split at
-            let byte_pos = grapheme_pos_to_byte_pos(self.as_str(), pos);
-            
-            // Copy the elements after the split index to the second line
-            other.text.push_all(&self.text[byte_pos..]);
-            
-            // Truncate the first line
-            self.text.truncate(byte_pos);
+            // Split the text
+            other.text = self.text.split(pos);
             
             // Set the line endings appropriately
             other.ending = self.ending;
@@ -356,10 +301,20 @@ impl Line {
     }
     
     
+    /// Appends another line to the end of this one, consuming the other
+    /// line.
+    /// Note that the resulting line ending is the ending of the other
+    /// line, if any.
+    pub fn append(&mut self, other: Line) {
+        self.ending = other.ending;
+        self.text.append(other.text);
+    }
+    
+    
     /// Returns an iterator over the graphemes of the line
     pub fn grapheme_iter<'a>(&'a self) -> LineGraphemeIter<'a> {
         LineGraphemeIter {
-            graphemes: self.as_str().graphemes(true),
+            graphemes: self.text.grapheme_iter(),
             ending: self.ending,
             done: false,
         }
@@ -368,19 +323,11 @@ impl Line {
     
     /// Returns an iterator over the graphemes of the line
     pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> LineGraphemeIter<'a> {
-        let temp: &str = unsafe{mem::transmute(&self.text[])};
-        
-        let mut iter = LineGraphemeIter {
-            graphemes: temp.graphemes(true),
+        LineGraphemeIter {
+            graphemes: self.text.grapheme_iter_at_index(index),
             ending: self.ending,
             done: false,
-        };
-        
-        for _ in range(0, index) {
-            iter.next();
         }
-        
-        return iter;
     }
 }
 
@@ -473,7 +420,7 @@ pub const LINE_ENDINGS: [&'static str; 9] = ["",
 
 /// An iterator over the graphemes of a Line
 pub struct LineGraphemeIter<'a> {
-    graphemes: Graphemes<'a>,
+    graphemes: RopeGraphemeIter<'a>,
     ending: LineEnding,
     done: bool,
 }
@@ -531,7 +478,7 @@ mod tests {
     fn new_text_line() {
         let tl = Line::new();
         
-        assert!(tl.text.len() == 0);
+        assert_eq!(tl.text.grapheme_count(), 0);
         assert!(tl.ending == LineEnding::None);
     }
     
@@ -539,13 +486,13 @@ mod tests {
     fn new_text_line_from_str() {
         let tl = Line::new_from_str("Hello!");
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::None);
     }
     
@@ -553,7 +500,7 @@ mod tests {
     fn new_text_line_from_empty_str() {
         let tl = Line::new_from_str("");
         
-        assert!(tl.text.len() == 0);
+        assert_eq!(tl.text.grapheme_count(), 0);
         assert!(tl.ending == LineEnding::None);
     }
     
@@ -561,13 +508,13 @@ mod tests {
     fn new_text_line_from_str_with_lf() {
         let tl = Line::new_from_str("Hello!\n");
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::LF);
     }
     
@@ -575,13 +522,13 @@ mod tests {
     fn new_text_line_from_str_with_crlf() {
         let tl = Line::new_from_str("Hello!\r\n");
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::CRLF);
     }
     
@@ -589,13 +536,13 @@ mod tests {
     fn new_text_line_from_str_with_crlf_and_too_long() {
         let tl = Line::new_from_str("Hello!\r\nLa la la la");
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::CRLF);
     }
     
@@ -605,13 +552,13 @@ mod tests {
         
         let tl = Line::new_from_string_unchecked(s);
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::None);
     }
     
@@ -621,13 +568,13 @@ mod tests {
         
         let tl = Line::new_from_string_unchecked(s);
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::LF);
     }
     
@@ -637,13 +584,13 @@ mod tests {
         
         let tl = Line::new_from_string_unchecked(s);
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::CRLF);
     }
     
@@ -653,13 +600,13 @@ mod tests {
         
         let tl = Line::new_from_string_unchecked(s);
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::LS);
     }
     
@@ -669,19 +616,19 @@ mod tests {
         
         tl.insert_text(" world", 5);
         
-        assert!(tl.text.len() == 12);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == (' ' as u8));
-        assert!(tl.text[6] == ('w' as u8));
-        assert!(tl.text[7] == ('o' as u8));
-        assert!(tl.text[8] == ('r' as u8));
-        assert!(tl.text[9] == ('l' as u8));
-        assert!(tl.text[10] == ('d' as u8));
-        assert!(tl.text[11] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 12);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == " ");
+        assert!(&tl.text[6] == "w");
+        assert!(&tl.text[7] == "o");
+        assert!(&tl.text[8] == "r");
+        assert!(&tl.text[9] == "l");
+        assert!(&tl.text[10] == "d");
+        assert!(&tl.text[11] == "!");
         assert!(tl.ending == LineEnding::CRLF);
     }
     
@@ -691,19 +638,19 @@ mod tests {
         
         tl.append_text(" world!");
         
-        assert!(tl.text.len() == 12);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == (' ' as u8));
-        assert!(tl.text[6] == ('w' as u8));
-        assert!(tl.text[7] == ('o' as u8));
-        assert!(tl.text[8] == ('r' as u8));
-        assert!(tl.text[9] == ('l' as u8));
-        assert!(tl.text[10] == ('d' as u8));
-        assert!(tl.text[11] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 12);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == " ");
+        assert!(&tl.text[6] == "w");
+        assert!(&tl.text[7] == "o");
+        assert!(&tl.text[8] == "r");
+        assert!(&tl.text[9] == "l");
+        assert!(&tl.text[10] == "d");
+        assert!(&tl.text[11] == "!");
         assert!(tl.ending == LineEnding::CRLF);
     }
     
@@ -713,13 +660,13 @@ mod tests {
         
         tl.remove_text(5, 11);
         
-        assert!(tl.text.len() == 6);
-        assert!(tl.text[0] == ('H' as u8));
-        assert!(tl.text[1] == ('e' as u8));
-        assert!(tl.text[2] == ('l' as u8));
-        assert!(tl.text[3] == ('l' as u8));
-        assert!(tl.text[4] == ('o' as u8));
-        assert!(tl.text[5] == ('!' as u8));
+        assert_eq!(tl.text.grapheme_count(), 6);
+        assert!(&tl.text[0] == "H");
+        assert!(&tl.text[1] == "e");
+        assert!(&tl.text[2] == "l");
+        assert!(&tl.text[3] == "l");
+        assert!(&tl.text[4] == "o");
+        assert!(&tl.text[5] == "!");
         assert!(tl.ending == LineEnding::CRLF);
     }
     
@@ -729,22 +676,22 @@ mod tests {
         
         let tl2 = tl1.split(LineEnding::LF, 5);
         
-        assert!(tl1.text.len() == 5);
-        assert!(tl1.text[0] == ('H' as u8));
-        assert!(tl1.text[1] == ('e' as u8));
-        assert!(tl1.text[2] == ('l' as u8));
-        assert!(tl1.text[3] == ('l' as u8));
-        assert!(tl1.text[4] == ('o' as u8));
+        assert_eq!(tl1.text.grapheme_count(), 5);
+        assert!(&tl1.text[0] == "H");
+        assert!(&tl1.text[1] == "e");
+        assert!(&tl1.text[2] == "l");
+        assert!(&tl1.text[3] == "l");
+        assert!(&tl1.text[4] == "o");
         assert!(tl1.ending == LineEnding::LF);
         
-        assert!(tl2.text.len() == 7);
-        assert!(tl2.text[0] == (' ' as u8));
-        assert!(tl2.text[1] == ('w' as u8));
-        assert!(tl2.text[2] == ('o' as u8));
-        assert!(tl2.text[3] == ('r' as u8));
-        assert!(tl2.text[4] == ('l' as u8));
-        assert!(tl2.text[5] == ('d' as u8));
-        assert!(tl2.text[6] == ('!' as u8));
+        assert_eq!(tl2.text.grapheme_count(), 7);
+        assert!(&tl2.text[0] == " ");
+        assert!(&tl2.text[1] == "w");
+        assert!(&tl2.text[2] == "o");
+        assert!(&tl2.text[3] == "r");
+        assert!(&tl2.text[4] == "l");
+        assert!(&tl2.text[5] == "d");
+        assert!(&tl2.text[6] == "!");
         assert!(tl2.ending == LineEnding::CRLF);
     }
     
@@ -754,16 +701,16 @@ mod tests {
         
         let tl2 = tl1.split(LineEnding::LF, 0);
         
-        assert!(tl1.text.len() == 0);
+        assert_eq!(tl1.text.grapheme_count(), 0);
         assert!(tl1.ending == LineEnding::LF);
         
-        assert!(tl2.text.len() == 6);
-        assert!(tl2.text[0] == ('H' as u8));
-        assert!(tl2.text[1] == ('e' as u8));
-        assert!(tl2.text[2] == ('l' as u8));
-        assert!(tl2.text[3] == ('l' as u8));
-        assert!(tl2.text[4] == ('o' as u8));
-        assert!(tl2.text[5] == ('!' as u8));
+        assert_eq!(tl2.text.grapheme_count(), 6);
+        assert!(&tl2.text[0] == "H");
+        assert!(&tl2.text[1] == "e");
+        assert!(&tl2.text[2] == "l");
+        assert!(&tl2.text[3] == "l");
+        assert!(&tl2.text[4] == "o");
+        assert!(&tl2.text[5] == "!");
         assert!(tl2.ending == LineEnding::CRLF);
     }
     
