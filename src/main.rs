@@ -2,8 +2,10 @@
 #![feature(io)]
 #![feature(collections)]
 #![feature(path)]
+#![feature(test)]
 #![feature(std_misc)]
 
+extern crate test;
 extern crate rustbox;
 extern crate docopt;
 extern crate "rustc-serialize" as rustc_serialize;
