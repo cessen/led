@@ -73,7 +73,7 @@ impl Buffer {
             
             if a != b {
                 let substr = &string[a..b];
-                let line = Line::new_from_str_unchecked(substr);
+                let line = Line::new_from_str_with_count_unchecked(substr, count);
                 let node = BufferNode::new_from_line_with_count_unchecked(line, count);
                 buf.append_leaf_node_unchecked(node);
             }

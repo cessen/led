@@ -2,7 +2,7 @@
 
 use std::mem;
 use super::rope::{Rope, RopeGraphemeIter};
-use string_utils::is_line_ending;
+use string_utils::{is_line_ending, grapheme_count};
 
 
 /// A single line of text
@@ -100,7 +100,7 @@ impl Line {
     }
     
     
-    pub fn new_from_str_unchecked(text: &str) -> Line {
+    pub fn new_from_str_with_count_unchecked(text: &str, count: usize) -> Line {
         let mut ending = LineEnding::None;
         
         let bytes = text.as_bytes();
@@ -175,8 +175,9 @@ impl Line {
         }
         
         // Create and return Line
+        let cnt = if ending == LineEnding::None { count } else { count - 1 };
         return Line {
-            text: Rope::new_from_str(&text[..(bytes.len()-le_size)]),
+            text: Rope::new_from_str_with_count(&text[..(bytes.len()-le_size)], cnt),
             ending: ending,
         };
     }
@@ -189,7 +190,7 @@ impl Line {
         // TODO: this can be smarter, and can pass the string
         // directly to the Rope after taking off any line
         // endings.
-        return Line::new_from_str_unchecked(text.as_slice());
+        return Line::new_from_str_with_count_unchecked(text.as_slice(), grapheme_count(text.as_slice()));
     }
     
     

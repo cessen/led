@@ -32,6 +32,7 @@ impl Rope {
             tree_height: 1,
         }
     }
+    
 
     /// Creates a new rope from a string slice    
     pub fn new_from_str(s: &str) -> Rope {
@@ -104,6 +105,19 @@ impl Rope {
         };
         
         return rope;
+    }
+    
+    pub fn new_from_str_with_count(s: &str, count: usize) -> Rope {
+        if count <= MAX_NODE_SIZE {
+            Rope {
+                data: RopeData::Leaf(String::from_str(s)),
+                grapheme_count_: count,
+                tree_height: 1,
+            }
+        }
+        else {
+            Rope::new_from_str(s)
+        }
     }
     
     /// Creates a new rope from a string, consuming the string
