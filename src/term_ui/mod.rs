@@ -382,7 +382,9 @@ impl TermUI {
             
             // Loop through the graphemes of the line and print them to
             // the screen.
+            let mut last_pos_y = 0;
             for (g, (pos_y, pos_x), width) in editor.formatter.iter(line) {
+                last_pos_y = pos_y;
                 // Calculate the cell coordinates at which to draw the grapheme
                 let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
                 let py = pos_y as isize + screen_line;
@@ -433,8 +435,7 @@ impl TermUI {
                 grapheme_index += 1;
             }
             
-            let (dim_y, _) = editor.formatter.dimensions(line);
-            screen_line += dim_y as isize; 
+            screen_line += last_pos_y as isize + 1; 
             line_num += 1;
         }
         
