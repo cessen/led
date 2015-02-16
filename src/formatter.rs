@@ -1,7 +1,13 @@
 #![allow(dead_code)]
 
-use buffer::line::Line;
 use buffer::Buffer;
+
+// Maximum graphemes in a line before a soft line break is forced.
+// This is necessary to prevent pathological formatting cases which
+// could slow down the editor arbitrarily for arbitrarily long
+// lines.
+pub const LINE_BLOCK_LENGTH: usize = 4096;
+
 
 #[derive(Copy, PartialEq)]
 pub enum RoundingBehavior {
@@ -14,23 +20,40 @@ pub enum RoundingBehavior {
 pub trait LineFormatter {
     fn single_line_height(&self) -> usize;
     
-    /// Returns the 2d visual dimensions of the given line when formatted
+    /// Returns the 2d visual dimensions of the given text when formatted
     /// by the formatter.
-    fn dimensions(&self, line: &Line) -> (usize, usize);
+    /// The text to be formatted is passed as a grapheme iterator.
+    fn dimensions<'a, T>(&'a self, g_iter: T) -> (usize, usize)
+    where T: Iterator<Item=&'a str>;
     
     
-    /// Converts a grapheme index within a line into a visual 2d position.
-    fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize);
+    /// Converts a grapheme index within a text into a visual 2d position.
+    /// The text to be formatted is passed as a grapheme iterator.
+    fn index_to_v2d<'a, T>(&'a self, g_iter: T, index: usize) -> (usize, usize)
+    where T: Iterator<Item=&'a str>;
     
     
-    /// Converts a visual 2d position into a grapheme index within a line.
-    fn v2d_to_index(&self, line: &Line, v2d: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize;
+    /// Converts a visual 2d position into a grapheme index within a text.
+    /// The text to be formatted is passed as a grapheme iterator.
+    fn v2d_to_index<'a, T>(&'a self, g_iter: T, v2d: (usize, usize), rounding: (RoundingBehavior, RoundingBehavior)) -> usize
+    where T: Iterator<Item=&'a str>;
 
 
     fn index_to_horizontal_v2d(&self, buf: &Buffer, index: usize) -> usize {
         let (line_i, col_i) = buf.index_to_line_col(index);
         let line = buf.get_line(line_i);
-        return self.index_to_v2d(line, col_i).1;
+        
+        // Find the right block in the line, and the index within that block
+        let mut index: usize = col_i;
+        let mut line_block: usize = 0;
+        while col_i >= LINE_BLOCK_LENGTH {
+            line_block += 1;
+            index -= LINE_BLOCK_LENGTH; 
+        }
+        
+        // Get an iter into the right block
+        let g_iter = line.grapheme_iter_at_index(line_block * LINE_BLOCK_LENGTH);
+        return self.index_to_v2d(g_iter, index).1;
     }
     
     
@@ -40,14 +63,14 @@ pub trait LineFormatter {
         // TODO: handle rounding modes
         // TODO: do this with bidirectional line iterator
         let (mut line_i, mut col_i) = buf.index_to_line_col(index);
-        let (mut y, x) = self.index_to_v2d(buf.get_line(line_i), col_i);
+        let (mut y, x) = self.index_to_v2d(buf.get_line(line_i).grapheme_iter(), col_i);
         let mut new_y = y as isize + offset;
         
         // First, find the right line while keeping track of the vertical offset
         let mut line;
         loop {
             line = buf.get_line(line_i);
-            let (h, _) = self.dimensions(line);
+            let (h, _) = self.dimensions(line.grapheme_iter());
             
             if new_y >= 0 && new_y < h as isize {
                 y = new_y as usize;
@@ -71,7 +94,7 @@ pub trait LineFormatter {
                     
                     line_i -= 1;
                     line = buf.get_line(line_i);
-                    let (h, _) = self.dimensions(line);
+                    let (h, _) = self.dimensions(line.grapheme_iter());
                     new_y += h as isize;
                 }
                 else {
@@ -82,7 +105,7 @@ pub trait LineFormatter {
         
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
-        col_i = self.v2d_to_index(line, (y, x), rounding);
+        col_i = self.v2d_to_index(line.grapheme_iter(), (y, x), rounding);
         
         return buf.line_col_to_index((line_i, col_i));
     }
@@ -92,8 +115,18 @@ pub trait LineFormatter {
         let (line_i, col_i) = buf.index_to_line_col(index);
         let line = buf.get_line(line_i);
         
-        let (v, _) = self.index_to_v2d(line, col_i);
-        let mut new_col_i = self.v2d_to_index(line, (v, horizontal), (RoundingBehavior::Floor, rounding));
+        // Find the right block in the line, and the index within that block
+        let mut col_i_adjusted: usize = col_i;
+        let mut line_block: usize = 0;
+        while col_i >= LINE_BLOCK_LENGTH {
+            line_block += 1;
+            col_i_adjusted -= LINE_BLOCK_LENGTH; 
+        }
+        let start_index = line_block * LINE_BLOCK_LENGTH;
+        
+        // Calculate the horizontal position
+        let (v, _) = self.index_to_v2d(line.grapheme_iter_at_index(start_index), col_i_adjusted);
+        let mut new_col_i = start_index + self.v2d_to_index(line.grapheme_iter_at_index(start_index), (v, horizontal), (RoundingBehavior::Floor, rounding));
         
         // Make sure we're not pushing the index off the end of the line
         if (line_i + 1) < buf.line_count()

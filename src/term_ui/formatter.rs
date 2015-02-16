@@ -1,7 +1,6 @@
 use std::cmp::max;
 
 use string_utils::{is_line_ending};
-use buffer::line::{Line, LineGraphemeIter};
 use formatter::{LineFormatter, RoundingBehavior};
 
 //===================================================================
@@ -22,9 +21,11 @@ impl ConsoleLineFormatter {
         }
     }
     
-    pub fn iter<'a>(&'a self, line: &'a Line) -> ConsoleLineFormatterVisIter<'a> {
-        ConsoleLineFormatterVisIter {
-            grapheme_iter: line.grapheme_iter(),
+    pub fn iter<'a, T>(&'a self, g_iter: T) -> ConsoleLineFormatterVisIter<'a, T>
+    where T: Iterator<Item=&'a str>
+    {
+        ConsoleLineFormatterVisIter::<'a, T> {
+            grapheme_iter: g_iter,
             f: self,
             pos: (0, 0),
         }
@@ -38,10 +39,12 @@ impl LineFormatter for ConsoleLineFormatter {
     }
     
     
-    fn dimensions(&self, line: &Line) -> (usize, usize) {
+    fn dimensions<'a, T>(&'a self, g_iter: T) -> (usize, usize)
+    where T: Iterator<Item=&'a str>
+    {
         let mut dim: (usize, usize) = (0, 0);
         
-        for (_, pos, width) in self.iter(line) {       
+        for (_, pos, width) in self.iter(g_iter) {       
             dim = (max(dim.0, pos.0), max(dim.1, pos.1 + width));
         }
         
@@ -51,12 +54,14 @@ impl LineFormatter for ConsoleLineFormatter {
     }
     
     
-    fn index_to_v2d(&self, line: &Line, index: usize) -> (usize, usize) {
+    fn index_to_v2d<'a, T>(&'a self, g_iter: T, index: usize) -> (usize, usize)
+    where T: Iterator<Item=&'a str>
+    {
         let mut pos = (0, 0);
         let mut i = 0;
         let mut last_width = 0;
         
-        for (_, _pos, width) in self.iter(line) {
+        for (_, _pos, width) in self.iter(g_iter) {
             pos = _pos;
             last_width = width;
             i += 1;
@@ -70,11 +75,13 @@ impl LineFormatter for ConsoleLineFormatter {
     }
     
     
-    fn v2d_to_index(&self, line: &Line, v2d: (usize, usize), _: (RoundingBehavior, RoundingBehavior)) -> usize {
+    fn v2d_to_index<'a, T>(&'a self, g_iter: T, v2d: (usize, usize), _: (RoundingBehavior, RoundingBehavior)) -> usize
+    where T: Iterator<Item=&'a str>
+    {
         // TODO: handle rounding modes
         let mut i = 0;
         
-        for (_, pos, _) in self.iter(line) {
+        for (_, pos, _) in self.iter(g_iter) {
             if pos.0 > v2d.0 {
                 break;
             }
@@ -94,15 +101,19 @@ impl LineFormatter for ConsoleLineFormatter {
 // An iterator that iterates over the graphemes in a line in a
 // manner consistent with the ConsoleFormatter.
 //===================================================================
-pub struct ConsoleLineFormatterVisIter<'a> {
-    grapheme_iter: LineGraphemeIter<'a>,
+pub struct ConsoleLineFormatterVisIter<'a, T>
+where T: Iterator<Item=&'a str>
+{
+    grapheme_iter: T,
     f: &'a ConsoleLineFormatter,
     pos: (usize, usize),
 }
 
 
 
-impl<'a> Iterator for ConsoleLineFormatterVisIter<'a> {
+impl<'a, T> Iterator for ConsoleLineFormatterVisIter<'a, T>
+where T: Iterator<Item=&'a str>
+{
     type Item = (&'a str, (usize, usize), usize);
 
     fn next(&mut self) -> Option<(&'a str, (usize, usize), usize)> {

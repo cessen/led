@@ -15,6 +15,7 @@
     - Loading/saving code for different encodings.
     - Auto-detecting text encodings from file data (this one will be tricky).
 
+- Handle extremely long lines well.
 - Word wrap.
 - Get non-wrapping text working again.
 - File opening by entering path
