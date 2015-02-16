@@ -316,6 +316,7 @@ impl Line {
     pub fn grapheme_iter<'a>(&'a self) -> LineGraphemeIter<'a> {
         LineGraphemeIter {
             graphemes: self.text.grapheme_iter(),
+            grapheme_count: None,
             ending: self.ending,
             done: false,
         }
@@ -326,6 +327,18 @@ impl Line {
     pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> LineGraphemeIter<'a> {
         LineGraphemeIter {
             graphemes: self.text.grapheme_iter_at_index(index),
+            grapheme_count: None,
+            ending: self.ending,
+            done: false,
+        }
+    }
+    
+    
+    /// Returns an iterator over the graphemes of the line
+    pub fn grapheme_iter_at_index_with_max_length<'a>(&'a self, index: usize, length: usize) -> LineGraphemeIter<'a> {
+        LineGraphemeIter {
+            graphemes: self.text.grapheme_iter_at_index(index),
+            grapheme_count: Some(length),
             ending: self.ending,
             done: false,
         }
@@ -422,6 +435,7 @@ pub const LINE_ENDINGS: [&'static str; 9] = ["",
 /// An iterator over the graphemes of a Line
 pub struct LineGraphemeIter<'a> {
     graphemes: RopeGraphemeIter<'a>,
+    grapheme_count: Option<usize>,
     ending: LineEnding,
     done: bool,
 }
@@ -443,7 +457,14 @@ impl<'a> Iterator for LineGraphemeIter<'a> {
         if self.done {
             return None;
         }
+        else if let Some(0) = self.grapheme_count {
+            return None;
+        }
         else {
+            if let Some(ref mut i) = self.grapheme_count {
+                *i -= 1;
+            }
+            
             let g = self.graphemes.next();
             if let Some(_) = g {
                 return g;
