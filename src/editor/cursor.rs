@@ -103,8 +103,6 @@ impl Index<usize> for CursorSet {
 
 
 impl IndexMut<usize> for CursorSet {
-    type Output = Cursor;
-    
     fn index_mut<'a>(&'a mut self, _index: &usize) -> &'a mut Cursor {
         &mut (self.cursors[*_index])
     }

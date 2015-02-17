@@ -2,6 +2,7 @@
 #![feature(io)]
 #![feature(collections)]
 #![feature(path)]
+#![feature(unicode)]
 #![feature(test)]
 #![feature(std_misc)]
 
