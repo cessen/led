@@ -143,7 +143,7 @@ impl<T: LineFormatter> Editor<T> {
         let mut lei = 0;
         let mut le_count = 0;
         for i in 0us..8 {
-            if line_ending_histogram[i] > le_count {
+            if line_ending_histogram[i] >= le_count {
                 lei = i;
                 le_count = line_ending_histogram[i];
             }
