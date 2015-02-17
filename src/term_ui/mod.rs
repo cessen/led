@@ -358,9 +358,9 @@ impl TermUI {
         // Calculate all the starting info
         let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
         let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
-        let (mut block_index, _) = block_index_and_offset(col_i);
-        let mut grapheme_index = editor.buffer.line_col_to_index((line_index, block_index * LINE_BLOCK_LENGTH));
-        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(line_index).grapheme_iter_at_index_with_max_length(block_index*LINE_BLOCK_LENGTH, LINE_BLOCK_LENGTH), editor.view_pos.0 - grapheme_index);
+        let (mut line_block_index, _) = block_index_and_offset(col_i);
+        let mut grapheme_index = editor.buffer.line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
+        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(line_index).grapheme_iter_at_index_with_max_length(line_block_index*LINE_BLOCK_LENGTH, LINE_BLOCK_LENGTH), editor.view_pos.0 - grapheme_index);
         
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
         let screen_col = c1.1 as isize + gutter_width as isize;
@@ -375,7 +375,7 @@ impl TermUI {
         let mut line_num = line_index + 1;
         for line in editor.buffer.line_iter_at_index(line_index) {
             // Print line number
-            if block_index == 0 {
+            if line_block_index == 0 {
                 let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
@@ -386,18 +386,9 @@ impl TermUI {
             // Loop through the graphemes of the line and print them to
             // the screen.
             let mut line_g_index: usize = 0;
-            let mut line_block_index: usize = 0;
             let mut last_pos_y = 0;
             let mut lines_traversed: usize = 0;
-            
-            let mut g_iter = if block_index == 0 {
-                editor.formatter.iter(line.grapheme_iter())
-            }
-            else {
-                let iter = editor.formatter.iter(line.grapheme_iter_at_index(block_index*LINE_BLOCK_LENGTH));
-                block_index = 0;
-                iter
-            };
+            let mut g_iter = editor.formatter.iter(line.grapheme_iter_at_index(line_block_index*LINE_BLOCK_LENGTH));
             
             loop {
                 if let Some((g, (pos_y, pos_x), width)) = g_iter.next() {
@@ -469,6 +460,7 @@ impl TermUI {
                 }
             }
             
+            line_block_index = 0;
             screen_line += lines_traversed as isize + 1; 
             line_num += 1;
         }
