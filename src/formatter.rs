@@ -152,6 +152,6 @@ pub trait LineFormatter {
     
 }
 
-fn block_index_and_offset(index: usize) -> (usize, usize) {
+pub fn block_index_and_offset(index: usize) -> (usize, usize) {
     (index / LINE_BLOCK_LENGTH, index % LINE_BLOCK_LENGTH)
 }

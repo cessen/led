@@ -3,7 +3,7 @@
 use rustbox;
 use rustbox::Color;
 use editor::Editor;
-use formatter::{LineFormatter, LINE_BLOCK_LENGTH};
+use formatter::{LineFormatter, LINE_BLOCK_LENGTH, block_index_and_offset};
 use std::char;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending};
@@ -357,9 +357,10 @@ impl TermUI {
     fn draw_editor_text(&self, editor: &Editor<ConsoleLineFormatter>, c1: (usize, usize), c2: (usize, usize)) {
         // Calculate all the starting info
         let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
-        let (starting_line, _) = editor.buffer.index_to_line_col(editor.view_pos.0);
-        let mut grapheme_index = editor.buffer.line_col_to_index((starting_line, 0));
-        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(starting_line).grapheme_iter(), editor.view_pos.0 - grapheme_index);
+        let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
+        let (mut block_index, _) = block_index_and_offset(col_i);
+        let mut grapheme_index = editor.buffer.line_col_to_index((line_index, block_index * LINE_BLOCK_LENGTH));
+        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(line_index).grapheme_iter_at_index_with_max_length(block_index*LINE_BLOCK_LENGTH, LINE_BLOCK_LENGTH), editor.view_pos.0 - grapheme_index);
         
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
         let screen_col = c1.1 as isize + gutter_width as isize;
@@ -371,13 +372,15 @@ impl TermUI {
             }
         }
         
-        let mut line_num = starting_line + 1;
-        for line in editor.buffer.line_iter_at_index(starting_line) {
+        let mut line_num = line_index + 1;
+        for line in editor.buffer.line_iter_at_index(line_index) {
             // Print line number
-            let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
-            let lny = screen_line as usize;
-            if lny >= c1.0 && lny <= c2.0 {
-                self.rb.print(lnx, lny, rustbox::RB_NORMAL, Color::White, Color::Blue, format!("{}", line_num).as_slice());
+            if block_index == 0 {
+                let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
+                let lny = screen_line as usize;
+                if lny >= c1.0 && lny <= c2.0 {
+                    self.rb.print(lnx, lny, rustbox::RB_NORMAL, Color::White, Color::Blue, format!("{}", line_num).as_slice());
+                }
             }
             
             // Loop through the graphemes of the line and print them to
@@ -386,7 +389,16 @@ impl TermUI {
             let mut line_block_index: usize = 0;
             let mut last_pos_y = 0;
             let mut lines_traversed: usize = 0;
-            let mut g_iter = editor.formatter.iter(line.grapheme_iter());
+            
+            let mut g_iter = if block_index == 0 {
+                editor.formatter.iter(line.grapheme_iter())
+            }
+            else {
+                let iter = editor.formatter.iter(line.grapheme_iter_at_index(block_index*LINE_BLOCK_LENGTH));
+                block_index = 0;
+                iter
+            };
+            
             loop {
                 if let Some((g, (pos_y, pos_x), width)) = g_iter.next() {
                     if last_pos_y != pos_y {
