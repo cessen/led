@@ -200,11 +200,17 @@ impl Rope {
 
     /// Appends another rope to the end of this one, consuming the other rope.    
     pub fn append(&mut self, rope: Rope) {
-        // TODO: make more efficient.  Converting to a string and then
-        // inserting is pretty slow...
-        let s = rope.to_string();
-        let gc = self.grapheme_count();
-        self.insert_text_at_grapheme_index(s.as_slice(), gc);
+        if self.tree_height <= rope.tree_height || self.is_leaf() {
+            let mut temp_rope = Box::new(Rope::new());
+            mem::swap(self, &mut (*temp_rope));
+            self.data = RopeData::Branch(temp_rope, Box::new(rope));
+        }
+        else if let RopeData::Branch(_, ref mut right) = self.data {
+            right.append(rope);
+        }
+        
+        self.update_stats();
+        self.rebalance();
     }
     
     /// Makes a copy of the rope as a string
