@@ -202,18 +202,16 @@ impl Rope {
 
     /// Appends another rope to the end of this one, consuming the other rope.    
     pub fn append(&mut self, rope: Rope) {
-        if self.tree_height <= rope.tree_height || self.is_leaf() {
-            let mut temp_rope = Box::new(Rope::new());
-            mem::swap(self, &mut (*temp_rope));
-            self.data = RopeData::Branch(temp_rope, Box::new(rope));
+        if self.tree_height > rope.tree_height {
+            self.append_right(rope);
         }
-        else if let RopeData::Branch(_, ref mut right) = self.data {
-            right.append(rope);
+        else {
+            let mut rope = rope;
+            mem::swap(self, &mut rope);
+            self.append_left(rope);
         }
-        
-        self.update_stats();
-        self.rebalance();
-    }
+    }    
+    
     
     /// Makes a copy of the rope as a string
     pub fn to_string(&self) -> String {
@@ -323,6 +321,36 @@ impl Rope {
                 self.tree_height = max(left.tree_height, right.tree_height) + 1;
             }
         }
+    }
+    
+    
+    fn append_right(&mut self, rope: Rope) {
+        if self.tree_height <= rope.tree_height || self.is_leaf() {
+            let mut temp_rope = Box::new(Rope::new());
+            mem::swap(self, &mut (*temp_rope));
+            self.data = RopeData::Branch(temp_rope, Box::new(rope));
+        }
+        else if let RopeData::Branch(_, ref mut right) = self.data {
+            right.append_right(rope);
+        }
+        
+        self.update_stats();
+        self.rebalance();
+    }
+    
+    
+    fn append_left(&mut self, rope: Rope) {
+        if self.tree_height <= rope.tree_height || self.is_leaf() {
+            let mut temp_rope = Box::new(Rope::new());
+            mem::swap(self, &mut (*temp_rope));
+            self.data = RopeData::Branch(Box::new(rope), temp_rope);
+        }
+        else if let RopeData::Branch(ref mut left, _) = self.data {
+            left.append_left(rope);
+        }
+        
+        self.update_stats();
+        self.rebalance();
     }
 
 
@@ -452,6 +480,9 @@ impl Rope {
     
     /// Balances the tree under this node.  Assumes that both the left and
     /// right sub-trees are themselves aleady balanced.
+    /// Runs in time linear to the difference in height between the two
+    /// sub-trees.  Thus worst-case is O(log N) time, and best-case is O(1)
+    /// time.
     fn rebalance(&mut self) {
         let mut rot: isize = 0;
         
@@ -762,6 +793,28 @@ mod tests {
         rope1.append(rope2);
         
         assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn append_4() {
+        let mut rope1 = Rope::new_from_str("1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.");
+        let mut rope2 = Rope::new_from_str("Z");
+        
+        rope1.append(rope2);
+        
+        assert_eq!(rope1.to_string(), "1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.Z");
+    }
+    
+    
+    #[test]
+    fn append_5() {
+        let mut rope1 = Rope::new_from_str("Z");
+        let mut rope2 = Rope::new_from_str("1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.");
+        
+        rope1.append(rope2);
+        
+        assert_eq!(rope1.to_string(), "Z1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.");
     }
     
     
@@ -1283,13 +1336,22 @@ mod tests {
         let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1025]).unwrap().as_slice());
         
         assert_eq!(rope1.tree_height, rope2.tree_height);
-        
-        
     }
     
     
     #[test]
     fn rebalance_2() {
+        let mut rope1 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 2]).unwrap().as_slice());
+        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1024]).unwrap().as_slice(), MAX_NODE_SIZE);
+        
+        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1026]).unwrap().as_slice());
+        
+        assert_eq!(rope1.tree_height, rope2.tree_height);
+    }
+    
+    
+    #[test]
+    fn rebalance_3() {
         let mut rope1 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1024]).unwrap().as_slice());
         rope1.remove_text_between_grapheme_indices(MAX_NODE_SIZE*7, MAX_NODE_SIZE*(7+959));
         
@@ -1353,7 +1415,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     #[bench]
     fn new_from_str_4(b: &mut Bencher) {
         b.iter(|| {
-            let rope = Rope::new_from_str("
+            let _ = Rope::new_from_str("
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
