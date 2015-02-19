@@ -4,12 +4,13 @@ use std::str::Graphemes;
 use std::ops::Index;
 use string_utils::{grapheme_count, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index, grapheme_pos_to_byte_pos};
 
-const MIN_NODE_SIZE: usize = 64;
-const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
+pub const MIN_NODE_SIZE: usize = 64;
+pub const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
 
 
 /// A rope data structure for storing text in a format that is efficient
 /// for insertion and removal even for extremely large strings.
+#[derive(Debug)]
 pub struct Rope {
     data: RopeData,
     grapheme_count_: usize,
@@ -17,6 +18,7 @@ pub struct Rope {
 }
 
 
+#[derive(Debug)]
 enum RopeData {
     Leaf(String),
     Branch(Box<Rope>, Box<Rope>),
@@ -448,59 +450,56 @@ impl Rope {
     }
     
     
-    /// Balances the tree under this node
+    /// Balances the tree under this node.  Assumes that both the left and
+    /// right sub-trees are themselves aleady balanced.
     fn rebalance(&mut self) {
-        loop {
-            let mut rot: isize;
-            
-            if let RopeData::Branch(ref mut left, ref mut right) = self.data {
-                let height_diff = (left.tree_height as isize) - (right.tree_height as isize);
+        let mut rot: isize = 0;
+        
+        if let RopeData::Branch(ref mut left, ref mut right) = self.data {
+            let height_diff = (left.tree_height as isize) - (right.tree_height as isize);
 
-                // Left side higher than right side
-                if height_diff > 1 {
-                    let mut child_rot = false;
-                    if let RopeData::Branch(ref lc, ref rc) = left.data {
-                        if lc.tree_height < rc.tree_height {
-                            child_rot = true;
-                        }
+            // Left side higher than right side
+            if height_diff > 1 {
+                let mut child_rot = false;
+                if let RopeData::Branch(ref lc, ref rc) = left.data {
+                    if lc.tree_height < rc.tree_height {
+                        child_rot = true;
                     }
-                    
-                    if child_rot {
-                        left.rotate_left();
-                    }
-                    
-                    rot = 1;
                 }
-                // Right side higher then left side
-                else if height_diff < -1 {
-                    let mut child_rot = false;
-                    if let RopeData::Branch(ref lc, ref rc) = right.data {
-                        if lc.tree_height > rc.tree_height {
-                            child_rot = true;
-                        }
-                    }
-                    
-                    if child_rot {
-                        right.rotate_right();
-                    }
-                    
-                    rot = -1;
+                
+                if child_rot {
+                    left.rotate_left();
                 }
-                // Balanced, stop
-                else {
-                    break;
+                
+                rot = 1;
+            }
+            // Right side higher then left side
+            else if height_diff < -1 {
+                let mut child_rot = false;
+                if let RopeData::Branch(ref lc, ref rc) = right.data {
+                    if lc.tree_height > rc.tree_height {
+                        child_rot = true;
+                    }
                 }
+                
+                if child_rot {
+                    right.rotate_right();
+                }
+                
+                rot = -1;
             }
-            else {
-                // Leaf node, stop
-                break;
+        }
+        
+        if rot == 1 {
+            self.rotate_right();
+            if let RopeData::Branch(_, ref mut right) = self.data {
+                right.rebalance();
             }
-            
-            if rot == 1 {
-                self.rotate_right();
-            }
-            else if rot == -1 {
-                self.rotate_left();
+        }
+        else if rot == -1 {
+            self.rotate_left();
+            if let RopeData::Branch(ref mut left, _) = self.data {
+                left.rebalance();
             }
         }
     }
@@ -629,6 +628,7 @@ impl<'a> Iterator for RopeGraphemeIter<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::iter;
     use super::*;
 
 
@@ -1272,6 +1272,30 @@ mod tests {
         assert!(Some("8") == iter.next());
         assert!(Some("9") == iter.next());
         assert!(None == iter.next());
+    }
+    
+    
+    #[test]
+    fn rebalance_1() {
+        let mut rope1 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE]).unwrap().as_slice());
+        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1024]).unwrap().as_slice(), MAX_NODE_SIZE);
+        
+        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1025]).unwrap().as_slice());
+        
+        assert_eq!(rope1.tree_height, rope2.tree_height);
+        
+        
+    }
+    
+    
+    #[test]
+    fn rebalance_2() {
+        let mut rope1 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1024]).unwrap().as_slice());
+        rope1.remove_text_between_grapheme_indices(MAX_NODE_SIZE*7, MAX_NODE_SIZE*(7+959));
+        
+        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 65]).unwrap().as_slice());
+        
+        assert_eq!(rope1.tree_height, rope2.tree_height);
     }
 }
 
