@@ -562,6 +562,22 @@ impl Rope {
         
         self.update_stats();
     }
+    
+    
+    /// Tests if the rope adheres to the AVL balancing invariants.
+    fn is_balanced(&self) -> bool {
+        match self.data {
+            RopeData::Leaf(_) => {
+                return true;
+            },
+            
+            RopeData::Branch(ref left, ref right) => {
+                let mut diff = left.tree_height as isize - right.tree_height as isize;
+                diff = if diff < 0 {-diff} else {diff};
+                return (diff < 2) && left.is_balanced() && right.is_balanced();
+            }
+        }
+    }
 }
 
 
@@ -691,7 +707,7 @@ mod tests {
     use super::{Rope, RopeData, RopeGraphemeIter, MAX_NODE_SIZE};
     use std::old_path::Path;
     use std::old_io::fs::File;
-    use std::old_io::{BufferedWriter};
+    use std::old_io::BufferedWriter;
 
 
     #[test]
@@ -743,6 +759,14 @@ mod tests {
         assert_eq!(Some("d"), iter.next());
         assert_eq!(Some("!"), iter.next());
         assert_eq!(None, iter.next());
+    }
+    
+    
+    #[test]
+    fn new_4() {
+        let rope = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 1 + MAX_NODE_SIZE * 53]).unwrap().as_slice());
+        
+        assert!(rope.is_balanced());
     }
     
     
@@ -1364,25 +1388,22 @@ mod tests {
         let left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 64]).unwrap().as_slice());
         let right = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1]).unwrap().as_slice());
         
-        let mut rope1 = Rope {
+        let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
             tree_height: 1,
         };
-        rope1.update_stats();
-        
-        let rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 65]).unwrap().as_slice());
-        
-        rope1.rebalance();
+        rope.update_stats();
         
         //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
-        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
-        //f1.write_str(rope1.to_graphviz().as_slice());
-        //f2.write_str(rope2.to_graphviz().as_slice());
+        //f1.write_str(rope.to_graphviz().as_slice());
         
-        // TODO: replace this check with a method that verifies that the AVL
-        // balance invariants are true.
-        assert_eq!(rope1.tree_height, rope2.tree_height);
+        rope.rebalance();
+        
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f2.write_str(rope.to_graphviz().as_slice());
+        
+        assert!(rope.is_balanced());
     }
     
     
@@ -1391,25 +1412,22 @@ mod tests {
         let left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1]).unwrap().as_slice());
         let right = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 64]).unwrap().as_slice());
         
-        let mut rope1 = Rope {
+        let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
             tree_height: 1,
         };
-        rope1.update_stats();
-        
-        let rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 65]).unwrap().as_slice());
-        
-        rope1.rebalance();
+        rope.update_stats();
         
         //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
-        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
-        //f1.write_str(rope1.to_graphviz().as_slice());
-        //f2.write_str(rope2.to_graphviz().as_slice());
+        //f1.write_str(rope.to_graphviz().as_slice());
         
-        // TODO: replace this check with a method that verifies that the AVL
-        // balance invariants are true.
-        assert_eq!(rope1.tree_height, rope2.tree_height);
+        rope.rebalance();
+        
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f2.write_str(rope.to_graphviz().as_slice());
+        
+        assert!(rope.is_balanced());
     }
     
     
@@ -1418,25 +1436,22 @@ mod tests {
         let left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 53]).unwrap().as_slice());
         let right = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1]).unwrap().as_slice());
         
-        let mut rope1 = Rope {
+        let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
             tree_height: 1,
         };
-        rope1.update_stats();
-        
-        let rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 54]).unwrap().as_slice());
-        
-        rope1.rebalance();
+        rope.update_stats();
         
         //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
-        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
-        //f1.write_str(rope1.to_graphviz().as_slice());
-        //f2.write_str(rope2.to_graphviz().as_slice());
+        //f1.write_str(rope.to_graphviz().as_slice());
         
-        // TODO: replace this check with a method that verifies that the AVL
-        // balance invariants are true.
-        assert_eq!(rope1.tree_height, rope2.tree_height);
+        rope.rebalance();
+        
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f2.write_str(rope.to_graphviz().as_slice());
+        
+        assert!(rope.is_balanced());
     }
     
     
@@ -1445,23 +1460,22 @@ mod tests {
         let left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1]).unwrap().as_slice());
         let right = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 53]).unwrap().as_slice());
         
-        let mut rope1 = Rope {
+        let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
             tree_height: 1,
         };
-        rope1.update_stats();
-        
-        rope1.rebalance();
+        rope.update_stats();
         
         //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
+        //f1.write_str(rope.to_graphviz().as_slice());
+        
+        rope.rebalance();
+        
         //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
-        //f1.write_str(rope1.to_graphviz().as_slice());
-        //f2.write_str(rope2.to_graphviz().as_slice());
+        //f2.write_str(rope.to_graphviz().as_slice());
 
-        // TODO: replace this check with a method that verifies that the AVL
-        // balance invariants are true.
-        assert_eq!(rope1.tree_height, 8);
+        assert!(rope.is_balanced());
     }
     
     
