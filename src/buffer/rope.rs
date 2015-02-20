@@ -294,9 +294,40 @@ impl Rope {
     }
     
     
+    // Creates a graphviz document of the Rope's structure, and returns
+    // it as a string.
+    pub fn to_graphviz(&self) -> String {
+        let mut text = String::from_str("digraph {\n");
+        self.to_graphviz_recursive(&mut text, String::from_str("s"));
+        text.push_str("}");
+        return text;
+    }
+    
+    
     //================================================================
     // Private utility functions
     //================================================================
+    
+    
+    fn to_graphviz_recursive(&self, text: &mut String, name: String) {
+        match self.data {
+            RopeData::Leaf(_) => {
+                text.push_str(format!("{} [label=\"{}\"];\n", name, self.grapheme_count_).as_slice());
+            },
+            
+            RopeData::Branch(ref left, ref right) => {
+                let mut lname = name.clone();
+                let mut rname = name.clone();
+                lname.push('l');
+                rname.push('r');
+                text.push_str(format!("{} [shape=box, label=\"h={}\\nc={}\"];\n", name, self.tree_height, self.grapheme_count_).as_slice());
+                text.push_str(format!("{} -> {{ {} {} }};\n", name, lname, rname).as_slice());
+                left.to_graphviz_recursive(text, lname);
+                right.to_graphviz_recursive(text, rname);
+            }
+        }
+    }
+    
     
     fn is_leaf(&self) -> bool {
         if let RopeData::Leaf(_) = self.data {
@@ -661,6 +692,9 @@ impl<'a> Iterator for RopeGraphemeIter<'a> {
 mod tests {
     use std::iter;
     use super::*;
+    use std::old_path::Path;
+    use std::old_io::fs::File;
+    use std::old_io::{BufferedWriter};
 
 
     #[test]
@@ -1342,9 +1376,14 @@ mod tests {
     #[test]
     fn rebalance_2() {
         let mut rope1 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 2]).unwrap().as_slice());
-        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1024]).unwrap().as_slice(), MAX_NODE_SIZE);
+        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 64]).unwrap().as_slice(), MAX_NODE_SIZE);
         
-        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1026]).unwrap().as_slice());
+        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 66]).unwrap().as_slice());
+        
+        //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f1.write_str(rope1.to_graphviz().as_slice());
+        //f2.write_str(rope2.to_graphviz().as_slice());
         
         assert_eq!(rope1.tree_height, rope2.tree_height);
     }
