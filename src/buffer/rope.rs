@@ -564,6 +564,8 @@ impl Rope {
                 left.rebalance();
             }
         }
+        
+        self.update_stats();
     }
 }
 
