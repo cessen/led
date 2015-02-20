@@ -93,15 +93,10 @@ impl Rope {
         }
         else {
             while rope_stack.len() > 1 {
-                let right = Box::new(rope_stack.pop().unwrap());
-                let left = Box::new(rope_stack.pop().unwrap());
-                let h = max(left.tree_height, right.tree_height) + 1;
-                let gc = left.grapheme_count_ + right.grapheme_count_;
-                rope_stack.push(Rope {
-                    data: RopeData::Branch(left, right),
-                    grapheme_count_: gc,
-                    tree_height: h,
-                });
+                let right = rope_stack.pop().unwrap();
+                let mut left = rope_stack.pop().unwrap();
+                left.append_right(right);
+                rope_stack.push(left);
             }
             rope_stack.pop().unwrap()
         };
@@ -1367,9 +1362,9 @@ mod tests {
     #[test]
     fn rebalance_1() {
         let mut rope1 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE]).unwrap().as_slice());
-        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1024]).unwrap().as_slice(), MAX_NODE_SIZE);
+        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 63]).unwrap().as_slice(), MAX_NODE_SIZE);
         
-        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 1025]).unwrap().as_slice());
+        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 64]).unwrap().as_slice());
         
         assert_eq!(rope1.tree_height, rope2.tree_height);
     }
@@ -1378,9 +1373,9 @@ mod tests {
     #[test]
     fn rebalance_2() {
         let mut rope1 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 2]).unwrap().as_slice());
-        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 64]).unwrap().as_slice(), MAX_NODE_SIZE);
+        rope1.insert_text_at_grapheme_index(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 63]).unwrap().as_slice(), MAX_NODE_SIZE);
         
-        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 66]).unwrap().as_slice());
+        let mut rope2 = Rope::new_from_str(String::from_utf8(vec!['c' as u8; MAX_NODE_SIZE * 65]).unwrap().as_slice());
         
         //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
         //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
