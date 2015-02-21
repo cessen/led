@@ -2,9 +2,9 @@ use std::cmp::{min, max};
 use std::mem;
 use std::str::Graphemes;
 use std::ops::Index;
-use string_utils::{grapheme_count, grapheme_count_is_less_than, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index, grapheme_pos_to_byte_pos};
+use string_utils::{grapheme_count, grapheme_count_is_less_than, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index};
 
-pub const MIN_NODE_SIZE: usize = 64;
+pub const MIN_NODE_SIZE: usize = 1;
 pub const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
 
 
@@ -127,6 +127,10 @@ impl Rope {
         return self.grapheme_count_;
     }
     
+    /// Inserts the given text at the given grapheme index.
+    /// For small lengths of 'text' runs in O(log N) time.
+    /// For large lengths of 'text', dunno.  But it seems to perform
+    /// sub-linearly, at least.
     pub fn insert_text_at_grapheme_index(&mut self, text: &str, pos: usize) {
         let mut leaf_insert = false;
         
@@ -191,6 +195,12 @@ impl Rope {
         self.rebalance();
     }
     
+    
+    /// Removes the text between grapheme indices pos_a and pos_b.
+    /// For small distances between pos_a and pos_b runs in O(log N) time.
+    /// For large distances, dunno.  If it becomes a performance bottleneck,
+    /// can special-case that to two splits and an append, which are all
+    /// O(log N).
     pub fn remove_text_between_grapheme_indices(&mut self, pos_a: usize, pos_b: usize) {
         // Bounds checks
         if pos_a > pos_b {
@@ -226,19 +236,28 @@ impl Rope {
     /// Splits a rope into two pieces from the given grapheme index.
     /// The first piece remains in this rope, the second piece is returned
     /// as a new rope.
+    /// Runs in O(log N) time.
     pub fn split(&mut self, pos: usize) -> Rope {
-        // TODO: make more efficient.
-        let s = self.to_string();
-        let gc = self.grapheme_count();
-        let bp = grapheme_pos_to_byte_pos(s.as_slice(), pos);
-        self.remove_text_between_grapheme_indices(pos, gc);
+        let mut left = Rope::new();
+        let mut right = Rope::new();
         
-        Rope::new_from_str(&s.as_slice()[bp..])
+        self.split_recursive(pos, &mut left, &mut right);
+        
+        mem::swap(self, &mut left);
+        return right;
     }
 
-    /// Appends another rope to the end of this one, consuming the other rope.    
+    /// Appends another rope to the end of this one, consuming the other rope.
+    /// Runs in O(log N) time.
     pub fn append(&mut self, rope: Rope) {
-        if self.tree_height > rope.tree_height {
+        if self.grapheme_count_ == 0 {
+            let mut r = rope;
+            mem::swap(self, &mut r);
+        }
+        else if rope.grapheme_count_ == 0 {
+            return;
+        }
+        else if self.tree_height > rope.tree_height {
             self.append_right(rope);
         }
         else {
@@ -249,7 +268,8 @@ impl Rope {
     }    
     
     
-    /// Makes a copy of the rope as a string
+    /// Makes a copy of the rope as a string.
+    /// Runs in O(N) time.
     pub fn to_string(&self) -> String {
         let mut s = String::new();
 
@@ -331,11 +351,11 @@ impl Rope {
     
     
     // Creates a graphviz document of the Rope's structure, and returns
-    // it as a string.
+    // it as a string.  For debugging purposes.
     pub fn to_graphviz(&self) -> String {
         let mut text = String::from_str("digraph {\n");
         self.to_graphviz_recursive(&mut text, String::from_str("s"));
-        text.push_str("}");
+        text.push_str("}\n");
         return text;
     }
     
@@ -388,6 +408,84 @@ impl Rope {
                 self.tree_height = max(left.tree_height, right.tree_height) + 1;
             }
         }
+    }
+    
+    
+    fn split_recursive(&mut self, pos: usize, left: &mut Rope, right: &mut Rope) {
+        match self.data {
+            RopeData::Leaf(ref text) => {
+                // Split the text into two new nodes
+                let mut l_text = text.clone();
+                let r_text = split_string_at_grapheme_index(&mut l_text, pos);
+                let new_rope_l = Rope::new_from_string(l_text);
+                let mut new_rope_r = Rope::new_from_string(r_text);
+                
+                // Append the nodes to their respective sides
+                left.append(new_rope_l);
+                mem::swap(right, &mut new_rope_r);
+                right.append(new_rope_r);
+            },
+            
+            RopeData::Branch(ref mut left_b, ref mut right_b) => {
+                let mut l = Rope::new();
+                let mut r = Rope::new();
+                mem::swap(&mut **left_b, &mut l);
+                mem::swap(&mut **right_b, &mut r);
+                
+                // Split is on left side
+                if pos < l.grapheme_count_ {
+                    // Append the right split to the right side
+                    mem::swap(right, &mut r);
+                    right.append(r);
+                    
+                    // Recurse
+                    if let RopeData::Branch(_, ref mut new_left) = left.data {
+                        if let RopeData::Branch(ref mut new_right, _) = right.data {
+                            l.split_recursive(pos, new_left, new_right);
+                        }
+                        else {
+                            l.split_recursive(pos, new_left, right);
+                        }
+                    }
+                    else {
+                        if let RopeData::Branch(ref mut new_right, _) = right.data {
+                            l.split_recursive(pos, left, new_right);
+                        }
+                        else {
+                            l.split_recursive(pos, left, right);
+                        }
+                    }
+                }
+                // Split is on right side
+                else {
+                    // Append the left split to the left side
+                    let new_pos = pos - l.grapheme_count_;
+                    left.append(l);
+                    
+                    // Recurse
+                    if let RopeData::Branch(_, ref mut new_left) = left.data {
+                        if let RopeData::Branch(ref mut new_right, _) = right.data {
+                            r.split_recursive(new_pos, new_left, new_right);
+                        }
+                        else {
+                            r.split_recursive(new_pos, new_left, right);
+                        }
+                    }
+                    else {
+                        if let RopeData::Branch(ref mut new_right, _) = right.data {
+                            r.split_recursive(new_pos, left, new_right);
+                        }
+                        else {
+                            r.split_recursive(new_pos, left, right);
+                        }
+                    }
+                }
+            },
+            
+        }
+        
+        left.rebalance();
+        right.rebalance();
     }
     
     
@@ -833,8 +931,18 @@ mod tests {
     #[test]
     fn split_1() {
         let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
-        let rope2 = rope1.split(18);
         
+        //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
+        //f1.write_str(rope1.to_graphviz().as_slice());
+                
+        let rope2 = rope1.split(18);
+
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f2.write_str(rope1.to_graphviz().as_slice());
+        //f2.write_str(rope2.to_graphviz().as_slice());
+        
+        assert!(rope1.is_balanced());
+        assert!(rope2.is_balanced());
         assert_eq!("Hello there good p", rope1.to_string().as_slice());
         assert_eq!("eople of the world!", rope2.to_string().as_slice());
     }
@@ -843,18 +951,62 @@ mod tests {
     #[test]
     fn split_2() {
         let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
-        let rope2 = rope1.split(37);
         
-        assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
-        assert_eq!("", rope2.to_string().as_slice());
+        //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
+        //f1.write_str(rope1.to_graphviz().as_slice());
+                
+        let rope2 = rope1.split(31);
+
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f2.write_str(rope1.to_graphviz().as_slice());
+        //f2.write_str(rope2.to_graphviz().as_slice());
+        
+        assert!(rope1.is_balanced());
+        assert!(rope2.is_balanced());
+        assert_eq!("Hello there good people of the ", rope1.to_string().as_slice());
+        assert_eq!("world!", rope2.to_string().as_slice());
     }
     
     
     #[test]
     fn split_3() {
         let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
+        
+        //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
+        //f1.write_str(rope1.to_graphviz().as_slice());
+                
+        let rope2 = rope1.split(5);
+
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f2.write_str(rope1.to_graphviz().as_slice());
+        //f2.write_str(rope2.to_graphviz().as_slice());
+        
+        assert!(rope1.is_balanced());
+        assert!(rope2.is_balanced());
+        assert_eq!("Hello", rope1.to_string().as_slice());
+        assert_eq!(" there good people of the world!", rope2.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn split_4() {
+        let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
+        let rope2 = rope1.split(37);
+        
+        assert!(rope1.is_balanced());
+        assert!(rope2.is_balanced());
+        assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
+        assert_eq!("", rope2.to_string().as_slice());
+    }
+    
+    
+    #[test]
+    fn split_5() {
+        let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
         let rope2 = rope1.split(0);
         
+        assert!(rope1.is_balanced());
+        assert!(rope2.is_balanced());
         assert_eq!("", rope1.to_string().as_slice());
         assert_eq!("Hello there good people of the world!", rope2.to_string().as_slice());
     }
@@ -867,6 +1019,7 @@ mod tests {
         
         rope1.append(rope2);
         
+        assert!(rope1.is_balanced());
         assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
     }
     
@@ -878,6 +1031,7 @@ mod tests {
         
         rope1.append(rope2);
         
+        assert!(rope1.is_balanced());
         assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
     }
     
@@ -889,6 +1043,7 @@ mod tests {
         
         rope1.append(rope2);
         
+        assert!(rope1.is_balanced());
         assert_eq!("Hello there good people of the world!", rope1.to_string().as_slice());
     }
     
@@ -900,6 +1055,7 @@ mod tests {
         
         rope1.append(rope2);
         
+        assert!(rope1.is_balanced());
         assert_eq!(rope1.to_string(), "1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.Z");
     }
     
@@ -911,6 +1067,7 @@ mod tests {
         
         rope1.append(rope2);
         
+        assert!(rope1.is_balanced());
         assert_eq!(rope1.to_string(), "Z1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.");
     }
     
@@ -923,6 +1080,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 9);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -945,6 +1103,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 17);
         assert!(Some("A") == iter.next());
         assert!(Some("g") == iter.next());
@@ -975,6 +1134,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 17);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1005,6 +1165,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 16);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1034,6 +1195,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 16);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1063,6 +1225,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 16);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1093,6 +1256,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 16);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1123,6 +1287,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 20);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1157,6 +1322,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 26);
         assert!(Some("t") == iter.next());
         assert!(Some("h") == iter.next());
@@ -1196,6 +1362,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 17);
         assert!(Some("p") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1226,6 +1393,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 17);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
@@ -1256,6 +1424,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 23);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
@@ -1292,6 +1461,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 17);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
@@ -1322,6 +1492,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1338,6 +1509,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 5);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
@@ -1356,6 +1528,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 4);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1373,6 +1546,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 8);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1394,6 +1568,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 4);
         assert!(Some("1") == iter.next());
         assert!(Some("2") == iter.next());
@@ -1411,6 +1586,7 @@ mod tests {
         
         let mut iter = rope.grapheme_iter();
         
+        assert!(rope.is_balanced());
         assert!(rope.grapheme_count() == 9);
         assert!(Some("1") == iter.next());
         assert!(Some("2") == iter.next());
@@ -1776,7 +1952,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     fn split_1(b: &mut Bencher) {
         b.iter(|| {
             let mut left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 7649]).unwrap().as_slice());
-            let right = left.split(3617);
+            let _ = left.split(3617);
         });
     }
     
@@ -1785,7 +1961,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     fn split_2(b: &mut Bencher) {
         b.iter(|| {
             let mut left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 7649]).unwrap().as_slice());
-            let right = left.split(263);
+            let _ = left.split(263);
         });
     }
 }

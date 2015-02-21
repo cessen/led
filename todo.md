@@ -15,7 +15,11 @@
     - Loading/saving code for different encodings.
     - Auto-detecting text encodings from file data (this one will be tricky).
 
-- Handle extremely long lines well.
+- Switch back to using a Rope directly, instead of using a tree of lines.
+  The code for everything is sufficiently clear now that doing this shouldn't
+  be difficult, as the needed API's are pretty obvious.  And then we have
+  fewer moving parts.  Yay!
+
 - Word wrap.
 - Get non-wrapping text working again.
 - File opening by entering path
