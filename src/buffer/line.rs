@@ -492,6 +492,7 @@ impl<'a> Iterator for LineGraphemeIter<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unused_imports)]
     use super::{Line, LineEnding, LineGraphemeIter};
     const TAB_WIDTH: usize = 4;
 

@@ -2,7 +2,7 @@ use std::cmp::{min, max};
 use std::mem;
 use std::str::Graphemes;
 use std::ops::Index;
-use string_utils::{grapheme_count, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index, grapheme_pos_to_byte_pos};
+use string_utils::{grapheme_count, grapheme_count_is_less_than, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index, grapheme_pos_to_byte_pos};
 
 pub const MIN_NODE_SIZE: usize = 64;
 pub const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
@@ -128,6 +128,8 @@ impl Rope {
     }
     
     pub fn insert_text_at_grapheme_index(&mut self, text: &str, pos: usize) {
+        let mut leaf_insert = false;
+        
         match self.data {
             // Find node for text to be inserted into
             RopeData::Branch(ref mut left, ref mut right) => {
@@ -141,12 +143,51 @@ impl Rope {
             
             // Insert the text
             RopeData::Leaf(ref mut s_text) => {
-                insert_text_at_grapheme_index(s_text, text, pos);
+                if grapheme_count_is_less_than(text, MAX_NODE_SIZE - self.grapheme_count_ + 1) {
+                    // Simple case
+                    insert_text_at_grapheme_index(s_text, text, pos);
+                }
+                else {
+                    // Special cases
+                    leaf_insert = true;
+                }
             },
         }
         
+        // The special cases of inserting at a leaf node.
+        // These have to be done outside of the match statement because
+        // of the borrow checker, but logically they take place in the
+        // RopeData::Leaf branch of the match statement above.
+        if leaf_insert {
+            // TODO: these special cases are currently prone to causing leaf
+            // fragmentation.  Find ways to reduce that.
+            if pos == 0 {
+                let mut new_rope = Rope::new();
+                mem::swap(self, &mut new_rope);
+                self.data = RopeData::Branch(Box::new(Rope::new_from_str(text)), Box::new(new_rope));
+            }
+            else if pos == self.grapheme_count_ {
+                let mut new_rope = Rope::new();
+                mem::swap(self, &mut new_rope);
+                self.data = RopeData::Branch(Box::new(new_rope), Box::new(Rope::new_from_str(text)));
+            }
+            else {
+                // Split the leaf node at the insertion point
+                let mut node_l = Rope::new();
+                let node_r = self.split(pos);
+                mem::swap(self, &mut node_l);
+                
+                // Set the inserted text as the main node
+                *self = Rope::new_from_str(text);
+                
+                // Append the left and right split nodes to either side of
+                // the main node.
+                self.append_left(node_l);
+                self.append_right(node_r);
+            }
+        }
+        
         self.update_stats();
-        self.split_if_too_large();
         self.rebalance();
     }
     
@@ -703,6 +744,7 @@ impl<'a> Iterator for RopeGraphemeIter<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unused_imports)]
     use std::iter;
     use super::{Rope, RopeData, RopeGraphemeIter, MAX_NODE_SIZE};
     use std::old_path::Path;
@@ -854,7 +896,7 @@ mod tests {
     #[test]
     fn append_4() {
         let mut rope1 = Rope::new_from_str("1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.");
-        let mut rope2 = Rope::new_from_str("Z");
+        let rope2 = Rope::new_from_str("Z");
         
         rope1.append(rope2);
         
@@ -865,7 +907,7 @@ mod tests {
     #[test]
     fn append_5() {
         let mut rope1 = Rope::new_from_str("Z");
-        let mut rope2 = Rope::new_from_str("1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.");
+        let rope2 = Rope::new_from_str("1234567890-=qwertyuiop{}asdfghjkl;'zxcvbnm,.Hello World!  Let's make this a long string for kicks and giggles.  Who knows when it will end?  No one!  Well, except for the person writing it.  And... eh... later, the person reading it.  Because they'll get to the end.  And then they'll know.");
         
         rope1.append(rope2);
         
@@ -1105,8 +1147,8 @@ mod tests {
         
         assert!(None == iter.next());
     }
-    
-    
+
+
     #[test]
     fn remove_text_1() {
         let mut rope = Rope::new_from_str("Hi\nthere\npeople\nof\nthe\nworld!");
@@ -1633,6 +1675,36 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
             for i in 0..200 {
                 rope.insert_text_at_grapheme_index("Hi", i);
             }
+        });
+    }
+    
+    
+    #[bench]
+    fn insert_large_text_bench_1(b: &mut Bencher) {
+        let s = String::from_utf8(vec!['c' as u8; 3457]).unwrap();
+        b.iter(|| {
+            let mut rope = Rope::new_from_str("Hello there!");
+            rope.insert_text_at_grapheme_index(s.as_slice(), 0);
+        });
+    }
+    
+    
+    #[bench]
+    fn insert_large_text_bench_2(b: &mut Bencher) {
+        let s = String::from_utf8(vec!['c' as u8; 3457]).unwrap();
+        b.iter(|| {
+            let mut rope = Rope::new_from_str("Hello there!");
+            rope.insert_text_at_grapheme_index(s.as_slice(), 3);
+        });
+    }
+    
+    
+    #[bench]
+    fn insert_large_text_bench_3(b: &mut Bencher) {
+        let s = String::from_utf8(vec!['c' as u8; 3457]).unwrap();
+        b.iter(|| {
+            let mut rope = Rope::new_from_str("Hello there!");
+            rope.insert_text_at_grapheme_index(s.as_slice(), 12);
         });
     }
     

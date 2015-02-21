@@ -45,6 +45,18 @@ pub fn grapheme_count(text: &str) -> usize {
     return count;
 }
 
+pub fn grapheme_count_is_less_than(text: &str, n: usize) -> bool {
+    let mut count = 0;
+    for _ in text.graphemes(true) {
+        count += 1;
+        if count >= n {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 pub fn grapheme_and_line_ending_count(text: &str) -> (usize, usize) {
     let mut grapheme_count = 0;
     let mut line_ending_count = 0;

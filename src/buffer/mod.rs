@@ -548,6 +548,7 @@ impl<'a> Iterator for BufferLineIter<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unused_imports)]
     use super::{Buffer, BufferGraphemeIter, BufferLineIter};
 
     #[test]
