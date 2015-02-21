@@ -4,7 +4,7 @@ use std::str::Graphemes;
 use std::ops::Index;
 use string_utils::{grapheme_count, grapheme_count_is_less_than, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index};
 
-pub const MIN_NODE_SIZE: usize = 1;
+pub const MIN_NODE_SIZE: usize = 64;
 pub const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
 
 
