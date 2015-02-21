@@ -1740,4 +1740,52 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
             }
         });
     }
+    
+    
+    #[bench]
+    fn append_1(b: &mut Bencher) {
+        b.iter(|| {
+            let mut left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 3617]).unwrap().as_slice());
+            let right = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 3617]).unwrap().as_slice());
+            left.append(right);
+        });
+    }
+    
+    
+    #[bench]
+    fn append_2(b: &mut Bencher) {
+        b.iter(|| {
+            let mut left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 263]).unwrap().as_slice());
+            let right = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 3617]).unwrap().as_slice());
+            left.append(right);
+        });
+    }
+    
+    
+    #[bench]
+    fn append_3(b: &mut Bencher) {
+        b.iter(|| {
+            let mut left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 3617]).unwrap().as_slice());
+            let right = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 263]).unwrap().as_slice());
+            left.append(right);
+        });
+    }
+    
+    
+    #[bench]
+    fn split_1(b: &mut Bencher) {
+        b.iter(|| {
+            let mut left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 7649]).unwrap().as_slice());
+            let right = left.split(3617);
+        });
+    }
+    
+    
+    #[bench]
+    fn split_2(b: &mut Bencher) {
+        b.iter(|| {
+            let mut left = Rope::new_from_str(String::from_utf8(vec!['c' as u8; 7649]).unwrap().as_slice());
+            let right = left.split(263);
+        });
+    }
 }
