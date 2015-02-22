@@ -11,7 +11,7 @@ use string_utils::{
     is_line_ending
 };
 
-pub const MIN_NODE_SIZE: usize = 1;
+pub const MIN_NODE_SIZE: usize = 64;
 pub const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
 
 
@@ -216,6 +216,45 @@ impl Rope {
                     return right.grapheme_index_to_line_index(pos - left.grapheme_count_) + left.line_ending_count;
                 }
             },
+        }
+    }
+    
+    
+    /// Converts a grapheme index into a line number and grapheme-column
+    /// number.
+    ///
+    /// If the index is off the end of the text, returns the line and column
+    /// number of the last valid text position.
+    pub fn grapheme_index_to_line_col(&self, pos: usize) -> (usize, usize) {
+        let p = min(pos, self.grapheme_count_);
+        let line = self.grapheme_index_to_line_index(p);
+        let line_pos = self.line_index_to_grapheme_index(line);
+        return (line, p - line_pos);
+    }
+    
+    
+    /// Converts a line number and grapheme-column number into a grapheme
+    /// index.
+    ///
+    /// If the column number given is beyond the end of the line, returns the
+    /// index of the line's last valid position.  If the line number given is
+    /// beyond the end of the buffer, returns the index of the buffer's last
+    /// valid position.
+    pub fn line_col_to_grapheme_index(&self, pos: (usize, usize)) -> usize {
+        if pos.0 <= self.line_ending_count {
+            let l_begin_pos = self.line_index_to_grapheme_index(pos.0);
+            
+            let l_end_pos = if pos.0 < self.line_ending_count {
+                self.line_index_to_grapheme_index(pos.0 + 1) - 1
+            }
+            else {
+                self.grapheme_count_
+            };
+                
+            return min(l_begin_pos + pos.1, l_end_pos);
+        }
+        else {
+            return self.grapheme_count_;
         }
     }
     
@@ -1067,6 +1106,36 @@ mod tests {
         assert_eq!(rope.grapheme_index_to_line_index(22), 4);
         assert_eq!(rope.grapheme_index_to_line_index(23), 5);
         assert_eq!(rope.grapheme_index_to_line_index(29), 5);
+    }
+    
+    
+    #[test]
+    fn grapheme_index_to_line_col_1() {
+        let rope = Rope::new_from_str("Hello\nworld!\n");
+        
+        assert_eq!(rope.grapheme_index_to_line_col(0), (0,0));
+        assert_eq!(rope.grapheme_index_to_line_col(5), (0,5));
+        assert_eq!(rope.grapheme_index_to_line_col(6), (1,0));
+        assert_eq!(rope.grapheme_index_to_line_col(12), (1,6));
+        assert_eq!(rope.grapheme_index_to_line_col(13), (2,0));
+        assert_eq!(rope.grapheme_index_to_line_col(14), (2,0));
+    }
+    
+    
+    #[test]
+    fn line_col_to_grapheme_index_1() {
+        let rope = Rope::new_from_str("Hello\nworld!\n");
+        
+        assert_eq!(rope.line_col_to_grapheme_index((0,0)), 0);
+        assert_eq!(rope.line_col_to_grapheme_index((0,5)), 5);
+        assert_eq!(rope.line_col_to_grapheme_index((0,6)), 5);
+        
+        assert_eq!(rope.line_col_to_grapheme_index((1,0)), 6);
+        assert_eq!(rope.line_col_to_grapheme_index((1,6)), 12);
+        assert_eq!(rope.line_col_to_grapheme_index((1,7)), 12);
+        
+        assert_eq!(rope.line_col_to_grapheme_index((2,0)), 13);
+        assert_eq!(rope.line_col_to_grapheme_index((2,1)), 13);        
     }
     
     
