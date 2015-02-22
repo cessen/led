@@ -148,6 +148,78 @@ impl Rope {
         return self.line_ending_count + 1;
     }
     
+    
+    /// Returns the grapheme index at the start of the given line index.
+    pub fn line_index_to_grapheme_index(&self, li: usize) -> usize {
+        // Bounds check
+        if li > self.line_ending_count {
+            panic!("Rope::line_index_to_grapheme_index: line index is out of bounds.");
+        }
+        
+        // Special case for the beginning of the rope
+        if li == 0 {
+            return 0;
+        }
+        
+        // General cases
+        match self.data {
+            RopeData::Leaf(ref text) => {
+                let mut gi = 0;
+                let mut lei = 0;
+                for g in text.as_slice().graphemes(true) {
+                    gi += 1;
+                    if is_line_ending(g) {
+                        lei += 1;
+                    }
+                    if lei == li {
+                        break;
+                    }
+                }
+                return gi;
+            },
+            
+            RopeData::Branch(ref left, ref right) => {
+                if li <= left.line_ending_count {
+                    return left.line_index_to_grapheme_index(li);
+                }
+                else {
+                    return right.line_index_to_grapheme_index(li - left.line_ending_count) + left.grapheme_count_;
+                }
+            },
+        }
+    }
+    
+    
+    /// Returns the index of the line that the given grapheme index is on.
+    pub fn grapheme_index_to_line_index(&self, pos: usize) -> usize {
+        match self.data {
+            RopeData::Leaf(ref text) => {
+                let mut gi = 0;
+                let mut lei = 0;
+                for g in text.as_slice().graphemes(true) {
+                    if gi == pos {
+                        break;
+                    }
+                    gi += 1;
+                    if is_line_ending(g) {
+                        lei += 1;
+                    }
+                }
+                return lei;
+            },
+            
+            RopeData::Branch(ref left, ref right) => {
+                if pos < left.grapheme_count_ {
+                    return left.grapheme_index_to_line_index(pos);
+                }
+                else {
+                    return right.grapheme_index_to_line_index(pos - left.grapheme_count_) + left.line_ending_count;
+                }
+            },
+        }
+    }
+    
+    
     /// Inserts the given text at the given grapheme index.
     /// For small lengths of 'text' runs in O(log N) time.
     /// For large lengths of 'text', dunno.  But it seems to perform
@@ -942,6 +1014,61 @@ mod tests {
         assert_eq!("界", &rope[4]);
     }
     
+
+    #[test]
+    fn line_index_to_grapheme_index_1() {
+        let rope = Rope::new_from_str("Hello\nworld!\n");
+        
+        assert_eq!(rope.line_index_to_grapheme_index(0), 0);
+        assert_eq!(rope.line_index_to_grapheme_index(1), 6);
+        assert_eq!(rope.line_index_to_grapheme_index(2), 13);
+    }
+    
+    
+    #[test]
+    fn line_index_to_grapheme_index_2() {
+        let rope = Rope::new_from_str("Hi\nthere\npeople\nof\nthe\nworld!");
+        
+        assert_eq!(rope.line_index_to_grapheme_index(0), 0);
+        assert_eq!(rope.line_index_to_grapheme_index(1), 3);
+        assert_eq!(rope.line_index_to_grapheme_index(2), 9);
+        assert_eq!(rope.line_index_to_grapheme_index(3), 16);
+        assert_eq!(rope.line_index_to_grapheme_index(4), 19);
+        assert_eq!(rope.line_index_to_grapheme_index(5), 23);
+    }
+    
+    
+    #[test]
+    fn grapheme_index_to_line_index_1() {
+        let rope = Rope::new_from_str("Hello\nworld!\n");
+        
+        assert_eq!(rope.grapheme_index_to_line_index(0), 0);
+        assert_eq!(rope.grapheme_index_to_line_index(1), 0);
+        assert_eq!(rope.grapheme_index_to_line_index(5), 0);
+        assert_eq!(rope.grapheme_index_to_line_index(6), 1);
+        assert_eq!(rope.grapheme_index_to_line_index(12), 1);
+        assert_eq!(rope.grapheme_index_to_line_index(13), 2);
+    }
+    
+    
+    #[test]
+    fn grapheme_index_to_line_index_2() {
+        let rope = Rope::new_from_str("Hi\nthere\npeople\nof\nthe\nworld!");
+        
+        assert_eq!(rope.grapheme_index_to_line_index(0), 0);
+        assert_eq!(rope.grapheme_index_to_line_index(2), 0);
+        assert_eq!(rope.grapheme_index_to_line_index(3), 1);
+        assert_eq!(rope.grapheme_index_to_line_index(8), 1);
+        assert_eq!(rope.grapheme_index_to_line_index(9), 2);
+        assert_eq!(rope.grapheme_index_to_line_index(15), 2);
+        assert_eq!(rope.grapheme_index_to_line_index(16), 3);
+        assert_eq!(rope.grapheme_index_to_line_index(18), 3);
+        assert_eq!(rope.grapheme_index_to_line_index(19), 4);
+        assert_eq!(rope.grapheme_index_to_line_index(22), 4);
+        assert_eq!(rope.grapheme_index_to_line_index(23), 5);
+        assert_eq!(rope.grapheme_index_to_line_index(29), 5);
+    }
+    
     
     #[test]
     fn to_string() {
@@ -996,14 +1123,14 @@ mod tests {
     fn split_3() {
         let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
         
-        let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
-        f1.write_str(rope1.to_graphviz().as_slice());
+        //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
+        //f1.write_str(rope1.to_graphviz().as_slice());
                 
         let rope2 = rope1.split(5);
 
-        let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
-        f2.write_str(rope1.to_graphviz().as_slice());
-        f2.write_str(rope2.to_graphviz().as_slice());
+        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        //f2.write_str(rope1.to_graphviz().as_slice());
+        //f2.write_str(rope2.to_graphviz().as_slice());
         
         assert!(rope1.is_balanced());
         assert!(rope2.is_balanced());
