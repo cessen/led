@@ -6,9 +6,8 @@ use editor::Editor;
 use formatter::{LineFormatter, LINE_BLOCK_LENGTH, block_index_and_offset};
 use std::char;
 use std::time::duration::Duration;
-use string_utils::{is_line_ending};
+use string_utils::{is_line_ending, line_ending_to_str, LineEnding};
 use utils::digit_count;
-use buffer::line::{line_ending_to_str, LineEnding};
 use self::formatter::ConsoleLineFormatter;
 
 pub mod formatter;
@@ -360,7 +359,7 @@ impl TermUI {
         let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
         let (mut line_block_index, _) = block_index_and_offset(col_i);
         let mut grapheme_index = editor.buffer.line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
-        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(line_index).grapheme_iter_at_index_with_max_length(line_block_index*LINE_BLOCK_LENGTH, LINE_BLOCK_LENGTH), editor.view_pos.0 - grapheme_index);
+        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(line_index).grapheme_iter_between_indices(line_block_index*LINE_BLOCK_LENGTH, (line_block_index+1)*LINE_BLOCK_LENGTH), editor.view_pos.0 - grapheme_index);
         
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
         let screen_col = c1.1 as isize + gutter_width as isize;

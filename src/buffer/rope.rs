@@ -8,7 +8,9 @@ use string_utils::{
     insert_text_at_grapheme_index,
     remove_text_between_grapheme_indices,
     split_string_at_grapheme_index,
-    is_line_ending
+    is_line_ending,
+    LineEnding,
+    str_to_line_ending,
 };
 
 pub const MIN_NODE_SIZE: usize = 64;
@@ -259,6 +261,11 @@ impl Rope {
     }
     
     
+    pub fn grapheme_at_index<'a>(&'a self, index: usize) -> &'a str {
+        &self[index]
+    }
+    
+    
     /// Inserts the given text at the given grapheme index.
     /// For small lengths of 'text' runs in O(log N) time.
     /// For large lengths of 'text', dunno.  But it seems to perform
@@ -478,7 +485,47 @@ impl Rope {
         return RopeGraphemeIter {
             chunk_iter: chunk_iter,
             cur_chunk: giter,
+            length: None,
         };
+    }
+    
+    
+    /// Creates an iterator that starts a pos_a and stops just before pos_b.
+    pub fn grapheme_iter_between_indices<'a>(&'a self, pos_a: usize, pos_b: usize) -> RopeGraphemeIter<'a> {
+        let mut iter = self.grapheme_iter_at_index(pos_a);
+        iter.length = Some(pos_b - pos_a);
+        return iter;
+    }
+    
+    
+    /// Creates an iterator over the lines in the rope.
+    pub fn line_iter<'a>(&'a self) -> RopeLineIter<'a> {
+        RopeLineIter {
+            rope: self,
+            li: 0,
+        }
+    }
+    
+    
+    /// Creates an iterator over the lines in the rope, starting at the given
+    /// line index.
+    pub fn line_iter_at_index<'a>(&'a self, index: usize) -> RopeLineIter<'a> {
+        RopeLineIter {
+            rope: self,
+            li: index,
+        }
+    }
+    
+    
+    pub fn slice<'a>(&'a self, pos_a: usize, pos_b: usize) -> RopeSlice<'a> {
+        let a = pos_a;
+        let b = min(self.grapheme_count_, pos_b);
+        
+        RopeSlice {
+            rope: self,
+            start: a,
+            end: b,
+        }
     }
     
     
@@ -944,6 +991,7 @@ impl<'a> Iterator for RopeChunkIter<'a> {
 pub struct RopeGraphemeIter<'a> {
     chunk_iter: RopeChunkIter<'a>,
     cur_chunk: Graphemes<'a>,
+    length: Option<usize>,
 }
 
 
@@ -951,8 +999,17 @@ impl<'a> Iterator for RopeGraphemeIter<'a> {
     type Item = &'a str;
     
     fn next(&mut self) -> Option<&'a str> {
+        if let Some(ref mut l) = self.length {
+            if *l == 0 {
+                return None;
+            }
+        }
+        
         loop {
             if let Some(g) = self.cur_chunk.next() {
+                if let Some(ref mut l) = self.length {
+                    *l -= 1;
+                }
                 return Some(g);
             }
             else {   
@@ -964,6 +1021,106 @@ impl<'a> Iterator for RopeGraphemeIter<'a> {
                     return None;
                 }
             }
+        }
+    }
+}
+
+
+
+/// An iterator over a rope's lines, returned as RopeSlice's
+pub struct RopeLineIter<'a> {
+    rope: &'a Rope,
+    li: usize,
+}
+
+
+impl<'a> Iterator for RopeLineIter<'a> {
+    type Item = RopeSlice<'a>;
+
+    fn next(&mut self) -> Option<RopeSlice<'a>> {
+        if self.li >= self.rope.line_count() {
+            return None;
+        }
+        else {
+            let a = self.rope.line_index_to_grapheme_index(self.li);
+            let b = if self.li+1 < self.rope.line_count() {
+                self.rope.line_index_to_grapheme_index(self.li+1)
+            }
+            else {
+                self.rope.grapheme_count()
+            };
+            
+            self.li += 1;
+            
+            return Some(self.rope.slice(a, b));
+        }
+    }
+}
+
+
+
+
+//=============================================================
+// Rope slice
+//=============================================================
+
+/// An immutable slice into a Rope
+pub struct RopeSlice<'a> {
+    rope: &'a Rope,
+    start: usize,
+    end: usize,
+}
+
+
+impl<'a> RopeSlice<'a> {
+    pub fn grapheme_count(&self) -> usize {
+        self.end - self.start
+    }
+    
+    
+    pub fn grapheme_iter(&self) -> RopeGraphemeIter<'a> {
+        self.rope.grapheme_iter_between_indices(self.start, self.end)
+    }
+    
+    pub fn grapheme_iter_at_index(&self, pos: usize) -> RopeGraphemeIter<'a> {
+        let a = min(self.end, self.start + pos);
+        
+        self.rope.grapheme_iter_between_indices(a, self.end)
+    }
+    
+    pub fn grapheme_iter_between_indices(&self, pos_a: usize, pos_b: usize) -> RopeGraphemeIter<'a> {
+        let a = min(self.end, self.start + pos_a);
+        let b = min(self.end, self.start + pos_b);
+        
+        self.rope.grapheme_iter_between_indices(a, b)
+    }
+    
+    
+    pub fn grapheme_at_index(&self, index: usize) -> &'a str {
+        &self.rope[self.start+index]
+    }
+    
+    
+    /// Convenience function for when the slice represents a line
+    pub fn ending(&self) -> LineEnding {
+        if self.grapheme_count() > 0 {
+            let g = self.grapheme_at_index(self.grapheme_count() - 1);
+            return str_to_line_ending(g);
+        }
+        else {
+            return LineEnding::None;
+        }
+    }
+    
+    
+    pub fn slice(&self, pos_a: usize, pos_b: usize) -> RopeSlice<'a> {
+        let a = min(self.end, self.start + pos_a);
+        let b = min(self.end, self.start + pos_b);
+        
+        RopeSlice {
+            rope: self.rope,
+            start: a,
+            end: b,
         }
     }
 }

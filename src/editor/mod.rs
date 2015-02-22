@@ -1,12 +1,11 @@
 #![allow(dead_code)]
 
 use buffer::Buffer;
-use buffer::line::LineEnding;
 use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
 use std::old_path::Path;
 use std::cmp::{min, max};
-use string_utils::grapheme_count;
+use string_utils::{grapheme_count, LineEnding};
 use utils::digit_count;
 use self::cursor::CursorSet;
 
@@ -103,7 +102,7 @@ impl<T: LineFormatter> Editor<T> {
         // Collect statistics
         let mut line_i: usize = 0;
         for line in self.buffer.line_iter() {
-            match line.ending {
+            match line.ending() {
                 LineEnding::None => {
                 },
                 LineEnding::CRLF => {

@@ -5,15 +5,12 @@ use std::old_path::Path;
 use std::old_io::fs::File;
 use std::old_io::{IoResult, BufferedReader, BufferedWriter};
 
-use self::line::Line;
-use self::node::{BufferNode, BufferNodeGraphemeIter, BufferNodeLineIter};
+pub use self::rope::{Rope, RopeSlice, RopeGraphemeIter, RopeLineIter};
 use self::undo_stack::{UndoStack};
 use self::undo_stack::Operation::*;
-use string_utils::{is_line_ending, grapheme_count};
+use string_utils::grapheme_count;
 
-pub mod line;
 mod rope;
-mod node;
 mod undo_stack;
 
 
@@ -23,7 +20,7 @@ mod undo_stack;
 
 /// A text buffer
 pub struct Buffer {
-    text: BufferNode,
+    text: Rope,
     file_path: Option<Path>,
     undo_stack: UndoStack,
 }
@@ -33,7 +30,7 @@ pub struct Buffer {
 impl Buffer {
     pub fn new() -> Buffer {
         Buffer {
-            text: BufferNode::new(),
+            text: Rope::new(),
             file_path: None,
             undo_stack: UndoStack::new(),
         }
@@ -42,58 +39,23 @@ impl Buffer {
     
     pub fn new_from_file(path: &Path) -> IoResult<Buffer> {
         let mut f = BufferedReader::new(try!(File::open(path)));
+        let string = f.read_to_string().unwrap();
     
-        let mut buf = Buffer {
-            text: BufferNode::new(),
+        let buf = Buffer {
+            text: Rope::new_from_str(string.as_slice()),
             file_path: Some(path.clone()),
             undo_stack: UndoStack::new(),
         };
          
-        let string = f.read_to_string().unwrap();
-        let mut g_iter = string.as_slice().grapheme_indices(true);
-        let mut done = false;
-        let mut a = 0;
-        let mut b = 0;
-        
-        while !done {
-            let mut count = 0;
-            loop {
-                if let Some((i, g)) = g_iter.next() {
-                    count += 1;
-                    b = i + g.len();
-                    if is_line_ending(g) {
-                        break;
-                    }
-                }
-                else {
-                    done = true;
-                    break;
-                }
-            }
-            
-            if a != b {
-                let substr = &string[a..b];
-                let line = Line::new_from_str_with_count_unchecked(substr, count);
-                let node = BufferNode::new_from_line_with_count_unchecked(line, count);
-                buf.append_leaf_node_unchecked(node);
-            }
-            
-            a = b;
-        }
-    
-        // Remove initial blank line
-        buf.remove_lines(0, 1);
-    
         return Ok(buf);
     }
     
     
     pub fn save_to_file(&self, path: &Path) -> IoResult<()> {
-        // TODO: make more efficient
         let mut f = BufferedWriter::new(try!(File::create(path)));
         
-        for g in self.grapheme_iter() {
-            let _ = f.write_str(g);
+        for c in self.text.chunk_iter() {
+            let _ = f.write_str(c);
         }
         
         return Ok(());
@@ -107,12 +69,12 @@ impl Buffer {
     //------------------------------------------------------------------------
     
     pub fn grapheme_count(&self) -> usize {
-        self.text.grapheme_count
+        self.text.grapheme_count()
     }
 
     
     pub fn line_count(&self) -> usize {
-        self.text.line_count
+        self.text.line_count()
     }
 
     
@@ -130,7 +92,7 @@ impl Buffer {
     }
     
     fn _insert_text(&mut self, text: &str, pos: usize) {
-        self.text.insert_text(text, pos);
+        self.text.insert_text_at_grapheme_index(text, pos);
     }
 
     
@@ -173,16 +135,13 @@ impl Buffer {
             panic!("Buffer::_remove_text(): attempt to remove text past the end of buffer.");
         }
         // Complete removal of all text
-        else if pos_a == 0 && pos_b == self.text.grapheme_count {
-            let mut temp_node = BufferNode::new();
+        else if pos_a == 0 && pos_b == self.text.grapheme_count() {
+            let mut temp_node = Rope::new();
             mem::swap(&mut (self.text), &mut temp_node);
         }
         // All other cases
         else {
-            if self.text.remove_text_recursive(pos_a, pos_b, true) {
-                panic!("Buffer::_remove_text(): dangling left side remains.  This should never happen!");
-            }
-            self.text.set_last_line_ending_recursive();
+            self.text.remove_text_between_grapheme_indices(pos_a, pos_b);
         }
     }
     
@@ -232,6 +191,7 @@ impl Buffer {
     
     
     /// Removes the lines in line indices [line_a, line_b).
+    /// TODO: undo
     pub fn remove_lines(&mut self, line_a: usize, line_b: usize) {
         // Nothing to do
         if line_a == line_b {
@@ -246,30 +206,23 @@ impl Buffer {
             panic!("Buffer::remove_lines(): attempt to remove lines past the last line of text.");
         }
         // Complete removal of all lines
-        else if line_a == 0 && line_b == self.text.line_count {
-            let mut temp_node = BufferNode::new();
+        else if line_a == 0 && line_b == self.text.line_count() {
+            let mut temp_node = Rope::new();
             mem::swap(&mut (self.text), &mut temp_node);
         }
         // All other cases
         else {
-            self.text.remove_lines_recursive(line_a, line_b);
-            self.text.set_last_line_ending_recursive();
+            let a = self.text.line_index_to_grapheme_index(line_a);
+            let b = if line_b < self.line_count() {
+                self.text.line_index_to_grapheme_index(line_b)
+            }
+            else {
+                self.text.grapheme_count()
+            };
+            
+            self.text.remove_text_between_grapheme_indices(a, b);
         }
     }
-    
-    
-    /// Blindly appends a line to the end of the current text without
-    /// doing any sanity checks.  This is primarily for efficient
-    /// file loading.
-    pub fn append_line_unchecked(&mut self, line: Line) {
-        self.text.append_line_unchecked_recursive(line);
-    }
-    
-    
-    fn append_leaf_node_unchecked(&mut self, node: BufferNode) {
-        self.text.append_leaf_node_unchecked_recursive(node);
-    }
-    
     
     
     
@@ -359,7 +312,7 @@ impl Buffer {
     /// If the index is off the end of the text, returns the line and column
     /// number of the last valid text position.
     pub fn index_to_line_col(&self, pos: usize) -> (usize, usize) {
-        return self.text.index_to_line_col_recursive(pos);
+        return self.text.grapheme_index_to_line_col(pos);
     }
     
     
@@ -371,7 +324,7 @@ impl Buffer {
     /// beyond the end of the buffer, returns the index of the buffer's last
     /// valid position.
     pub fn line_col_to_index(&self, pos: (usize, usize)) -> usize {
-        return self.text.line_col_to_index_recursive(pos);
+        return self.text.line_col_to_grapheme_index(pos);
     }
     
     
@@ -384,20 +337,25 @@ impl Buffer {
             panic!("Buffer::get_grapheme(): index past last grapheme.");
         }
         else {
-            return self.text.get_grapheme_recursive(index);
+            return &self.text[index];
         }
     }
     
     
-    pub fn get_line<'a>(&'a self, index: usize) -> &'a Line {
+    pub fn get_line<'a>(&'a self, index: usize) -> RopeSlice<'a> {
         if index >= self.line_count() {
             panic!("get_line(): index out of bounds.");
         }
         
-        // NOTE: this can be done non-recursively, which would be more
-        // efficient.  However, it seems likely to require unsafe code
-        // if done that way.
-        return self.text.get_line_recursive(index);
+        let a = self.text.line_index_to_grapheme_index(index);
+        let b = if index+1 < self.line_count() {
+            self.text.line_index_to_grapheme_index(index+1)
+        }
+        else {
+            self.text.grapheme_count()
+        };
+        
+        return self.text.slice(a, b);
     }
     
     
@@ -416,7 +374,7 @@ impl Buffer {
         let mut i = 0;
         let i_end = pos_b - pos_a;
         
-        for g in self.grapheme_iter_at_index(pos_a) {
+        for g in self.text.grapheme_iter_at_index(pos_a) {
             if i == i_end {
                 break;
             }
@@ -436,109 +394,30 @@ impl Buffer {
     //------------------------------------------------------------------------
     
     /// Creates an iterator at the first character
-    pub fn grapheme_iter<'a>(&'a self) -> BufferGraphemeIter<'a> {
-        BufferGraphemeIter {
-            gi: self.text.grapheme_iter()
-        }
+    pub fn grapheme_iter<'a>(&'a self) -> RopeGraphemeIter<'a> {
+        self.text.grapheme_iter()
     }
     
     
     /// Creates an iterator starting at the specified grapheme index.
     /// If the index is past the end of the text, then the iterator will
     /// return None on next().
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> BufferGraphemeIter<'a> {
-        BufferGraphemeIter {
-            gi: self.text.grapheme_iter_at_index(index)
-        }
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> RopeGraphemeIter<'a> {
+        self.text.grapheme_iter_at_index(index)
     }
     
     
-    pub fn line_iter<'a>(&'a self) -> BufferLineIter<'a> {
-        BufferLineIter {
-            li: self.text.line_iter()
-        }
+    pub fn line_iter<'a>(&'a self) -> RopeLineIter<'a> {
+        self.text.line_iter()
     }
     
     
-    pub fn line_iter_at_index<'a>(&'a self, index: usize) -> BufferLineIter<'a> {
-        BufferLineIter {
-            li: self.text.line_iter_at_index(index)
-        }
+    pub fn line_iter_at_index<'a>(&'a self, index: usize) -> RopeLineIter<'a> {
+        self.text.line_iter_at_index(index)
     }
     
 
 }
-
-
-
-
-//=============================================================
-// Buffer iterators
-//=============================================================
-
-/// An iterator over a text buffer's graphemes
-pub struct BufferGraphemeIter<'a> {
-    gi: BufferNodeGraphemeIter<'a>,
-}
-
-
-impl<'a> BufferGraphemeIter<'a> {
-    // Puts the iterator on the next line.
-    // Returns true if there was a next line,
-    // false if there wasn't.
-    pub fn next_line(&mut self) -> bool {
-        self.gi.next_line()
-    }
-    
-    
-    // Skips the iterator n graphemes ahead.
-    // If it runs out of graphemes before reaching the desired skip count,
-    // returns false.  Otherwise returns true.
-    pub fn skip_graphemes(&mut self, n: usize) -> bool {
-        self.gi.skip_graphemes(n)
-    }
-    
-    //pub fn skip_non_newline_graphemes(&mut self, n: usize) -> bool {
-    //    let mut i: usize = 0;
-    //    
-    //    for g in self.gi {
-    //        if is_line_ending(g) {
-    //            return true;
-    //        }
-    //        
-    //        i += 1;
-    //        if i >= n {
-    //            break;
-    //        }
-    //    }
-    //    
-    //    return false;
-    //}
-}
-
-
-impl<'a> Iterator for BufferGraphemeIter<'a> {
-    type Item = &'a str;
-    
-    fn next(&mut self) -> Option<&'a str> {
-        self.gi.next()
-    }
-}
-
-
-pub struct BufferLineIter<'a> {
-    li: BufferNodeLineIter<'a>,
-}
-
-
-impl<'a> Iterator for BufferLineIter<'a> {
-    type Item = &'a Line;
-
-    fn next(&mut self) -> Option<&'a Line> {
-        self.li.next()
-    }
-}
-
 
 
 
@@ -549,7 +428,7 @@ impl<'a> Iterator for BufferLineIter<'a> {
 #[cfg(test)]
 mod tests {
     #![allow(unused_imports)]
-    use super::{Buffer, BufferGraphemeIter, BufferLineIter};
+    use super::{Buffer, BufferLineIter};
 
     #[test]
     fn insert_text() {

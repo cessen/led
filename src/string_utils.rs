@@ -190,3 +190,94 @@ pub fn split_string_at_grapheme_index(s1: &mut String, pos: usize) -> String {
     
     return s2;
 }
+
+
+
+
+
+
+
+/// Represents one of the valid Unicode line endings.
+/// Also acts as an index into `LINE_ENDINGS`.
+#[derive(PartialEq, Copy)]
+pub enum LineEnding {
+    None = 0,  // No line ending
+    CRLF = 1,  // CarriageReturn followed by LineFeed
+    LF = 2,    // U+000A -- LineFeed
+    VT = 3,    // U+000B -- VerticalTab
+    FF = 4,    // U+000C -- FormFeed
+    CR = 5,    // U+000D -- CarriageReturn
+    NEL = 6,   // U+0085 -- NextLine
+    LS = 7,    // U+2028 -- Line Separator
+    PS = 8,    // U+2029 -- ParagraphSeparator
+}
+
+pub fn str_to_line_ending(g: &str) -> LineEnding {
+    match g {
+        //==============
+        // Line endings
+        //==============
+        
+        // CRLF
+        "\u{000D}\u{000A}" => {
+            return LineEnding::CRLF;
+        },
+        
+        // LF
+        "\u{000A}" => {
+            return LineEnding::LF;
+        },
+        
+        // VT
+        "\u{000B}" => {
+            return LineEnding::VT;
+        },
+        
+        // FF
+        "\u{000C}" => {
+            return LineEnding::FF;
+        },
+        
+        // CR
+        "\u{000D}" => {
+            return LineEnding::CR;
+        },
+        
+        // NEL
+        "\u{0085}" => {
+            return LineEnding::NEL;
+        },
+        
+        // LS
+        "\u{2028}" => {
+            return LineEnding::LS;
+        },
+        
+        // PS
+        "\u{2029}" => {
+            return LineEnding::PS;
+        },
+        
+        // Not a line ending
+        _ => {
+            return LineEnding::None;
+        }
+    }
+}
+
+pub fn line_ending_to_str(ending: LineEnding) -> &'static str {
+    LINE_ENDINGS[ending as usize]
+}
+
+/// An array of string literals corresponding to the possible
+/// unicode line endings.
+pub const LINE_ENDINGS: [&'static str; 9] = ["",
+                          "\u{000D}\u{000A}",
+                          "\u{000A}",
+                          "\u{000B}",
+                          "\u{000C}",
+                          "\u{000D}",
+                          "\u{0085}",
+                          "\u{2028}",
+                          "\u{2029}"
+];
