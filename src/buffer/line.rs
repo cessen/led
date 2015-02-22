@@ -177,7 +177,7 @@ impl Line {
         // Create and return Line
         let cnt = if ending == LineEnding::None { count } else { count - 1 };
         return Line {
-            text: Rope::new_from_str_with_count(&text[..(bytes.len()-le_size)], cnt),
+            text: Rope::new_from_str_with_count(&text[..(bytes.len()-le_size)], cnt, 0),
             ending: ending,
         };
     }

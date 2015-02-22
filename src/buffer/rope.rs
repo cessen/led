@@ -2,9 +2,16 @@ use std::cmp::{min, max};
 use std::mem;
 use std::str::Graphemes;
 use std::ops::Index;
-use string_utils::{grapheme_count, grapheme_count_is_less_than, insert_text_at_grapheme_index, remove_text_between_grapheme_indices, split_string_at_grapheme_index};
+use string_utils::{
+    grapheme_and_line_ending_count,
+    grapheme_count_is_less_than,
+    insert_text_at_grapheme_index,
+    remove_text_between_grapheme_indices,
+    split_string_at_grapheme_index,
+    is_line_ending
+};
 
-pub const MIN_NODE_SIZE: usize = 64;
+pub const MIN_NODE_SIZE: usize = 1;
 pub const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
 
 
@@ -14,6 +21,7 @@ pub const MAX_NODE_SIZE: usize = MIN_NODE_SIZE * 2;
 pub struct Rope {
     data: RopeData,
     grapheme_count_: usize,
+    line_ending_count: usize,
     tree_height: u32,
 }
 
@@ -31,6 +39,7 @@ impl Rope {
         Rope {
             data: RopeData::Leaf(String::new()),
             grapheme_count_: 0,
+            line_ending_count: 0,
             tree_height: 1,
         }
     }
@@ -43,16 +52,20 @@ impl Rope {
         let mut s1 = s;
         loop {
             // Get the next chunk of the string to add
-            let mut i = 0;
             let mut byte_i = 0;
+            let mut le_count = 0;
+            let mut g_count = 0;
             for (bi, g) in s1.grapheme_indices(true) {
                 byte_i = bi + g.len();
-                i += 1;
-                if i >= MAX_NODE_SIZE {
+                g_count += 1;
+                if is_line_ending(g) {
+                    le_count += 1;
+                }
+                if g_count >= MAX_NODE_SIZE {
                     break;
                 }
             }
-            if i == 0 {
+            if g_count == 0 {
                 break;
             }
             let chunk = &s1[..byte_i];
@@ -60,7 +73,8 @@ impl Rope {
             // Add chunk
             rope_stack.push(Rope {
                 data: RopeData::Leaf(String::from_str(chunk)),
-                grapheme_count_: i,
+                grapheme_count_: g_count,
+                line_ending_count: le_count,
                 tree_height: 1,
             });
             
@@ -71,10 +85,12 @@ impl Rope {
                     let right = Box::new(rope_stack.pop().unwrap());
                     let left = Box::new(rope_stack.pop().unwrap());
                     let h = max(left.tree_height, right.tree_height) + 1;
+                    let lc = left.line_ending_count + right.line_ending_count;
                     let gc = left.grapheme_count_ + right.grapheme_count_;
                     rope_stack.push(Rope {
                         data: RopeData::Branch(left, right),
                         grapheme_count_: gc,
+                        line_ending_count: lc,
                         tree_height: h,
                     });
                 }
@@ -104,11 +120,12 @@ impl Rope {
         return rope;
     }
     
-    pub fn new_from_str_with_count(s: &str, count: usize) -> Rope {
-        if count <= MAX_NODE_SIZE {
+    pub fn new_from_str_with_count(s: &str, g_count: usize, le_count: usize) -> Rope {
+        if g_count <= MAX_NODE_SIZE {
             Rope {
                 data: RopeData::Leaf(String::from_str(s)),
-                grapheme_count_: count,
+                grapheme_count_: g_count,
+                line_ending_count: le_count,
                 tree_height: 1,
             }
         }
@@ -125,6 +142,10 @@ impl Rope {
     
     pub fn grapheme_count(&self) -> usize {
         return self.grapheme_count_;
+    }
+    
+    pub fn line_count(&self) -> usize {
+        return self.line_ending_count + 1;
     }
     
     /// Inserts the given text at the given grapheme index.
@@ -368,7 +389,7 @@ impl Rope {
     fn to_graphviz_recursive(&self, text: &mut String, name: String) {
         match self.data {
             RopeData::Leaf(_) => {
-                text.push_str(format!("{} [label=\"{}\"];\n", name, self.grapheme_count_).as_slice());
+                text.push_str(format!("{} [label=\"gc={}\\nlec={}\"];\n", name, self.grapheme_count_, self.line_ending_count).as_slice());
             },
             
             RopeData::Branch(ref left, ref right) => {
@@ -376,7 +397,7 @@ impl Rope {
                 let mut rname = name.clone();
                 lname.push('l');
                 rname.push('r');
-                text.push_str(format!("{} [shape=box, label=\"h={}\\nc={}\"];\n", name, self.tree_height, self.grapheme_count_).as_slice());
+                text.push_str(format!("{} [shape=box, label=\"h={}\\ngc={}\\nlec={}\"];\n", name, self.tree_height, self.grapheme_count_, self.line_ending_count).as_slice());
                 text.push_str(format!("{} -> {{ {} {} }};\n", name, lname, rname).as_slice());
                 left.to_graphviz_recursive(text, lname);
                 right.to_graphviz_recursive(text, rname);
@@ -399,12 +420,15 @@ impl Rope {
     fn update_stats(&mut self) {
         match self.data {
             RopeData::Leaf(ref text) => {
-                self.grapheme_count_ = grapheme_count(text);
+                let (gc, lec) = grapheme_and_line_ending_count(text);
+                self.grapheme_count_ = gc;
+                self.line_ending_count = lec;
                 self.tree_height = 1;
             },
             
             RopeData::Branch(ref left, ref right) => {
                 self.grapheme_count_ = left.grapheme_count_ + right.grapheme_count_;
+                self.line_ending_count = left.line_ending_count + right.line_ending_count;
                 self.tree_height = max(left.tree_height, right.tree_height) + 1;
             }
         }
@@ -972,14 +996,14 @@ mod tests {
     fn split_3() {
         let mut rope1 = Rope::new_from_str("Hello there good people of the world!");
         
-        //let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
-        //f1.write_str(rope1.to_graphviz().as_slice());
+        let mut f1 = BufferedWriter::new(File::create(&Path::new("yar1.gv")).unwrap());
+        f1.write_str(rope1.to_graphviz().as_slice());
                 
         let rope2 = rope1.split(5);
 
-        //let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
-        //f2.write_str(rope1.to_graphviz().as_slice());
-        //f2.write_str(rope2.to_graphviz().as_slice());
+        let mut f2 = BufferedWriter::new(File::create(&Path::new("yar2.gv")).unwrap());
+        f2.write_str(rope1.to_graphviz().as_slice());
+        f2.write_str(rope2.to_graphviz().as_slice());
         
         assert!(rope1.is_balanced());
         assert!(rope2.is_balanced());
@@ -1104,7 +1128,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 17);
+        assert_eq!(rope.grapheme_count(), 17);
+        assert_eq!(rope.line_count(), 3);
         assert!(Some("A") == iter.next());
         assert!(Some("g") == iter.next());
         assert!(Some("a") == iter.next());
@@ -1135,7 +1160,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 17);
+        assert_eq!(rope.grapheme_count(), 17);
+        assert_eq!(rope.line_count(), 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1166,7 +1192,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 16);
+        assert_eq!(rope.grapheme_count(), 16);
+        assert_eq!(rope.line_count(), 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1196,7 +1223,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 16);
+        assert_eq!(rope.grapheme_count(), 16);
+        assert_eq!(rope.line_count(), 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1226,7 +1254,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 16);
+        assert_eq!(rope.grapheme_count(), 16);
+        assert_eq!(rope.line_count(), 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("a") == iter.next());
@@ -1257,7 +1286,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 16);
+        assert_eq!(rope.grapheme_count(), 16);
+        assert_eq!(rope.line_count(), 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1288,7 +1318,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 20);
+        assert_eq!(rope.grapheme_count(), 20);
+        assert_eq!(rope.line_count(), 7);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1323,7 +1354,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 26);
+        assert_eq!(rope.grapheme_count(), 26);
+        assert_eq!(rope.line_count(), 5);
         assert!(Some("t") == iter.next());
         assert!(Some("h") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1363,7 +1395,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 17);
+        assert_eq!(rope.grapheme_count(), 17);
+        assert_eq!(rope.line_count(), 4);
         assert!(Some("p") == iter.next());
         assert!(Some("l") == iter.next());
         assert!(Some("e") == iter.next());
@@ -1394,7 +1427,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 17);
+        assert_eq!(rope.grapheme_count(), 17);
+        assert_eq!(rope.line_count(), 4);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1425,7 +1459,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 23);
+        assert_eq!(rope.grapheme_count(), 23);
+        assert_eq!(rope.line_count(), 6);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1462,7 +1497,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 17);
+        assert_eq!(rope.grapheme_count(), 17);
+        assert_eq!(rope.line_count(), 4);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1493,7 +1529,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 3);
+        assert_eq!(rope.grapheme_count(), 3);
+        assert_eq!(rope.line_count(), 1);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1510,7 +1547,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 5);
+        assert_eq!(rope.grapheme_count(), 5);
+        assert_eq!(rope.line_count(), 2);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1529,7 +1567,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 4);
+        assert_eq!(rope.grapheme_count(), 4);
+        assert_eq!(rope.line_count(), 1);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1547,7 +1586,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 8);
+        assert_eq!(rope.grapheme_count(), 8);
+        assert_eq!(rope.line_count(), 2);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1569,7 +1609,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 4);
+        assert_eq!(rope.grapheme_count(), 4);
+        assert_eq!(rope.line_count(), 2);
         assert!(Some("1") == iter.next());
         assert!(Some("2") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1587,7 +1628,8 @@ mod tests {
         let mut iter = rope.grapheme_iter();
         
         assert!(rope.is_balanced());
-        assert!(rope.grapheme_count() == 9);
+        assert_eq!(rope.grapheme_count(), 9);
+        assert_eq!(rope.line_count(), 1);
         assert!(Some("1") == iter.next());
         assert!(Some("2") == iter.next());
         assert!(Some("3") == iter.next());
@@ -1609,6 +1651,7 @@ mod tests {
         let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
+            line_ending_count: 0,
             tree_height: 1,
         };
         rope.update_stats();
@@ -1633,6 +1676,7 @@ mod tests {
         let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
+            line_ending_count: 0,
             tree_height: 1,
         };
         rope.update_stats();
@@ -1657,6 +1701,7 @@ mod tests {
         let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
+            line_ending_count: 0,
             tree_height: 1,
         };
         rope.update_stats();
@@ -1681,6 +1726,7 @@ mod tests {
         let mut rope = Rope {
             data: RopeData::Branch(Box::new(left), Box::new(right)),
             grapheme_count_: 0,
+            line_ending_count: 0,
             tree_height: 1,
         };
         rope.update_stats();
