@@ -479,8 +479,7 @@ impl TermUI {
         
         if at_cursor {
             // Calculate the cell coordinates at which to draw the cursor
-            let line = self.editor.buffer.get_line(self.editor.buffer.line_count()-1);
-            let (_, pos_x) = editor.formatter.index_to_v2d(line.grapheme_iter(), line.grapheme_count());
+            let pos_x = editor.formatter.index_to_horizontal_v2d(&self.editor.buffer, self.editor.buffer.grapheme_count());
             let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
             let py = screen_line - 1;
             
