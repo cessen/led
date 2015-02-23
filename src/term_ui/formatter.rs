@@ -170,7 +170,7 @@ fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize
 mod tests {
     #![allow(unused_imports)]
     use super::*;
-    use formatter::LineFormatter;
+    use formatter::{LineFormatter, LINE_BLOCK_LENGTH};
     use formatter::RoundingBehavior::{Round, Floor, Ceiling};
     use buffer::Buffer;
     

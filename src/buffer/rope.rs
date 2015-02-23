@@ -1399,6 +1399,41 @@ mod tests {
         assert!(None == iter.next());
     }
     
+    
+    #[test]
+    fn slice_8() {
+        let rope = Rope::new_from_str("Hello everyone!  How are you doing, eh?");
+        let s = rope.slice(15, 39);
+        
+        let mut iter = s.grapheme_iter_between_indices(0, 25);
+        
+        assert!(Some(" ") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("H") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("w") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("a") == iter.next());
+        assert!(Some("r") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("y") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("u") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("d") == iter.next());
+        assert!(Some("o") == iter.next());
+        assert!(Some("i") == iter.next());
+        assert!(Some("n") == iter.next());
+        assert!(Some("g") == iter.next());
+        assert!(Some(",") == iter.next());
+        assert!(Some(" ") == iter.next());
+        assert!(Some("e") == iter.next());
+        assert!(Some("h") == iter.next());
+        assert!(Some("?") == iter.next());
+        assert!(None == iter.next());
+    }
+    
 
     #[test]
     fn line_index_to_grapheme_index_1() {

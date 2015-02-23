@@ -65,14 +65,14 @@ pub trait LineFormatter {
         let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
         
         let (mut y, x) = self.index_to_v2d(buf.get_line(line_i).grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH), col_i_adjusted);
-        let mut new_y = y as isize + offset;
         
         // First, find the right line while keeping track of the vertical offset
+        let mut new_y = y as isize + offset;
         let mut line;
         let mut block_index: usize = line_block;
         loop {
             line = buf.get_line(line_i);
-            let (h, _) = self.dimensions(line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH));
+            let (h, _) = self.dimensions(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH));
             
             if new_y >= 0 && new_y < h as isize {
                 y = new_y as usize;
@@ -80,14 +80,14 @@ pub trait LineFormatter {
             }
             else {
                 if new_y > 0 {
-                    let last_block = block_index >= (line.grapheme_count() / LINE_BLOCK_LENGTH);
+                    let is_last_block = block_index >= last_block_index(line.grapheme_count());
                     
                     // Check for off-the-end
-                    if last_block && (line_i + 1) >= buf.line_count() {
+                    if is_last_block && (line_i + 1) >= buf.line_count() {
                         return buf.grapheme_count();
                     }
                     
-                    if last_block { 
+                    if is_last_block { 
                         line_i += 1;
                         block_index = 0;
                     }
@@ -105,12 +105,12 @@ pub trait LineFormatter {
                     if block_index == 0 {
                         line_i -= 1;
                         line = buf.get_line(line_i);
-                        block_index = line.grapheme_count() / LINE_BLOCK_LENGTH;
+                        block_index = last_block_index(line.grapheme_count());
                     }
                     else {
                         block_index -= 1;
                     }
-                    let (h, _) = self.dimensions(line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH));
+                    let (h, _) = self.dimensions(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH));
                     new_y += h as isize;
                 }
                 else {
@@ -121,7 +121,7 @@ pub trait LineFormatter {
         
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
-        col_i = (block_index * LINE_BLOCK_LENGTH) + self.v2d_to_index(line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH), (y, x), rounding);
+        col_i = (block_index * LINE_BLOCK_LENGTH) + self.v2d_to_index(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH), (y, x), rounding);
         
         return buf.line_col_to_index((line_i, col_i));
     }
@@ -157,4 +157,18 @@ pub trait LineFormatter {
 
 pub fn block_index_and_offset(index: usize) -> (usize, usize) {
     (index / LINE_BLOCK_LENGTH, index % LINE_BLOCK_LENGTH)
+}
+
+pub fn last_block_index(gc: usize) -> usize {
+    let mut block_count = gc / LINE_BLOCK_LENGTH;
+    if (gc % LINE_BLOCK_LENGTH) > 0 {
+        block_count += 1;
+    }
+    
+    if block_count > 0 {
+        return block_count - 1;
+    }
+    else {
+        return 0;
+    }
 }
