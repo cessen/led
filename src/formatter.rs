@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::cmp::min;
 use buffer::Buffer;
 
 // Maximum graphemes in a line before a soft line break is forced.
@@ -121,7 +122,9 @@ pub trait LineFormatter {
         
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
-        col_i = (block_index * LINE_BLOCK_LENGTH) + self.v2d_to_index(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH), (y, x), rounding);
+        let block_slice = line.slice(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH);
+        let block_col_i = min(self.v2d_to_index(block_slice.grapheme_iter(), (y, x), rounding), LINE_BLOCK_LENGTH - 1);
+        col_i = (block_index * LINE_BLOCK_LENGTH) + block_col_i;
         
         return buf.line_col_to_index((line_i, col_i));
     }
@@ -140,7 +143,8 @@ pub trait LineFormatter {
         
         // Calculate the horizontal position
         let (v, _) = self.index_to_v2d(line.grapheme_iter_between_indices(start_index, start_index+LINE_BLOCK_LENGTH), col_i_adjusted);
-        let mut new_col_i = start_index + self.v2d_to_index(line.grapheme_iter_between_indices(start_index, start_index+LINE_BLOCK_LENGTH), (v, horizontal), (RoundingBehavior::Floor, rounding));
+        let block_col_i = self.v2d_to_index(line.grapheme_iter_between_indices(start_index, start_index+LINE_BLOCK_LENGTH), (v, horizontal), (RoundingBehavior::Floor, rounding));
+        let mut new_col_i = start_index + min(block_col_i, LINE_BLOCK_LENGTH - 1);
         
         // Make sure we're not pushing the index off the end of the line
         if (line_i + 1) < buf.line_count()
