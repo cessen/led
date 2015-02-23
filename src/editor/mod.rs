@@ -321,7 +321,7 @@ impl<T: LineFormatter> Editor<T> {
         
         // Find the first and last grapheme index visible within the editor.
         let g_first = self.formatter.index_set_horizontal_v2d(&self.buffer, self.view_pos.0, 0, Floor);
-        let mut g_last = self.formatter.index_offset_vertical_v2d(&self.buffer, g_first, (self.view_dim.0 - 1) as isize, (Floor, Floor));
+        let mut g_last = self.formatter.index_offset_vertical_v2d(&self.buffer, g_first, self.view_dim.0 as isize, (Floor, Floor));
         g_last = self.formatter.index_set_horizontal_v2d(&self.buffer, g_last, self.view_dim.1, Floor);
 
         // Adjust the view depending on where the cursor is        
@@ -329,7 +329,7 @@ impl<T: LineFormatter> Editor<T> {
             self.view_pos.0 = self.cursors[0].range.0;
         }
         else if self.cursors[0].range.0 >= g_last {
-            self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer, self.cursors[0].range.0, -((self.view_dim.0 - 1) as isize), (Floor, Floor));
+            self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer, self.cursors[0].range.0, -(self.view_dim.0 as isize), (Floor, Floor));
         }
     }
     
