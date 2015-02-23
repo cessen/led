@@ -37,6 +37,15 @@ impl Buffer {
     }
     
     
+    pub fn new_from_str(s: &str) -> Buffer {
+        Buffer {
+            text: Rope::new_from_str(s),
+            file_path: None,
+            undo_stack: UndoStack::new(),
+        }
+    }
+    
+    
     pub fn new_from_file(path: &Path) -> IoResult<Buffer> {
         let mut f = BufferedReader::new(try!(File::open(path)));
         let string = f.read_to_string().unwrap();

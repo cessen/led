@@ -47,7 +47,7 @@ pub trait LineFormatter {
         let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
         
         // Get an iter into the right block
-        let g_iter = line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, line_block * (LINE_BLOCK_LENGTH+1));
+        let g_iter = line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH);
         return self.index_to_v2d(g_iter, col_i_adjusted).1;
     }
     
@@ -64,7 +64,7 @@ pub trait LineFormatter {
         // Find the right block in the line, and the index within that block
         let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
         
-        let (mut y, x) = self.index_to_v2d(buf.get_line(line_i).grapheme_iter_between_indices(line_block*LINE_BLOCK_LENGTH, line_block*(LINE_BLOCK_LENGTH+1)), col_i_adjusted);
+        let (mut y, x) = self.index_to_v2d(buf.get_line(line_i).grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH), col_i_adjusted);
         let mut new_y = y as isize + offset;
         
         // First, find the right line while keeping track of the vertical offset
@@ -72,7 +72,7 @@ pub trait LineFormatter {
         let mut block_index: usize = line_block;
         loop {
             line = buf.get_line(line_i);
-            let (h, _) = self.dimensions(line.grapheme_iter_between_indices(line_block*LINE_BLOCK_LENGTH, line_block*(LINE_BLOCK_LENGTH+1)));
+            let (h, _) = self.dimensions(line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH));
             
             if new_y >= 0 && new_y < h as isize {
                 y = new_y as usize;
@@ -110,7 +110,7 @@ pub trait LineFormatter {
                     else {
                         block_index -= 1;
                     }
-                    let (h, _) = self.dimensions(line.grapheme_iter_between_indices(line_block*LINE_BLOCK_LENGTH, line_block*(LINE_BLOCK_LENGTH+1)));
+                    let (h, _) = self.dimensions(line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH));
                     new_y += h as isize;
                 }
                 else {
@@ -121,12 +121,15 @@ pub trait LineFormatter {
         
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
-        col_i = (block_index * LINE_BLOCK_LENGTH) + self.v2d_to_index(line.grapheme_iter_between_indices(line_block*LINE_BLOCK_LENGTH, line_block*(LINE_BLOCK_LENGTH+1)), (y, x), rounding);
+        col_i = (block_index * LINE_BLOCK_LENGTH) + self.v2d_to_index(line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH), (y, x), rounding);
         
         return buf.line_col_to_index((line_i, col_i));
     }
     
     
+    /// Takes a grapheme index and a desired visual horizontal position, and
+    /// returns a grapheme index on the same visual line as the given index,
+    /// but offset to have the desired horizontal position.
     fn index_set_horizontal_v2d(&self, buf: &Buffer, index: usize, horizontal: usize, rounding: RoundingBehavior) -> usize {
         let (line_i, col_i) = buf.index_to_line_col(index);
         let line = buf.get_line(line_i);
