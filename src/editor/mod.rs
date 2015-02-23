@@ -328,7 +328,7 @@ impl<T: LineFormatter> Editor<T> {
         if self.cursors[0].range.0 < g_first {
             self.view_pos.0 = self.cursors[0].range.0;
         }
-        else if self.cursors[0].range.0 >= g_last {
+        else if self.cursors[0].range.0 > g_last {
             self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer, self.cursors[0].range.0, -(self.view_dim.0 as isize), (Floor, Floor));
         }
     }
