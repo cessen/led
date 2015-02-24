@@ -1,7 +1,7 @@
 #![feature(core)]
-#![feature(io)]
+#![feature(old_io)]
 #![feature(collections)]
-#![feature(path)]
+#![feature(old_path)]
 #![feature(unicode)]
 #![feature(test)]
 #![feature(std_misc)]
@@ -65,7 +65,7 @@ fn main() {
     if args.flag_gui {
         // // Load file, if specified    
         // let editor = if let Option::Some(s) = args.arg_file {
-        //     Editor::new_from_file(GUILineFormatter::new(4), &Path::new(&s[]))
+        //     Editor::new_from_file(GUILineFormatter::new(4), &Path::new(&s[..]))
         // }
         // else {
         //     Editor::new(GUILineFormatter::new(4))
@@ -80,7 +80,7 @@ fn main() {
     else {
         // Load file, if specified    
         let editor = if let Option::Some(s) = args.arg_file {
-            Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(&s[]))
+            Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(&s[..]))
         }
         else {
             Editor::new(ConsoleLineFormatter::new(4))

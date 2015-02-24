@@ -5,6 +5,8 @@ use rustbox::Color;
 use editor::Editor;
 use formatter::{LineFormatter, LINE_BLOCK_LENGTH, block_index_and_offset};
 use std::char;
+use std::old_io::stdio;
+use std::default::Default;
 use std::time::duration::Duration;
 use string_utils::{is_line_ending, line_ending_to_str, LineEnding};
 use utils::digit_count;
@@ -43,7 +45,10 @@ pub struct TermUI {
 
 impl TermUI {
     pub fn new() -> TermUI {
-        let rb = match rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]) {
+        let rb = match rustbox::RustBox::init(rustbox::InitOptions {
+            buffer_stderr: stdio::stderr_raw().isatty(),
+            ..Default::default()
+        }) {
             Ok(rbox) => rbox,
             Err(_) => panic!("Could not create Rustbox instance."),
         };
@@ -61,7 +66,10 @@ impl TermUI {
     }
     
     pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
-        let rb = match rustbox::RustBox::init(&[Some(rustbox::InitOption::BufferStderr)]) {
+        let rb = match rustbox::RustBox::init(rustbox::InitOptions {
+            buffer_stderr: stdio::stderr_raw().isatty(),
+            ..Default::default()
+        }) {
             Ok(rbox) => rbox,
             Err(_) => panic!("Could not create Rustbox instance."),
         };
@@ -174,7 +182,7 @@ impl TermUI {
                             // Character
                             0 => {
                                 if let Option::Some(c) = char::from_u32(character) {
-                                    self.editor.insert_text_at_cursor(&c.to_string()[]);
+                                    self.editor.insert_text_at_cursor(&c.to_string()[..]);
                                 }
                             },
                             
@@ -228,7 +236,7 @@ impl TermUI {
                 self.rb.print(i, 0, rustbox::RB_NORMAL, foreground, background, " ");
             }
             self.rb.print(1, 0, rustbox::RB_NORMAL, foreground, background, prefix);
-            self.rb.print(prefix.len() + 1, 0, rustbox::RB_NORMAL, foreground, background, &line[]);
+            self.rb.print(prefix.len() + 1, 0, rustbox::RB_NORMAL, foreground, background, &line[..]);
             self.rb.present();
             
             
@@ -318,7 +326,7 @@ impl TermUI {
         let filename = editor.file_path.display();
         let dirty_char = if editor.dirty {"*"} else {""};
         let name = format!("{}{}", filename, dirty_char);
-        self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, &name[]);
+        self.rb.print(c1.1 + 1, c1.0, rustbox::RB_NORMAL, foreground, background, &name[..]);
         
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
@@ -330,7 +338,7 @@ impl TermUI {
             100
         };
         let pstring = format!("{}%", percentage);
-        self.rb.print(c2.1 - pstring.len(), c1.0, rustbox::RB_NORMAL, foreground, background, &pstring[]);
+        self.rb.print(c2.1 - pstring.len(), c1.0, rustbox::RB_NORMAL, foreground, background, &pstring[..]);
         
         // Text encoding info and tab style
         let nl = match editor.line_ending_type {
@@ -346,7 +354,7 @@ impl TermUI {
         };
         let soft_tabs_str = if editor.soft_tabs {"spaces"} else {"tabs"};
         let info_line = format!("UTF8:{}  {}:{}", nl, soft_tabs_str, editor.soft_tab_width as usize);
-        self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, &info_line[]);
+        self.rb.print(c2.1 - 30, c1.0, rustbox::RB_NORMAL, foreground, background, &info_line[..]);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);

@@ -194,7 +194,7 @@ impl Buffer {
             // manipulates the node tree.
             let s = self.string_from_range(pos_a, pos_b);
             self._remove_text(pos_a, pos_b);
-            self._insert_text(&s[], pos_to);
+            self._insert_text(&s[..], pos_to);
         }
     }
     
@@ -257,19 +257,19 @@ impl Buffer {
         if let Some(op) = self.undo_stack.prev() {
             match op {
                 InsertText(ref s, p) => {
-                    let size = grapheme_count(&s[]);
+                    let size = grapheme_count(&s[..]);
                     self._remove_text(p, p+size);
                     return Some(p);
                 },
                 
                 RemoveTextBefore(ref s, p) => {
-                    let size = grapheme_count(&s[]);
-                    self._insert_text(&s[], p);
+                    let size = grapheme_count(&s[..]);
+                    self._insert_text(&s[..], p);
                     return Some(p+size);
                 },
                 
                 RemoveTextAfter(ref s, p) => {
-                    self._insert_text(&s[], p);
+                    self._insert_text(&s[..], p);
                     return Some(p);
                 },
                 
@@ -295,13 +295,13 @@ impl Buffer {
         if let Some(op) = self.undo_stack.next() {
             match op {
                 InsertText(ref s, p) => {
-                    let size = grapheme_count(&s[]);
-                    self._insert_text(&s[], p);
+                    let size = grapheme_count(&s[..]);
+                    self._insert_text(&s[..], p);
                     return Some(p+size);
                 },
                 
                 RemoveTextBefore(ref s, p) | RemoveTextAfter(ref s, p) => {
-                    let size = grapheme_count(&s[]);
+                    let size = grapheme_count(&s[..]);
                     self._remove_text(p, p+size);
                     return Some(p);
                 },
@@ -1505,7 +1505,7 @@ mod tests {
         
         let s = buf.string_from_range(1, 12);
         
-        assert!(&s[] == "i\nthere\npeo");
+        assert!(&s[..] == "i\nthere\npeo");
     }
     
     
@@ -1516,7 +1516,7 @@ mod tests {
         
         let s = buf.string_from_range(0, 29);
         
-        assert!(&s[] == "Hi\nthere\npeople\nof\nthe\nworld!");
+        assert!(&s[..] == "Hi\nthere\npeople\nof\nthe\nworld!");
     }
     
     

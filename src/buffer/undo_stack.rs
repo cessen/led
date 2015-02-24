@@ -1,4 +1,4 @@
-use std::collections::DList;
+use std::collections::LinkedList;
 
 
 /// A text editing operation
@@ -14,15 +14,15 @@ pub enum Operation {
 
 /// An undo/redo stack of text editing operations
 pub struct UndoStack {
-    stack_a: DList<Operation>,
-    stack_b: DList<Operation>,
+    stack_a: LinkedList<Operation>,
+    stack_b: LinkedList<Operation>,
 }
 
 impl UndoStack {
     pub fn new() -> UndoStack {
         UndoStack {
-            stack_a: DList::new(),
-            stack_b: DList::new(),
+            stack_a: LinkedList::new(),
+            stack_b: LinkedList::new(),
         }
     }
     

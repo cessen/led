@@ -141,7 +141,7 @@ impl<T: LineFormatter> Editor<T> {
         // Analyze stats and make a determination
         let mut lei = 0;
         let mut le_count = 0;
-        for i in 0us..8 {
+        for i in 0usize..8 {
             if line_ending_histogram[i] >= le_count {
                 lei = i;
                 le_count = line_ending_histogram[i];
@@ -170,7 +170,7 @@ impl<T: LineFormatter> Editor<T> {
         let mut space_blocks: usize = 0;
         let mut space_histogram: [usize; 9] = [0, 0, 0, 0, 0, 0, 0, 0, 0];
         
-        let mut last_indent = (false, 0us);  // (was_tabs, indent_count)
+        let mut last_indent = (false, 0usize);  // (was_tabs, indent_count)
         
         // Collect statistics
         let mut line_i: usize = 0;
@@ -244,7 +244,7 @@ impl<T: LineFormatter> Editor<T> {
         if space_blocks > (tab_blocks * 2) {
             let mut width = 0;
             let mut width_count = 0;
-            for i in 0us..9 {
+            for i in 0usize..9 {
                 if space_histogram[i] > width_count {
                     width = i;
                     width_count = space_histogram[i];
