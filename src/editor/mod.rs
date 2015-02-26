@@ -5,7 +5,7 @@ use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
 use std::old_path::Path;
 use std::cmp::{min, max};
-use string_utils::{grapheme_count, LineEnding};
+use string_utils::{grapheme_count, str_to_line_ending, LineEnding};
 use utils::digit_count;
 use self::cursor::CursorSet;
 
@@ -102,7 +102,17 @@ impl<T: LineFormatter> Editor<T> {
         // Collect statistics
         let mut line_i: usize = 0;
         for line in self.buffer.line_iter() {
-            match line.ending() {
+            // Get the line ending
+            let ending = if line.grapheme_count() > 0 {
+                let g = line.grapheme_at_index(line.grapheme_count() - 1);
+                str_to_line_ending(g)
+            }
+            else {
+                LineEnding::None
+            };
+            
+            // Record which line ending it is
+            match ending {
                 LineEnding::None => {
                 },
                 LineEnding::CRLF => {

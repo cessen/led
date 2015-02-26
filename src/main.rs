@@ -2,7 +2,6 @@
 #![feature(old_io)]
 #![feature(collections)]
 #![feature(old_path)]
-#![feature(unicode)]
 #![feature(test)]
 #![feature(std_misc)]
 
@@ -11,6 +10,7 @@ extern crate rustbox;
 extern crate docopt;
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate encoding;
+extern crate ropey;
 //extern crate freetype;
 //extern crate sdl2;
 

@@ -5,12 +5,11 @@ use std::old_path::Path;
 use std::old_io::fs::File;
 use std::old_io::{IoResult, BufferedReader, BufferedWriter};
 
-pub use self::rope::{Rope, RopeSlice, RopeGraphemeIter, RopeLineIter};
+use ropey::{Rope, RopeSlice, RopeGraphemeIter, RopeLineIter};
 use self::undo_stack::{UndoStack};
 use self::undo_stack::Operation::*;
 use string_utils::grapheme_count;
 
-mod rope;
 mod undo_stack;
 
 
@@ -39,7 +38,7 @@ impl Buffer {
     
     pub fn new_from_str(s: &str) -> Buffer {
         Buffer {
-            text: Rope::new_from_str(s),
+            text: Rope::from_str(s),
             file_path: None,
             undo_stack: UndoStack::new(),
         }
@@ -51,7 +50,7 @@ impl Buffer {
         let string = f.read_to_string().unwrap();
     
         let buf = Buffer {
-            text: Rope::new_from_str(string.as_slice()),
+            text: Rope::from_str(string.as_slice()),
             file_path: Some(path.clone()),
             undo_stack: UndoStack::new(),
         };

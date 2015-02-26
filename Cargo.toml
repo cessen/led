@@ -8,6 +8,9 @@ authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 name = "led"
 path = "src/main.rs"
 
+[dependencies.ropey]
+git = "https://github.com/cessen/ropey.git"
+
 [dependencies.sdl2]
 git = "https://github.com/AngryLawyer/rust-sdl2.git"
 
