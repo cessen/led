@@ -47,7 +47,7 @@ Options:
 
 // Struct for storing command-line arguments
 #[derive(RustcDecodable, Debug)]
-    struct Args {
+struct Args {
     arg_file: Option<String>,
     flag_gui: bool,
     flag_help: bool,

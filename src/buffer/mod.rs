@@ -88,7 +88,7 @@ impl Buffer {
 
     
     pub fn line_count(&self) -> usize {
-        self.text.line_count()
+        self.text.line_ending_count() + 1
     }
 
     
@@ -230,7 +230,7 @@ impl Buffer {
             panic!("Buffer::remove_lines(): attempt to remove lines past the last line of text.");
         }
         // Complete removal of all lines
-        else if line_a == 0 && line_b == self.text.line_count() {
+        else if line_a == 0 && line_b == (self.text.line_ending_count() + 1) {
             let mut temp_node = Rope::new();
             mem::swap(&mut (self.text), &mut temp_node);
         }
@@ -348,14 +348,18 @@ impl Buffer {
     /// number of the last valid text position.
     pub fn index_to_line_col(&self, pos: usize) -> (usize, usize) {
         // Convert to char index
-        let cpos = self.text.grapheme_index_to_char_index(pos);
+        let cpos = if pos < self.text.grapheme_count() {
+            self.text.grapheme_index_to_char_index(pos)
+        }
+        else {
+            self.text.char_count()
+        };
         
-        let p = min(cpos, self.text.char_count());
-        let line = self.text.char_index_to_line_index(p);
+        let line = self.text.char_index_to_line_index(cpos);
         let line_pos = self.text.line_index_to_char_index(line);
         
         // Convert back from char index
-        let gp = self.text.char_index_to_grapheme_index(p);
+        let gp = self.text.char_index_to_grapheme_index(cpos);
         let gline_pos = self.text.char_index_to_grapheme_index(line_pos);
         
         return (line, gp - gline_pos);
@@ -370,23 +374,23 @@ impl Buffer {
     /// beyond the end of the buffer, returns the index of the buffer's last
     /// valid position.
     pub fn line_col_to_index(&self, pos: (usize, usize)) -> usize {
-        if pos.0 <= (self.text.line_count()-1) {
-                let temp1 = self.text.line_index_to_char_index(pos.0);
-                let l_begin_pos = self.text.char_index_to_grapheme_index(temp1);
-                
-                let l_end_pos = if pos.0 < (self.text.line_count()-1) {
-                    let temp2 = self.text.line_index_to_char_index(pos.0 + 1);
-                    self.text.char_index_to_grapheme_index(temp2) - 1
-                }
-                else {
-                    self.text.grapheme_count()
-                };
-                
-                return min(l_begin_pos + pos.1, l_end_pos);
+        if pos.0 <= self.text.line_ending_count() {
+            let temp1 = self.text.line_index_to_char_index(pos.0);
+            let l_begin_pos = self.text.char_index_to_grapheme_index(temp1);
+            
+            let l_end_pos = if pos.0 < self.text.line_ending_count() {
+                let temp2 = self.text.line_index_to_char_index(pos.0 + 1);
+                self.text.char_index_to_grapheme_index(temp2) - 1
             }
             else {
-                return self.text.grapheme_count();
-            }
+                self.text.grapheme_count()
+            };
+            
+            return min(l_begin_pos + pos.1, l_end_pos);
+        }
+        else {
+            return self.text.grapheme_count();
+        }
     }
     
     
@@ -410,7 +414,7 @@ impl Buffer {
         }
         
         let a = self.text.line_index_to_char_index(index);
-        let b = if index+1 < self.line_count() {
+        let b = if (index+1) < self.line_count() {
             self.text.line_index_to_char_index(index+1)
         }
         else {
@@ -501,7 +505,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 9);
-        assert!(buf.text.line_count() == 1);
+        assert!(buf.line_count() == 1);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -524,7 +528,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 11);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -550,7 +554,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 17);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("A") == iter.next());
         assert!(Some("g") == iter.next());
         assert!(Some("a") == iter.next());
@@ -582,7 +586,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 17);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -614,7 +618,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 16);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -645,7 +649,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 16);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -676,7 +680,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 16);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("a") == iter.next());
@@ -708,7 +712,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 16);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -740,7 +744,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 20);
-        assert!(buf.text.line_count() == 7);
+        assert!(buf.line_count() == 7);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -772,14 +776,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         
         buf._remove_text(0, 3);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 26);
-        assert!(buf.text.line_count() == 5);
+        assert!(buf.line_count() == 5);
         assert!(Some("t") == iter.next());
         assert!(Some("h") == iter.next());
         assert!(Some("e") == iter.next());
@@ -816,14 +820,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         
         buf._remove_text(0, 12);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 17);
-        assert!(buf.text.line_count() == 4);
+        assert!(buf.line_count() == 4);
         assert!(Some("p") == iter.next());
         assert!(Some("l") == iter.next());
         assert!(Some("e") == iter.next());
@@ -851,14 +855,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         
         buf._remove_text(5, 17);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 17);
-        assert!(buf.text.line_count() == 4);
+        assert!(buf.line_count() == 4);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -886,14 +890,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         
         buf._remove_text(23, 29);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 23);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -927,14 +931,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         
         buf._remove_text(17, 29);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 17);
-        assert!(buf.text.line_count() == 4);
+        assert!(buf.line_count() == 4);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -962,14 +966,14 @@ mod tests {
         
         buf.insert_text("Hello\nworld!", 0);
         assert!(buf.grapheme_count() == 12);
-        assert!(buf.text.line_count() == 2);
+        assert!(buf.line_count() == 2);
         
         buf._remove_text(3, 12);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 3);
-        assert!(buf.text.line_count() == 1);
+        assert!(buf.line_count() == 1);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -983,14 +987,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\nworld!", 0);
         assert!(buf.grapheme_count() == 15);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         
         buf._remove_text(5, 15);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 5);
-        assert!(buf.text.line_count() == 2);
+        assert!(buf.line_count() == 2);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1006,14 +1010,14 @@ mod tests {
         
         buf.insert_text("Hello\nworld!", 0);
         assert!(buf.grapheme_count() == 12);
-        assert!(buf.text.line_count() == 2);
+        assert!(buf.line_count() == 2);
         
         buf._remove_text(3, 11);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 4);
-        assert!(buf.text.line_count() == 1);
+        assert!(buf.line_count() == 1);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1028,14 +1032,14 @@ mod tests {
         
         buf.insert_text("Hello\nworld!", 0);
         assert!(buf.grapheme_count() == 12);
-        assert!(buf.text.line_count() == 2);
+        assert!(buf.line_count() == 2);
         
         buf._remove_text(8, 12);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 8);
-        assert!(buf.text.line_count() == 2);
+        assert!(buf.line_count() == 2);
         assert!(Some("H") == iter.next());
         assert!(Some("e") == iter.next());
         assert!(Some("l") == iter.next());
@@ -1054,14 +1058,14 @@ mod tests {
         
         buf.insert_text("12\n34\n56\n78", 0);
         assert!(buf.grapheme_count() == 11);
-        assert!(buf.text.line_count() == 4);
+        assert!(buf.line_count() == 4);
         
         buf._remove_text(4, 11);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 4);
-        assert!(buf.text.line_count() == 2);
+        assert!(buf.line_count() == 2);
         assert!(Some("1") == iter.next());
         assert!(Some("2") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1076,14 +1080,14 @@ mod tests {
         
         buf.insert_text("1234567890", 0);
         assert!(buf.grapheme_count() == 10);
-        assert!(buf.text.line_count() == 1);
+        assert!(buf.line_count() == 1);
         
         buf._remove_text(9, 10);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 9);
-        assert!(buf.text.line_count() == 1);
+        assert!(buf.line_count() == 1);
         assert!(Some("1") == iter.next());
         assert!(Some("2") == iter.next());
         assert!(Some("3") == iter.next());
@@ -1108,7 +1112,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         assert!(Some("t") == iter.next());
         assert!(Some("h") == iter.next());
         assert!(Some("H") == iter.next());
@@ -1153,7 +1157,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1198,7 +1202,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1243,7 +1247,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1288,7 +1292,7 @@ mod tests {
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1328,14 +1332,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         
         buf.remove_lines(0, 3);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 13);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("o") == iter.next());
         assert!(Some("f") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1359,14 +1363,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert!(buf.grapheme_count() == 29);
-        assert!(buf.text.line_count() == 6);
+        assert!(buf.line_count() == 6);
         
         buf.remove_lines(1, 4);
         
         let mut iter = buf.grapheme_iter();
         
         assert!(buf.grapheme_count() == 13);
-        assert!(buf.text.line_count() == 3);
+        assert!(buf.line_count() == 3);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1390,14 +1394,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert_eq!(buf.grapheme_count(), 29);
-        assert_eq!(buf.text.line_count(), 6);
+        assert_eq!(buf.line_count(), 6);
         
         buf.remove_lines(3, 6);
         
         let mut iter = buf.grapheme_iter();
         
         assert_eq!(buf.grapheme_count(), 15);
-        assert_eq!(buf.text.line_count(), 3);
+        assert_eq!(buf.line_count(), 3);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1423,14 +1427,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\n", 0);
         assert_eq!(buf.grapheme_count(), 23);
-        assert_eq!(buf.text.line_count(), 6);
+        assert_eq!(buf.line_count(), 6);
         
         buf.remove_lines(3, 6);
         
         let mut iter = buf.grapheme_iter();
         
         assert_eq!(buf.grapheme_count(), 15);
-        assert_eq!(buf.text.line_count(), 3);
+        assert_eq!(buf.line_count(), 3);
         assert!(Some("H") == iter.next());
         assert!(Some("i") == iter.next());
         assert!(Some("\n") == iter.next());
@@ -1456,14 +1460,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\nworld!", 0);
         assert_eq!(buf.grapheme_count(), 29);
-        assert_eq!(buf.text.line_count(), 6);
+        assert_eq!(buf.line_count(), 6);
         
         buf.remove_lines(0, 6);
         
         let mut iter = buf.grapheme_iter();
         
         assert_eq!(buf.grapheme_count(), 0);
-        assert_eq!(buf.text.line_count(), 1);
+        assert_eq!(buf.line_count(), 1);
         assert!(None == iter.next());
     }
     
@@ -1474,14 +1478,14 @@ mod tests {
         
         buf.insert_text("Hi\nthere\npeople\nof\nthe\n", 0);
         assert_eq!(buf.grapheme_count(), 23);
-        assert_eq!(buf.text.line_count(), 6);
+        assert_eq!(buf.line_count(), 6);
         
         buf.remove_lines(0, 6);
         
         let mut iter = buf.grapheme_iter();
         
         assert_eq!(buf.grapheme_count(), 0);
-        assert_eq!(buf.text.line_count(), 1);
+        assert_eq!(buf.line_count(), 1);
         assert!(None == iter.next());
     }
     
@@ -1521,7 +1525,7 @@ mod tests {
     #[test]
     fn line_col_to_index_4() {
         let mut buf = Buffer::new();
-        buf.insert_text("Hello\nworld!\n");
+        buf.insert_text("Hello\nworld!\n", 0);
         
         assert_eq!(buf.line_col_to_index((0,0)), 0);
         assert_eq!(buf.line_col_to_index((0,5)), 5);
@@ -1560,7 +1564,7 @@ mod tests {
     #[test]
     fn index_to_line_col_3() {
         let mut buf = Buffer::new();
-        buf.insert_text("Hello\nworld!\n");
+        buf.insert_text("Hello\nworld!\n", 0);
         
         assert_eq!(buf.index_to_line_col(0), (0,0));
         assert_eq!(buf.index_to_line_col(5), (0,5));
