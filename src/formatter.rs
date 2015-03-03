@@ -48,7 +48,9 @@ pub trait LineFormatter {
         let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
         
         // Get an iter into the right block
-        let g_iter = line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH);
+        let a = line_block * LINE_BLOCK_LENGTH;
+        let b = min(line.grapheme_count(), (line_block+1) * LINE_BLOCK_LENGTH);
+        let g_iter = line.grapheme_iter_between_indices(a, b);
         return self.index_to_v2d(g_iter, col_i_adjusted).1;
     }
     
@@ -65,15 +67,16 @@ pub trait LineFormatter {
         // Find the right block in the line, and the index within that block
         let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
         
-        let (mut y, x) = self.index_to_v2d(buf.get_line(line_i).grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, (line_block+1) * LINE_BLOCK_LENGTH), col_i_adjusted);
+        let mut line = buf.get_line(line_i);
+        let (mut y, x) = self.index_to_v2d(line.grapheme_iter_between_indices(line_block * LINE_BLOCK_LENGTH, min(line.grapheme_count(), (line_block+1) * LINE_BLOCK_LENGTH)), col_i_adjusted);
         
         // First, find the right line while keeping track of the vertical offset
         let mut new_y = y as isize + offset;
-        let mut line;
+        
         let mut block_index: usize = line_block;
         loop {
             line = buf.get_line(line_i);
-            let (h, _) = self.dimensions(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH));
+            let (h, _) = self.dimensions(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, min(line.grapheme_count(), (block_index+1) * LINE_BLOCK_LENGTH)));
             
             if new_y >= 0 && new_y < h as isize {
                 y = new_y as usize;
@@ -111,7 +114,7 @@ pub trait LineFormatter {
                     else {
                         block_index -= 1;
                     }
-                    let (h, _) = self.dimensions(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH));
+                    let (h, _) = self.dimensions(line.grapheme_iter_between_indices(block_index * LINE_BLOCK_LENGTH, min(line.grapheme_count(), (block_index+1) * LINE_BLOCK_LENGTH)));
                     new_y += h as isize;
                 }
                 else {
@@ -122,7 +125,7 @@ pub trait LineFormatter {
         
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
-        let block_slice = line.slice(block_index * LINE_BLOCK_LENGTH, (block_index+1) * LINE_BLOCK_LENGTH);
+        let block_slice = line.slice(block_index * LINE_BLOCK_LENGTH, min(line.grapheme_count(), (block_index+1) * LINE_BLOCK_LENGTH));
         let block_col_i = min(self.v2d_to_index(block_slice.grapheme_iter(), (y, x), rounding), LINE_BLOCK_LENGTH - 1);
         col_i = (block_index * LINE_BLOCK_LENGTH) + block_col_i;
         
@@ -140,10 +143,11 @@ pub trait LineFormatter {
         // Find the right block in the line, and the index within that block
         let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
         let start_index = line_block * LINE_BLOCK_LENGTH;
+        let end_index = min(line.grapheme_count(), start_index+LINE_BLOCK_LENGTH);
         
         // Calculate the horizontal position
-        let (v, _) = self.index_to_v2d(line.grapheme_iter_between_indices(start_index, start_index+LINE_BLOCK_LENGTH), col_i_adjusted);
-        let block_col_i = self.v2d_to_index(line.grapheme_iter_between_indices(start_index, start_index+LINE_BLOCK_LENGTH), (v, horizontal), (RoundingBehavior::Floor, rounding));
+        let (v, _) = self.index_to_v2d(line.grapheme_iter_between_indices(start_index, end_index), col_i_adjusted);
+        let block_col_i = self.v2d_to_index(line.grapheme_iter_between_indices(start_index, end_index), (v, horizontal), (RoundingBehavior::Floor, rounding));
         let mut new_col_i = start_index + min(block_col_i, LINE_BLOCK_LENGTH - 1);
         
         // Make sure we're not pushing the index off the end of the line
