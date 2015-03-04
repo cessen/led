@@ -8,6 +8,7 @@ use std::char;
 use std::old_io::stdio;
 use std::default::Default;
 use std::time::duration::Duration;
+use std::cmp::min;
 use string_utils::{is_line_ending, line_ending_to_str, LineEnding};
 use utils::digit_count;
 use self::formatter::ConsoleLineFormatter;
@@ -367,7 +368,8 @@ impl TermUI {
         let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
         let (mut line_block_index, _) = block_index_and_offset(col_i);
         let mut grapheme_index = editor.buffer.line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
-        let (vis_line_offset, _) = editor.formatter.index_to_v2d(editor.buffer.get_line(line_index).grapheme_iter_between_indices(line_block_index*LINE_BLOCK_LENGTH, (line_block_index+1)*LINE_BLOCK_LENGTH), editor.view_pos.0 - grapheme_index);
+        let temp_line = editor.buffer.get_line(line_index);
+        let (vis_line_offset, _) = editor.formatter.index_to_v2d(temp_line.grapheme_iter_between_indices(line_block_index*LINE_BLOCK_LENGTH, min(temp_line.grapheme_count(), (line_block_index+1)*LINE_BLOCK_LENGTH)), editor.view_pos.0 - grapheme_index);
         
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
         let screen_col = c1.1 as isize + gutter_width as isize;
