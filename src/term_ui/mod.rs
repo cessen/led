@@ -93,12 +93,12 @@ impl TermUI {
         let mut resize: Option<(usize, usize)> = None;
     
         self.editor.update_dim(self.height-1, self.width);
-        self.editor.formatter.wrap_width = self.width as usize;
+        self.editor.formatter.set_wrap_width(self.width as usize);
     
         loop {
             // Draw the editor to screen
             self.editor.update_view_dim();
-            self.editor.formatter.wrap_width = self.editor.view_dim.1;
+            self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
             self.rb.clear();
             self.draw_editor(&self.editor, (0, 0), (self.height-1, self.width-1));
             self.rb.present();
@@ -230,7 +230,7 @@ impl TermUI {
         loop {
             // Draw the editor to screen
             self.editor.update_view_dim();
-            self.editor.formatter.wrap_width = self.editor.view_dim.1;
+            self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
             self.rb.clear();
             self.draw_editor(&self.editor, (0, 0), (self.height-1, self.width-1));
             for i in 0..self.width {

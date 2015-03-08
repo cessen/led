@@ -3,13 +3,20 @@ use std::cmp::max;
 use string_utils::{is_line_ending};
 use formatter::{LineFormatter, RoundingBehavior};
 
+pub enum WrapType {
+    NoWrap,
+    CharWrap(usize),
+    WordWrap(usize),
+}
+
 //===================================================================
 // LineFormatter implementation for terminals/consoles.
 //===================================================================
 
 pub struct ConsoleLineFormatter {
     pub tab_width: u8,
-    pub wrap_width: usize,
+    pub wrap_type: WrapType,
+    pub maintain_indent: bool,
 }
 
 
@@ -17,7 +24,23 @@ impl ConsoleLineFormatter {
     pub fn new(tab_width: u8) -> ConsoleLineFormatter {
         ConsoleLineFormatter {
             tab_width: tab_width,
-            wrap_width: 40,
+            wrap_type: WrapType::CharWrap(40),
+            maintain_indent: false,
+        }
+    }
+    
+    pub fn set_wrap_width(&mut self, width: usize) {
+        match self.wrap_type {
+            WrapType::NoWrap => {
+            },
+            
+            WrapType::CharWrap(ref mut w) => {
+                *w = width;
+            },
+            
+            WrapType::WordWrap(ref mut w) => {
+                *w = width;
+            },
         }
     }
     
@@ -118,22 +141,45 @@ where T: Iterator<Item=&'a str>
     type Item = (&'a str, (usize, usize), usize);
 
     fn next(&mut self) -> Option<(&'a str, (usize, usize), usize)> {
-        if let Some(g) = self.grapheme_iter.next() {            
-            let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
+        match self.f.wrap_type {
+            WrapType::NoWrap => {
+                if let Some(g) = self.grapheme_iter.next() {
+                    let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
+                    
+                    let pos = self.pos;
+                    self.pos = (self.pos.0, self.pos.1 + width);
+                    return Some((g, pos, width));
+                }
+                else {
+                    return None;
+                }
+            },
             
-            if (self.pos.1 + width) > self.f.wrap_width {
-                let pos = (self.pos.0 + self.f.single_line_height(), 0);
-                self.pos = (self.pos.0 + self.f.single_line_height(), width);
-                return Some((g, pos, width));
-            }
-            else {
-                let pos = self.pos;
-                self.pos = (self.pos.0, self.pos.1 + width);
-                return Some((g, pos, width));
-            }
-        }
-        else {
-            return None;
+            WrapType::CharWrap(wrap_width) => {
+                if let Some(g) = self.grapheme_iter.next() {            
+                    let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
+                    
+                    if (self.pos.1 + width) > wrap_width {
+                        let pos = (self.pos.0 + self.f.single_line_height(), 0);
+                        self.pos = (self.pos.0 + self.f.single_line_height(), width);
+                        return Some((g, pos, width));
+                    }
+                    else {
+                        let pos = self.pos;
+                        self.pos = (self.pos.0, self.pos.1 + width);
+                        return Some((g, pos, width));
+                    }
+                }
+                else {
+                    return None;
+                }
+            },
+            
+            WrapType::WordWrap(_) => {
+                // TODO
+                return None;
+            },
+            
         }
     }
 }
