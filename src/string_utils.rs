@@ -19,6 +19,38 @@ pub fn is_line_ending(text: &str) -> bool {
     }
 }
 
+pub fn is_whitespace(text: &str) -> bool {
+    // TODO: this is a naive categorization of whitespace characters.
+    // For better categorization these should be split up into groups
+    // based on e.g. breaking vs non-breaking spaces, among other things.
+    match text {
+        "\u{0020}" // SPACE
+        | "\u{0009}" // CHARACTER TABULATION
+        | "\u{00A0}" // NO-BREAK SPACE
+        //| "\u{1680}" // OGHAM SPACE MARK (here for completeness, but usually displayed as a dash, not as whitespace)
+        | "\u{180E}" // MONGOLIAN VOWEL SEPARATOR
+        | "\u{2000}" // EN QUAD
+        | "\u{2001}" // EM QUAD
+        | "\u{2002}" // EN SPACE
+        | "\u{2003}" // EM SPACE
+        | "\u{2004}" // THREE-PER-EM SPACE
+        | "\u{2005}" // FOUR-PER-EM SPACE
+        | "\u{2006}" // SIX-PER-EM SPACE
+        | "\u{2007}" // FIGURE SPACE
+        | "\u{2008}" // PUNCTUATION SPACE
+        | "\u{2009}" // THIN SPACE
+        | "\u{200A}" // HAIR SPACE
+        | "\u{200B}" // ZERO WIDTH SPACE
+        | "\u{202F}" // NARROW NO-BREAK SPACE
+        | "\u{205F}" // MEDIUM MATHEMATICAL SPACE
+        | "\u{3000}" // IDEOGRAPHIC SPACE
+        | "\u{FEFF}" // ZERO WIDTH NO-BREAK SPACE
+        => true, 
+        
+        _ => false
+    }
+}
+
 pub fn line_ending_count(text: &str) -> usize {
     let mut count = 0;
     for g in text.graphemes(true) {
