@@ -17,6 +17,7 @@ pub struct ConsoleLineFormatter {
     pub tab_width: u8,
     pub wrap_type: WrapType,
     pub maintain_indent: bool,
+    pub wrap_additional_indent: usize,
 }
 
 
@@ -26,6 +27,7 @@ impl ConsoleLineFormatter {
             tab_width: tab_width,
             wrap_type: WrapType::WordWrap(40),
             maintain_indent: true,
+            wrap_additional_indent: 0,
         }
     }
     
@@ -166,13 +168,13 @@ where T: Iterator<Item=&'a str>
             }
             
             if self.f.maintain_indent {
-                let pos = (self.pos.0 + self.f.single_line_height(), self.indent);
-                self.pos = (self.pos.0 + self.f.single_line_height(), self.indent + width);
+                let pos = (self.pos.0 + self.f.single_line_height(), self.indent + self.f.wrap_additional_indent);
+                self.pos = (self.pos.0 + self.f.single_line_height(), self.indent + self.f.wrap_additional_indent + width);
                 return Some((g, pos, width));
             }
             else {
-                let pos = (self.pos.0 + self.f.single_line_height(), 0);
-                self.pos = (self.pos.0 + self.f.single_line_height(), width);
+                let pos = (self.pos.0 + self.f.single_line_height(), self.f.wrap_additional_indent);
+                self.pos = (self.pos.0 + self.f.single_line_height(), self.f.wrap_additional_indent + width);
                 return Some((g, pos, width));
             }
         }
@@ -249,10 +251,10 @@ where T: Iterator<Item=&'a str>
                         }
                         
                         if self.f.maintain_indent {
-                            self.pos = (self.pos.0 + self.f.single_line_height(), self.indent);
+                            self.pos = (self.pos.0 + self.f.single_line_height(), self.indent + self.f.wrap_additional_indent);
                         }
                         else {
-                            self.pos = (self.pos.0 + self.f.single_line_height(), 0);
+                            self.pos = (self.pos.0 + self.f.single_line_height(), self.f.wrap_additional_indent);
                         }
                     }
                     
@@ -308,7 +310,11 @@ mod tests {
     #[test]
     fn dimensions_1() {
         let text = "Hello there, stranger!"; // 22 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
         assert_eq!(f.dimensions(text.graphemes(true)), (1, 22));
@@ -318,7 +324,11 @@ mod tests {
     #[test]
     fn dimensions_2() {
         let text = "Hello there, stranger!  How are you doing this fine day?"; // 56 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
         assert_eq!(f.dimensions(text.graphemes(true)), (5, 12));
@@ -328,7 +338,11 @@ mod tests {
     #[test]
     fn index_to_v2d_1() {
         let text = "Hello there, stranger!"; // 22 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
         assert_eq!(f.index_to_v2d(text.graphemes(true), 0), (0, 0));
@@ -341,7 +355,11 @@ mod tests {
     #[test]
     fn index_to_v2d_2() {
         let text = "Hello there, stranger!  How are you doing this fine day?"; // 56 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
         assert_eq!(f.index_to_v2d(text.graphemes(true), 0), (0, 0));
@@ -371,7 +389,11 @@ mod tests {
     #[test]
     fn v2d_to_index_1() {
         let text = "Hello there, stranger!"; // 22 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
         assert_eq!(f.v2d_to_index(text.graphemes(true), (0,0), (Floor, Floor)), 0);
@@ -386,7 +408,11 @@ mod tests {
     #[test]
     fn v2d_to_index_2() {
         let text = "Hello there, stranger!  How are you doing this fine day?"; // 56 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
         assert_eq!(f.v2d_to_index(text.graphemes(true), (0,0), (Floor, Floor)), 0);
@@ -415,7 +441,11 @@ mod tests {
     #[test]
     fn index_to_horizontal_v2d_1() {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
         assert_eq!(f.index_to_horizontal_v2d(&b, 0), 0);
@@ -429,7 +459,11 @@ mod tests {
     #[test]
     fn index_to_horizontal_v2d_2() {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
         assert_eq!(f.index_to_horizontal_v2d(&b, 0), 0);
@@ -453,7 +487,11 @@ mod tests {
     #[test]
     fn index_set_horizontal_v2d_1() {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
         assert_eq!(f.index_set_horizontal_v2d(&b, 0, 0, Floor), 0);
@@ -485,7 +523,11 @@ mod tests {
     #[test]
     fn index_set_horizontal_v2d_2() {
         let b = Buffer::new_from_str("Hello there, stranger! How are you doing this fine day?"); // 55 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
         assert_eq!(f.index_set_horizontal_v2d(&b, 0, 0, Floor), 0);
@@ -517,7 +559,11 @@ mod tests {
     #[test]
     fn index_offset_vertical_v2d_1() {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
         assert_eq!(f.index_offset_vertical_v2d(&b, 0, 0, (Floor, Floor)), 0);
@@ -541,7 +587,11 @@ mod tests {
     #[test]
     fn index_offset_vertical_v2d_2() {
         let b = Buffer::new_from_str("Hello there, stranger! How are you doing this fine day?"); // 55 graphemes long
+        
         let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
         assert_eq!(f.index_offset_vertical_v2d(&b, 0, 0, (Floor, Floor)), 0);
