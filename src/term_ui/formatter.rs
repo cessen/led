@@ -24,7 +24,7 @@ impl ConsoleLineFormatter {
     pub fn new(tab_width: u8) -> ConsoleLineFormatter {
         ConsoleLineFormatter {
             tab_width: tab_width,
-            wrap_type: WrapType::CharWrap(40),
+            wrap_type: WrapType::WordWrap(40),
             maintain_indent: true,
         }
     }
@@ -53,6 +53,8 @@ impl ConsoleLineFormatter {
             pos: (0, 0),
             indent: 0,
             indent_found: false,
+            word_buf: Vec::new(),
+            word_i: 0,
         }
     }
 }
@@ -133,8 +135,62 @@ where T: Iterator<Item=&'a str>
     grapheme_iter: T,
     f: &'a ConsoleLineFormatter,
     pos: (usize, usize),
+    
     indent: usize,
     indent_found: bool,
+    
+    word_buf: Vec<&'a str>,
+    word_i: usize,
+}
+
+
+impl<'a, T> ConsoleLineFormatterVisIter<'a, T>
+where T: Iterator<Item=&'a str>
+{
+    fn next_nowrap(&mut self, g: &'a str) -> Option<(&'a str, (usize, usize), usize)> {
+        let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
+        
+        let pos = self.pos;
+        self.pos = (self.pos.0, self.pos.1 + width);
+        return Some((g, pos, width));
+    }
+    
+    
+    fn next_charwrap(&mut self, g: &'a str, wrap_width: usize) -> Option<(&'a str, (usize, usize), usize)> {
+        let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
+        
+        if (self.pos.1 + width) > wrap_width {
+            if !self.indent_found {
+                self.indent = 0;
+                self.indent_found = true;
+            }
+            
+            if self.f.maintain_indent {
+                let pos = (self.pos.0 + self.f.single_line_height(), self.indent);
+                self.pos = (self.pos.0 + self.f.single_line_height(), self.indent + width);
+                return Some((g, pos, width));
+            }
+            else {
+                let pos = (self.pos.0 + self.f.single_line_height(), 0);
+                self.pos = (self.pos.0 + self.f.single_line_height(), width);
+                return Some((g, pos, width));
+            }
+        }
+        else {
+            if !self.indent_found {
+                if is_whitespace(g) {
+                    self.indent += width;
+                }
+                else {
+                    self.indent_found = true;
+                }
+            }
+            
+            let pos = self.pos;
+            self.pos = (self.pos.0, self.pos.1 + width);
+            return Some((g, pos, width));
+        }
+    }
 }
 
 
@@ -148,11 +204,7 @@ where T: Iterator<Item=&'a str>
         match self.f.wrap_type {
             WrapType::NoWrap => {
                 if let Some(g) = self.grapheme_iter.next() {
-                    let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
-                    
-                    let pos = self.pos;
-                    self.pos = (self.pos.0, self.pos.1 + width);
-                    return Some((g, pos, width));
+                    return self.next_nowrap(g);
                 }
                 else {
                     return None;
@@ -160,51 +212,58 @@ where T: Iterator<Item=&'a str>
             },
             
             WrapType::CharWrap(wrap_width) => {
-                if let Some(g) = self.grapheme_iter.next() {            
-                    let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
-                    
-                    if (self.pos.1 + width) > wrap_width {
-                        if !self.indent_found {
-                            self.indent = 0;
-                            self.indent_found = true;
-                        }
-                        
-                        if self.f.maintain_indent {
-                            let pos = (self.pos.0 + self.f.single_line_height(), self.indent);
-                            self.pos = (self.pos.0 + self.f.single_line_height(), self.indent + width);
-                            return Some((g, pos, width));
-                        }
-                        else {
-                            let pos = (self.pos.0 + self.f.single_line_height(), 0);
-                            self.pos = (self.pos.0 + self.f.single_line_height(), width);
-                            return Some((g, pos, width));
-                        }
-                    }
-                    else {
-                        if !self.indent_found {
-                            if is_whitespace(g) {
-                                self.indent += width;
-                            }
-                            else {
-                                self.indent_found = true;
-                            }
-                        }
-                        
-                        let pos = self.pos;
-                        self.pos = (self.pos.0, self.pos.1 + width);
-                        return Some((g, pos, width));
-                    }
+                if let Some(g) = self.grapheme_iter.next() {
+                    return self.next_charwrap(g, wrap_width);
                 }
                 else {
                     return None;
                 }
             },
             
-            WrapType::WordWrap(_) => {
-                // TODO
-                return None;
+            WrapType::WordWrap(wrap_width) => {
+                // Get next word if necessary
+                if self.word_i >= self.word_buf.len() {
+                    let mut word_width = 0;
+                    self.word_buf.truncate(0);
+                    while let Some(g) = self.grapheme_iter.next() {
+                        self.word_buf.push(g);
+                        let width = grapheme_vis_width_at_vis_pos(g, self.pos.1 + word_width, self.f.tab_width as usize);
+                        word_width += width;
+                        if is_whitespace(g) {
+                            break;
+                        }
+                    }
+                    
+                    if self.word_buf.len() == 0 {
+                        return None;
+                    }
+                    else if !self.indent_found && !is_whitespace(self.word_buf[0]) {
+                        self.indent_found = true;
+                    }
+                    
+                    // Move to next line if necessary
+                    if (self.pos.1 + word_width) > wrap_width {
+                        if !self.indent_found {
+                            self.indent = 0;
+                            self.indent_found = true;
+                        }
+                        
+                        if self.f.maintain_indent {
+                            self.pos = (self.pos.0 + self.f.single_line_height(), self.indent);
+                        }
+                        else {
+                            self.pos = (self.pos.0 + self.f.single_line_height(), 0);
+                        }
+                    }
+                    
+                    self.word_i = 0;
+                }
+                
+                // Iterate over the word
+                let g = self.word_buf[self.word_i];
+                self.word_i += 1;
+                return self.next_charwrap(g, wrap_width);
             },
-            
         }
     }
 }
