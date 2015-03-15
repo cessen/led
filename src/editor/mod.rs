@@ -3,7 +3,7 @@
 use buffer::Buffer;
 use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
-use std::old_path::Path;
+use std::path::{Path, PathBuf};
 use std::cmp::{min, max};
 use string_utils::{grapheme_count, str_to_line_ending, LineEnding};
 use utils::digit_count;
@@ -15,7 +15,7 @@ mod cursor;
 pub struct Editor<T: LineFormatter> {
     pub buffer: Buffer,
     pub formatter: T,
-    pub file_path: Path,
+    pub file_path: PathBuf,
     pub line_ending_type: LineEnding,
     pub soft_tabs: bool,
     pub soft_tab_width: u8,
@@ -40,7 +40,7 @@ impl<T: LineFormatter> Editor<T> {
         Editor {
             buffer: Buffer::new(),
             formatter: formatter,
-            file_path: Path::new(""),
+            file_path: PathBuf::new(""),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
@@ -63,7 +63,7 @@ impl<T: LineFormatter> Editor<T> {
         let mut ed = Editor {
             buffer: buf,
             formatter: formatter,
-            file_path: path.clone(),
+            file_path: path.to_path_buf(),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
@@ -89,7 +89,7 @@ impl<T: LineFormatter> Editor<T> {
     
     
     pub fn save_if_dirty(&mut self) {
-        if self.dirty && self.file_path != Path::new("") {
+        if self.dirty && self.file_path != PathBuf::new("") {
             let _ = self.buffer.save_to_file(&self.file_path);
             self.dirty = false;
         }

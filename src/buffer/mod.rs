@@ -2,9 +2,10 @@
 
 use std::mem;
 use std::cmp::min;
-use std::old_path::Path;
-use std::old_io::fs::File;
-use std::old_io::{IoResult, BufferedReader, BufferedWriter};
+use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::io;
+use std::io::{BufReader, BufWriter, Read, Write};
 
 use ropey::{Rope, RopeSlice, RopeGraphemeIter, RopeLineIter};
 use self::undo_stack::{UndoStack};
@@ -21,7 +22,7 @@ mod undo_stack;
 /// A text buffer
 pub struct Buffer {
     text: Rope,
-    file_path: Option<Path>,
+    file_path: Option<PathBuf>,
     undo_stack: UndoStack,
 }
 
@@ -46,13 +47,14 @@ impl Buffer {
     }
     
     
-    pub fn new_from_file(path: &Path) -> IoResult<Buffer> {
-        let mut f = BufferedReader::new(try!(File::open(path)));
-        let string = f.read_to_string().unwrap();
+    pub fn new_from_file(path: &Path) -> io::Result<Buffer> {
+        let mut f = BufReader::new(try!(File::open(path)));
+        let mut string = String::new();
+        try!(f.read_to_string(&mut string));
     
         let buf = Buffer {
             text: Rope::from_str(string.as_slice()),
-            file_path: Some(path.clone()),
+            file_path: Some(path.to_path_buf()),
             undo_stack: UndoStack::new(),
         };
          
@@ -60,11 +62,11 @@ impl Buffer {
     }
     
     
-    pub fn save_to_file(&self, path: &Path) -> IoResult<()> {
-        let mut f = BufferedWriter::new(try!(File::create(path)));
+    pub fn save_to_file(&self, path: &Path) -> io::Result<()> {
+        let mut f = BufWriter::new(try!(File::create(path)));
         
         for c in self.text.chunk_iter() {
-            let _ = f.write_str(c);
+            let _ = f.write(c.as_bytes());
         }
         
         return Ok(());

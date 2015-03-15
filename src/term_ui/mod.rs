@@ -5,7 +5,6 @@ use rustbox::Color;
 use editor::Editor;
 use formatter::{LineFormatter, LINE_BLOCK_LENGTH, block_index_and_offset};
 use std::char;
-use std::old_io::stdio;
 use std::default::Default;
 use std::time::duration::Duration;
 use std::cmp::min;
@@ -47,7 +46,7 @@ pub struct TermUI {
 impl TermUI {
     pub fn new() -> TermUI {
         let rb = match rustbox::RustBox::init(rustbox::InitOptions {
-            buffer_stderr: stdio::stderr_raw().isatty(),
+            buffer_stderr: false,
             ..Default::default()
         }) {
             Ok(rbox) => rbox,
@@ -68,7 +67,7 @@ impl TermUI {
     
     pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
         let rb = match rustbox::RustBox::init(rustbox::InitOptions {
-            buffer_stderr: stdio::stderr_raw().isatty(),
+            buffer_stderr: false,
             ..Default::default()
         }) {
             Ok(rbox) => rbox,

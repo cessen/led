@@ -1,7 +1,5 @@
 #![feature(core)]
-#![feature(old_io)]
 #![feature(collections)]
-#![feature(old_path)]
 #![feature(test)]
 #![feature(std_misc)]
 
@@ -14,7 +12,7 @@ extern crate ropey;
 //extern crate freetype;
 //extern crate sdl2;
 
-use std::old_path::Path;
+use std::path::Path;
 use docopt::Docopt;
 use editor::Editor;
 use term_ui::TermUI;
