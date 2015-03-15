@@ -11,17 +11,17 @@ path = "src/main.rs"
 [dependencies.ropey]
 git = "https://github.com/cessen/ropey.git"
 
-[dependencies.sdl2]
-git = "https://github.com/AngryLawyer/rust-sdl2.git"
-
 [dependencies.docopt]
 git = "https://github.com/docopt/docopt.rs.git"
 
 [dependencies.rustbox]
 git = "https://github.com/gchp/rustbox.git"
 
-[dependencies.freetype-rs]
-git = "https://github.com/PistonDevelopers/freetype-rs.git"
+#[dependencies.sdl2]
+#git = "https://github.com/AngryLawyer/rust-sdl2.git"
+
+#[dependencies.freetype-rs]
+#git = "https://github.com/PistonDevelopers/freetype-rs.git"
 
 [dependencies]
 rustc-serialize = "0.3.0"

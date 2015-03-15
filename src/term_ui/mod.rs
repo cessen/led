@@ -108,10 +108,10 @@ impl TermUI {
             // program doesn't loop like crazy, but then continue pulling
             // events in a non-blocking way until we run out of events
             // to handle.
-            let mut e = self.rb.poll_event(); // Block until we get an event
+            let mut e = self.rb.poll_event(true); // Block until we get an event
             loop {
                 match e {
-                    Ok(rustbox::Event::KeyEvent(_, key, character)) => {
+                    Ok(rustbox::Event::KeyEventRaw(_, key, character)) => {
                         //println!("      {} {} {}", modifier, key, character);
                         match key {
                             K_CTRL_Q => {
@@ -200,7 +200,7 @@ impl TermUI {
                     }
                 }
     
-                e = self.rb.peek_event(Duration::milliseconds(0)); // Get next event (if any)
+                e = self.rb.peek_event(Duration::milliseconds(0), true); // Get next event (if any)
             }
             
             if let Some((h, w)) = resize {
@@ -245,10 +245,10 @@ impl TermUI {
             // program doesn't loop like crazy, but then continue pulling
             // events in a non-blocking way until we run out of events
             // to handle.
-            let mut e = self.rb.poll_event(); // Block until we get an event
+            let mut e = self.rb.poll_event(true); // Block until we get an event
             loop {
                 match e {
-                    Ok(rustbox::Event::KeyEvent(_, key, character)) => {
+                    Ok(rustbox::Event::KeyEventRaw(_, key, character)) => {
                         match key {
                             K_ESC => {
                                 cancel = true;
@@ -288,7 +288,7 @@ impl TermUI {
                     }
                 }
     
-                e = self.rb.peek_event(Duration::milliseconds(0)); // Get next event (if any)
+                e = self.rb.peek_event(Duration::milliseconds(0), true); // Get next event (if any)
             }
             
             
