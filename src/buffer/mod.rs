@@ -105,7 +105,7 @@ impl Buffer {
         let cpos = self.text.grapheme_index_to_char_index(pos);
         self._insert_text(text, cpos);
         
-        self.undo_stack.push(InsertText(String::from_str(text), cpos));
+        self.undo_stack.push(InsertText(text.to_string(), cpos));
     }
     
     fn _insert_text(&mut self, text: &str, pos: usize) {

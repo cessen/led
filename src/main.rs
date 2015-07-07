@@ -1,13 +1,15 @@
-#![feature(core)]
-#![feature(collections)]
-#![feature(test)]
-#![feature(std_misc)]
+//#![feature(core)]
+//#![feature(collections)]
+//#![feature(test)]
+//#![feature(std_misc)]
 
 extern crate time;
-extern crate test;
+//extern crate test;
 extern crate rustbox;
 extern crate docopt;
 extern crate rustc_serialize;
+extern crate unicode_segmentation;
+extern crate unicode_width;
 extern crate encoding;
 extern crate ropey;
 //extern crate freetype;

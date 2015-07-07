@@ -20,6 +20,8 @@ git = "https://github.com/cessen/ropey.git"
 [dependencies]
 time = "0.1.30"
 rustc-serialize = "0.3.0"
+unicode-segmentation = "0.1.*"
+unicode-width = "0.1.*"
 docopt = "0.6.*"
 encoding = "*"
 rustbox = "0.6.3"

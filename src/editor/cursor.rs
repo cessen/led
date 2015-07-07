@@ -57,11 +57,11 @@ impl CursorSet {
     }
     
     pub fn iter<'a>(&'a self) -> Iter<'a, Cursor> {
-        self.cursors.as_slice().iter()
+        (&self.cursors[..]).iter()
     }
     
     pub fn iter_mut<'a>(&'a mut self) -> IterMut<'a, Cursor> {
-        self.cursors.as_mut_slice().iter_mut()
+        (&mut self.cursors[..]).iter_mut()
     }
     
     pub fn make_consistent(&mut self) {

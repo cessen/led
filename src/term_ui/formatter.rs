@@ -1,5 +1,6 @@
 use std::cmp::max;
 
+use unicode_width::UnicodeWidthStr;
 use string_utils::{is_line_ending, is_whitespace};
 use formatter::{LineFormatter, RoundingBehavior};
 
@@ -290,7 +291,7 @@ fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize
                 return 1;
             }
             else {
-                return g.width(true);
+                return UnicodeWidthStr::width(g);
             }
         }
     }

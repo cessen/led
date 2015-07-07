@@ -2,6 +2,7 @@
 //! Misc helpful utility functions for TextBuffer related stuff.
 
 use std::iter::repeat;
+use unicode_segmentation::UnicodeSegmentation;
 
 
 pub fn is_line_ending(text: &str) -> bool {
@@ -53,7 +54,7 @@ pub fn is_whitespace(text: &str) -> bool {
 
 pub fn line_ending_count(text: &str) -> usize {
     let mut count = 0;
-    for g in text.graphemes(true) {
+    for g in UnicodeSegmentation::graphemes(text, true) {
         if is_line_ending(g) {
             count += 1;
         }
@@ -71,7 +72,7 @@ pub fn char_count(text: &str) -> usize {
 
 pub fn grapheme_count(text: &str) -> usize {
     let mut count = 0;
-    for _ in text.graphemes(true) {
+    for _ in UnicodeSegmentation::graphemes(text, true) {
         count += 1;
     }
     return count;
@@ -79,7 +80,7 @@ pub fn grapheme_count(text: &str) -> usize {
 
 pub fn grapheme_count_is_less_than(text: &str, n: usize) -> bool {
     let mut count = 0;
-    for _ in text.graphemes(true) {
+    for _ in UnicodeSegmentation::graphemes(text, true) {
         count += 1;
         if count >= n {
             return false;
@@ -93,7 +94,7 @@ pub fn grapheme_and_line_ending_count(text: &str) -> (usize, usize) {
     let mut grapheme_count = 0;
     let mut line_ending_count = 0;
     
-    for g in text.graphemes(true) {
+    for g in UnicodeSegmentation::graphemes(text, true) {
         grapheme_count += 1;
         if is_line_ending(g) {
             line_ending_count += 1;
@@ -123,7 +124,7 @@ pub fn char_pos_to_byte_pos(text: &str, pos: usize) -> usize {
 pub fn grapheme_pos_to_byte_pos(text: &str, pos: usize) -> usize {
     let mut i: usize = 0;
     
-    for (offset, _) in text.grapheme_indices(true) {
+    for (offset, _) in UnicodeSegmentation::grapheme_indices(text, true) {
         if i == pos {
             return offset;
         }
@@ -162,7 +163,7 @@ pub fn insert_text_at_grapheme_index(s: &mut String, text: &str, pos: usize) {
     // Copy new bytes in
     // TODO: use copy_memory()
     let mut i = byte_pos;
-    for g in text.graphemes(true) {
+    for g in UnicodeSegmentation::graphemes(text, true) {
         
         for b in g.bytes() {
             byte_vec[i] = b;
@@ -216,7 +217,7 @@ pub fn split_string_at_grapheme_index(s1: &mut String, pos: usize) -> String {
         let byte_vec_1 = unsafe { s1.as_mut_vec() };
         let byte_vec_2 = unsafe { s2.as_mut_vec() };
         
-        byte_vec_2.push_all(&byte_vec_1[byte_pos..]);
+        byte_vec_2.extend((&byte_vec_1[byte_pos..]).iter().cloned());
         byte_vec_1.truncate(byte_pos);
     }
     
