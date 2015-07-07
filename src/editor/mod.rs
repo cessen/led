@@ -40,7 +40,7 @@ impl<T: LineFormatter> Editor<T> {
         Editor {
             buffer: Buffer::new(),
             formatter: formatter,
-            file_path: PathBuf::new(""),
+            file_path: PathBuf::new(),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
@@ -89,7 +89,7 @@ impl<T: LineFormatter> Editor<T> {
     
     
     pub fn save_if_dirty(&mut self) {
-        if self.dirty && self.file_path != PathBuf::new("") {
+        if self.dirty && self.file_path != PathBuf::new() {
             let _ = self.buffer.save_to_file(&self.file_path);
             self.dirty = false;
         }

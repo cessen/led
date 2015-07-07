@@ -13,7 +13,7 @@ use formatter::LineFormatter;
 ///
 /// `vis_start` is the visual 2d horizontal position of the cursor.  This
 /// doesn't affect editing operations at all, but is used for cursor movement.
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub struct Cursor {
     pub range: (usize, usize),  // start, end
     pub vis_start: usize,  // start
@@ -96,14 +96,14 @@ impl CursorSet {
 impl Index<usize> for CursorSet {
     type Output = Cursor;
     
-    fn index<'a>(&'a self, _index: &usize) -> &'a Cursor {
-        &(self.cursors[*_index])
+    fn index<'a>(&'a self, _index: usize) -> &'a Cursor {
+        &(self.cursors[_index])
     }
 }
 
 
 impl IndexMut<usize> for CursorSet {
-    fn index_mut<'a>(&'a mut self, _index: &usize) -> &'a mut Cursor {
-        &mut (self.cursors[*_index])
+    fn index_mut<'a>(&'a mut self, _index: usize) -> &'a mut Cursor {
+        &mut (self.cursors[_index])
     }
 }

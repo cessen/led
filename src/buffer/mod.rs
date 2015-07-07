@@ -53,7 +53,7 @@ impl Buffer {
         try!(f.read_to_string(&mut string));
     
         let buf = Buffer {
-            text: Rope::from_str(string.as_slice()),
+            text: Rope::from_str(&string[..]),
             file_path: Some(path.to_path_buf()),
             undo_stack: UndoStack::new(),
         };

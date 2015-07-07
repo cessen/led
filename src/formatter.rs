@@ -10,7 +10,7 @@ use buffer::Buffer;
 pub const LINE_BLOCK_LENGTH: usize = 4096;
 
 
-#[derive(Copy, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum RoundingBehavior {
     Round,
     Floor,

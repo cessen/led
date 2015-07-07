@@ -3,10 +3,10 @@
 use rustbox;
 use rustbox::Color;
 use editor::Editor;
+use time::Duration;
 use formatter::{LineFormatter, LINE_BLOCK_LENGTH, block_index_and_offset};
 use std::char;
 use std::default::Default;
-use std::time::duration::Duration;
 use std::cmp::min;
 use string_utils::{is_line_ending, line_ending_to_str, LineEnding};
 use utils::digit_count;
@@ -387,7 +387,7 @@ impl TermUI {
                 let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
-                    self.rb.print(lnx, lny, rustbox::RB_NORMAL, Color::White, Color::Blue, format!("{}", line_num).as_slice());
+                    self.rb.print(lnx, lny, rustbox::RB_NORMAL, Color::White, Color::Blue, &format!("{}", line_num)[..]);
                 }
             }
             
