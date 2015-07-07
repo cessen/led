@@ -11,12 +11,6 @@ path = "src/main.rs"
 [dependencies.ropey]
 git = "https://github.com/cessen/ropey.git"
 
-[dependencies.docopt]
-git = "https://github.com/docopt/docopt.rs.git"
-
-[dependencies.rustbox]
-git = "https://github.com/gchp/rustbox.git"
-
 #[dependencies.sdl2]
 #git = "https://github.com/AngryLawyer/rust-sdl2.git"
 
@@ -25,4 +19,6 @@ git = "https://github.com/gchp/rustbox.git"
 
 [dependencies]
 rustc-serialize = "0.3.0"
+docopt = "0.6.*"
 encoding = "*"
+rustbox = "0.6.3"
