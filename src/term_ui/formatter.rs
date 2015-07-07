@@ -302,6 +302,7 @@ fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize
 #[cfg(test)]
 mod tests {
     #![allow(unused_imports)]
+    use unicode_segmentation::UnicodeSegmentation;
     use super::*;
     use formatter::{LineFormatter, LINE_BLOCK_LENGTH};
     use formatter::RoundingBehavior::{Round, Floor, Ceiling};
@@ -318,7 +319,7 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
-        assert_eq!(f.dimensions(text.graphemes(true)), (1, 22));
+        assert_eq!(f.dimensions(UnicodeSegmentation::graphemes(text, true)), (1, 22));
     }
     
     
@@ -332,7 +333,7 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
-        assert_eq!(f.dimensions(text.graphemes(true)), (5, 12));
+        assert_eq!(f.dimensions(UnicodeSegmentation::graphemes(text, true)), (5, 12));
     }
     
     
@@ -346,10 +347,10 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 0), (0, 0));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 5), (0, 5));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 22), (0, 22));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 23), (0, 22));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 0), (0, 0));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 5), (0, 5));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 22), (0, 22));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 23), (0, 22));
     }
     
     
@@ -363,27 +364,27 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 0), (0, 0));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 5), (0, 5));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 11), (0, 11));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 0), (0, 0));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 5), (0, 5));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 11), (0, 11));
         
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 12), (1, 0));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 15), (1, 3));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 23), (1, 11));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 12), (1, 0));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 15), (1, 3));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 23), (1, 11));
         
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 24), (2, 0));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 28), (2, 4));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 35), (2, 11));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 24), (2, 0));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 28), (2, 4));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 35), (2, 11));
         
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 36), (3, 0));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 43), (3, 7));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 47), (3, 11));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 36), (3, 0));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 43), (3, 7));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 47), (3, 11));
         
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 48), (4, 0));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 50), (4, 2));
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 56), (4, 8));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 48), (4, 0));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 50), (4, 2));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 56), (4, 8));
         
-        assert_eq!(f.index_to_v2d(text.graphemes(true), 57), (4, 8));
+        assert_eq!(f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 57), (4, 8));
     }
     
     
@@ -397,12 +398,12 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
         
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (0,0), (Floor, Floor)), 0);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (0,5), (Floor, Floor)), 5);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (0,22), (Floor, Floor)), 22);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (0,23), (Floor, Floor)), 22);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (1,0), (Floor, Floor)), 22);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (1,1), (Floor, Floor)), 22);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (0,0), (Floor, Floor)), 0);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (0,5), (Floor, Floor)), 5);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (0,22), (Floor, Floor)), 22);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (0,23), (Floor, Floor)), 22);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (1,0), (Floor, Floor)), 22);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (1,1), (Floor, Floor)), 22);
     }
     
     
@@ -416,26 +417,26 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
         
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (0,0), (Floor, Floor)), 0);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (0,11), (Floor, Floor)), 11);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (0,12), (Floor, Floor)), 11);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (0,0), (Floor, Floor)), 0);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (0,11), (Floor, Floor)), 11);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (0,12), (Floor, Floor)), 11);
         
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (1,0), (Floor, Floor)), 12);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (1,11), (Floor, Floor)), 23);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (1,12), (Floor, Floor)), 23);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (1,0), (Floor, Floor)), 12);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (1,11), (Floor, Floor)), 23);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (1,12), (Floor, Floor)), 23);
         
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (2,0), (Floor, Floor)), 24);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (2,11), (Floor, Floor)), 35);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (2,12), (Floor, Floor)), 35);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (2,0), (Floor, Floor)), 24);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (2,11), (Floor, Floor)), 35);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (2,12), (Floor, Floor)), 35);
         
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (3,0), (Floor, Floor)), 36);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (3,11), (Floor, Floor)), 47);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (3,12), (Floor, Floor)), 47);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (3,0), (Floor, Floor)), 36);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (3,11), (Floor, Floor)), 47);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (3,12), (Floor, Floor)), 47);
         
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (4,0), (Floor, Floor)), 48);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (4,7), (Floor, Floor)), 55);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (4,8), (Floor, Floor)), 56);
-        assert_eq!(f.v2d_to_index(text.graphemes(true), (4,9), (Floor, Floor)), 56);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (4,0), (Floor, Floor)), 48);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (4,7), (Floor, Floor)), 55);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (4,8), (Floor, Floor)), 56);
+        assert_eq!(f.v2d_to_index(UnicodeSegmentation::graphemes(text, true), (4,9), (Floor, Floor)), 56);
     }
     
     

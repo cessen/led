@@ -1,7 +1,4 @@
-//#![feature(core)]
-//#![feature(collections)]
 //#![feature(test)]
-//#![feature(std_misc)]
 
 extern crate time;
 //extern crate test;
