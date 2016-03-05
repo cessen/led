@@ -13,7 +13,7 @@ pub fn digit_count(mut n: u32, b: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn digit_count_base_10() {
         assert_eq!(digit_count(0, 10), 1);

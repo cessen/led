@@ -1,7 +1,6 @@
-//#![feature(test)]
+// #![feature(test)]
 
-extern crate time;
-//extern crate test;
+// extern crate test;
 extern crate rustbox;
 extern crate docopt;
 extern crate rustc_serialize;
@@ -9,16 +8,16 @@ extern crate unicode_segmentation;
 extern crate unicode_width;
 extern crate encoding;
 extern crate ropey;
-//extern crate freetype;
-//extern crate sdl2;
+// extern crate freetype;
+// extern crate sdl2;
 
 use std::path::Path;
 use docopt::Docopt;
 use editor::Editor;
 use term_ui::TermUI;
 use term_ui::formatter::ConsoleLineFormatter;
-//use gui::GUI;
-//use gui::formatter::GUILineFormatter;
+// use gui::GUI;
+// use gui::formatter::GUILineFormatter;
 
 mod string_utils;
 mod utils;
@@ -26,8 +25,8 @@ mod buffer;
 mod formatter;
 mod editor;
 mod term_ui;
-//mod font;
-//mod gui;
+// mod font;
+// mod gui;
 
 
 
@@ -57,33 +56,31 @@ struct Args {
 fn main() {
     // Get command-line arguments
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
-    
-    
-    //Initialize and start UI
+
+
+    // Initialize and start UI
     if args.flag_gui {
-        // // Load file, if specified    
+        // // Load file, if specified
         // let editor = if let Option::Some(s) = args.arg_file {
         //     Editor::new_from_file(GUILineFormatter::new(4), &Path::new(&s[..]))
         // }
         // else {
         //     Editor::new(GUILineFormatter::new(4))
         // };
-        // 
+        //
         // // GUI
         // sdl2::init(sdl2::INIT_VIDEO);
         // let mut ui = GUI::new_from_editor(editor);
         // ui.main_ui_loop();
         // sdl2::quit();
-    }
-    else {
-        // Load file, if specified    
+    } else {
+        // Load file, if specified
         let editor = if let Option::Some(s) = args.arg_file {
             Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(&s[..]))
-        }
-        else {
+        } else {
             Editor::new(ConsoleLineFormatter::new(4))
         };
-        
+
         // Console UI
         let mut ui = TermUI::new_from_editor(editor);
         ui.main_ui_loop();

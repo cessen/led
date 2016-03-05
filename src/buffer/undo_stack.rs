@@ -25,31 +25,29 @@ impl UndoStack {
             stack_b: LinkedList::new(),
         }
     }
-    
-    
+
+
     pub fn push(&mut self, op: Operation) {
         self.stack_a.push_back(op);
         self.stack_b.clear();
     }
-    
-    
+
+
     pub fn prev(&mut self) -> Option<Operation> {
         if let Some(op) = self.stack_a.pop_back() {
             self.stack_b.push_back(op.clone());
             return Some(op);
-        }
-        else {
+        } else {
             return None;
         }
     }
-    
-    
+
+
     pub fn next(&mut self) -> Option<Operation> {
         if let Some(op) = self.stack_b.pop_back() {
             self.stack_a.push_back(op.clone());
             return Some(op);
-        }
-        else {
+        } else {
             return None;
         }
     }
