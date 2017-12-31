@@ -16,7 +16,7 @@ use formatter::LineFormatter;
 #[derive(Copy, Clone)]
 pub struct Cursor {
     pub range: (usize, usize), // start, end
-    pub vis_start: usize, // start
+    pub vis_start: usize,      // start
 }
 
 impl Cursor {
@@ -32,17 +32,17 @@ impl Cursor {
     }
 }
 
-
 /// A collection of cursors, managed to always be in a consistent
 /// state for multi-cursor editing.
 pub struct CursorSet {
     cursors: Vec<Cursor>,
 }
 
-
 impl CursorSet {
     pub fn new() -> CursorSet {
-        CursorSet { cursors: vec![Cursor::new()] }
+        CursorSet {
+            cursors: vec![Cursor::new()],
+        }
     }
 
     pub fn add_cursor(&mut self, cursor: Cursor) {
@@ -87,7 +87,6 @@ impl CursorSet {
     }
 }
 
-
 impl Index<usize> for CursorSet {
     type Output = Cursor;
 
@@ -95,7 +94,6 @@ impl Index<usize> for CursorSet {
         &(self.cursors[_index])
     }
 }
-
 
 impl IndexMut<usize> for CursorSet {
     fn index_mut<'a>(&'a mut self, _index: usize) -> &'a mut Cursor {

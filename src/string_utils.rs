@@ -4,17 +4,10 @@
 use std::iter::repeat;
 use unicode_segmentation::UnicodeSegmentation;
 
-
 pub fn is_line_ending(text: &str) -> bool {
     match text {
-        "\u{000D}\u{000A}" |
-        "\u{000A}" |
-        "\u{000B}" |
-        "\u{000C}" |
-        "\u{000D}" |
-        "\u{0085}" |
-        "\u{2028}" |
-        "\u{2029}" => true,
+        "\u{000D}\u{000A}" | "\u{000A}" | "\u{000B}" | "\u{000C}" | "\u{000D}" | "\u{0085}"
+        | "\u{2028}" | "\u{2029}" => true,
 
         _ => false,
     }
@@ -164,7 +157,6 @@ pub fn insert_text_at_grapheme_index(s: &mut String, text: &str, pos: usize) {
     // TODO: use copy_memory()
     let mut i = byte_pos;
     for g in UnicodeSegmentation::graphemes(text, true) {
-
         for b in g.bytes() {
             byte_vec[i] = b;
             i += 1
@@ -175,8 +167,10 @@ pub fn insert_text_at_grapheme_index(s: &mut String, text: &str, pos: usize) {
 /// Removes the text between the given grapheme indices in the given string.
 pub fn remove_text_between_grapheme_indices(s: &mut String, pos_a: usize, pos_b: usize) {
     // Bounds checks
-    assert!(pos_a <= pos_b,
-            "remove_text_between_grapheme_indices(): pos_a must be less than or equal to pos_b.");
+    assert!(
+        pos_a <= pos_b,
+        "remove_text_between_grapheme_indices(): pos_a must be less than or equal to pos_b."
+    );
 
     if pos_a == pos_b {
         return;
@@ -225,25 +219,19 @@ pub fn split_string_at_grapheme_index(s1: &mut String, pos: usize) -> String {
     return s2;
 }
 
-
-
-
-
-
-
 /// Represents one of the valid Unicode line endings.
 /// Also acts as an index into `LINE_ENDINGS`.
 #[derive(PartialEq, Copy, Clone)]
 pub enum LineEnding {
     None = 0, // No line ending
     CRLF = 1, // CarriageReturn followed by LineFeed
-    LF = 2, // U+000A -- LineFeed
-    VT = 3, // U+000B -- VerticalTab
-    FF = 4, // U+000C -- FormFeed
-    CR = 5, // U+000D -- CarriageReturn
-    NEL = 6, // U+0085 -- NextLine
-    LS = 7, // U+2028 -- Line Separator
-    PS = 8, // U+2029 -- ParagraphSeparator
+    LF = 2,   // U+000A -- LineFeed
+    VT = 3,   // U+000B -- VerticalTab
+    FF = 4,   // U+000C -- FormFeed
+    CR = 5,   // U+000D -- CarriageReturn
+    NEL = 6,  // U+0085 -- NextLine
+    LS = 7,   // U+2028 -- Line Separator
+    PS = 8,   // U+2029 -- ParagraphSeparator
 }
 
 pub fn str_to_line_ending(g: &str) -> LineEnding {
@@ -305,12 +293,14 @@ pub fn line_ending_to_str(ending: LineEnding) -> &'static str {
 
 /// An array of string literals corresponding to the possible
 /// unicode line endings.
-pub const LINE_ENDINGS: [&'static str; 9] = ["",
-                                             "\u{000D}\u{000A}",
-                                             "\u{000A}",
-                                             "\u{000B}",
-                                             "\u{000C}",
-                                             "\u{000D}",
-                                             "\u{0085}",
-                                             "\u{2028}",
-                                             "\u{2029}"];
+pub const LINE_ENDINGS: [&'static str; 9] = [
+    "",
+    "\u{000D}\u{000A}",
+    "\u{000A}",
+    "\u{000B}",
+    "\u{000C}",
+    "\u{000D}",
+    "\u{0085}",
+    "\u{2028}",
+    "\u{2029}",
+];

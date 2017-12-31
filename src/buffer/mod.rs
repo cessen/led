@@ -1,19 +1,17 @@
 #![allow(dead_code)]
 
-use std::mem;
-use std::cmp::min;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufWriter, Read, Write};
 
-use ropey::{Rope, RopeSlice, RopeGraphemeIter, RopeLineIter};
+use ropey;
+use ropey::{Rope, RopeSlice};
 use self::undo_stack::UndoStack;
 use self::undo_stack::Operation::*;
-use string_utils::grapheme_count;
+use string_utils::char_count;
 
 mod undo_stack;
-
 
 // =============================================================
 // Buffer
@@ -26,8 +24,6 @@ pub struct Buffer {
     undo_stack: UndoStack,
 }
 
-
-
 impl Buffer {
     pub fn new() -> Buffer {
         Buffer {
@@ -37,7 +33,6 @@ impl Buffer {
         }
     }
 
-
     pub fn new_from_str(s: &str) -> Buffer {
         Buffer {
             text: Rope::from_str(s),
@@ -45,7 +40,6 @@ impl Buffer {
             undo_stack: UndoStack::new(),
         }
     }
-
 
     pub fn new_from_file(path: &Path) -> io::Result<Buffer> {
         let mut f = BufReader::new(try!(File::open(path)));
@@ -61,40 +55,32 @@ impl Buffer {
         return Ok(buf);
     }
 
-
     pub fn save_to_file(&self, path: &Path) -> io::Result<()> {
         let mut f = BufWriter::new(try!(File::create(path)));
 
-        for c in self.text.chunk_iter() {
+        for c in self.text.chunks() {
             let _ = f.write(c.as_bytes());
         }
 
         return Ok(());
     }
 
-
-
-
     // ------------------------------------------------------------------------
     // Functions for getting information about the buffer.
     // ------------------------------------------------------------------------
 
     pub fn char_count(&self) -> usize {
-        self.text.char_count()
+        self.text.len_chars()
     }
-
 
     pub fn grapheme_count(&self) -> usize {
-        self.text.grapheme_count()
+        // TODO: be correct
+        self.text.len_chars()
     }
-
 
     pub fn line_count(&self) -> usize {
-        self.text.line_ending_count() + 1
+        self.text.len_lines()
     }
-
-
-
 
     // ------------------------------------------------------------------------
     // Editing operations
@@ -102,71 +88,38 @@ impl Buffer {
 
     /// Insert 'text' at grapheme position 'pos'.
     pub fn insert_text(&mut self, text: &str, pos: usize) {
-        let cpos = self.text.grapheme_index_to_char_index(pos);
-        self._insert_text(text, cpos);
+        self.text.insert(pos, text);
 
-        self.undo_stack.push(InsertText(text.to_string(), cpos));
+        self.undo_stack.push(InsertText(text.to_string(), pos));
     }
-
-    fn _insert_text(&mut self, text: &str, pos: usize) {
-        self.text.insert_text_at_char_index(text, pos);
-    }
-
 
     /// Remove the text before grapheme position 'pos' of length 'len'.
     pub fn remove_text_before(&mut self, pos: usize, len: usize) {
         if pos >= len {
-            let cpos_a = self.text.grapheme_index_to_char_index(pos);
-            let cpos_b = self.text.grapheme_index_to_char_index(pos - len);
-            let removed_text = self.string_from_range(cpos_b, cpos_a);
+            let removed_text = self.text.slice(pos - len, pos).to_string();
 
-            self._remove_text(cpos_b, cpos_a);
+            self.text.remove(pos - len, pos);
 
             // Push operation to the undo stack
-            self.undo_stack.push(RemoveTextBefore(removed_text, cpos_b));
+            self.undo_stack
+                .push(RemoveTextBefore(removed_text, pos - len));
         } else {
-            panic!("Buffer::remove_text_before(): attempt to remove text before beginning of \
-                    buffer.");
+            panic!(
+                "Buffer::remove_text_before(): attempt to remove text before beginning of \
+                 buffer."
+            );
         }
     }
 
     /// Remove the text after grapheme position 'pos' of length 'len'.
     pub fn remove_text_after(&mut self, pos: usize, len: usize) {
-        let cpos_a = self.text.grapheme_index_to_char_index(pos);
-        let cpos_b = self.text.grapheme_index_to_char_index(pos + len);
+        let removed_text = self.text.slice(pos, pos + len).to_string();
 
-        let removed_text = self.string_from_range(cpos_a, cpos_b);
-
-        self._remove_text(cpos_a, cpos_b);
+        self.text.remove(pos, pos + len);
 
         // Push operation to the undo stack
-        self.undo_stack.push(RemoveTextAfter(removed_text, cpos_a));
+        self.undo_stack.push(RemoveTextAfter(removed_text, pos));
     }
-
-    fn _remove_text(&mut self, pos_a: usize, pos_b: usize) {
-        // Nothing to do
-        if pos_a == pos_b {
-            return;
-        }
-        // Bounds error
-        else if pos_a > pos_b {
-            panic!("Buffer::_remove_text(): pos_a must be less than or equal to pos_b.");
-        }
-        // Bounds error
-        else if pos_b > self.char_count() {
-            panic!("Buffer::_remove_text(): attempt to remove text past the end of buffer.");
-        }
-        // Complete removal of all text
-        else if pos_a == 0 && pos_b == self.text.char_count() {
-            let mut temp_node = Rope::new();
-            mem::swap(&mut (self.text), &mut temp_node);
-        }
-        // All other cases
-        else {
-            self.text.remove_text_between_char_indices(pos_a, pos_b);
-        }
-    }
-
 
     /// Moves the text in [pos_a, pos_b) to begin at index pos_to.
     ///
@@ -174,14 +127,10 @@ impl Buffer {
     /// _after_ the operation, not the index before the operation.  This is a
     /// subtle but important distinction.
     pub fn move_text(&mut self, pos_a: usize, pos_b: usize, pos_to: usize) {
-        let cpos_a = self.text.grapheme_index_to_char_index(pos_a);
-        let cpos_b = self.text.grapheme_index_to_char_index(pos_b);
-        let cpos_to = self.text.grapheme_index_to_char_index(pos_to);
-
-        self._move_text(cpos_a, cpos_b, cpos_to);
+        self._move_text(pos_a, pos_b, pos_to);
 
         // Push operation to the undo stack
-        self.undo_stack.push(MoveText(cpos_a, cpos_b, cpos_to));
+        self.undo_stack.push(MoveText(pos_a, pos_b, pos_to));
     }
 
     fn _move_text(&mut self, pos_a: usize, pos_b: usize, pos_to: usize) {
@@ -194,27 +143,26 @@ impl Buffer {
             panic!("Buffer::_move_text(): pos_a must be less than or equal to pos_b.");
         }
         // Bounds error
-        else if pos_b > self.grapheme_count() {
+        else if pos_b > self.text.len_chars() {
             panic!("Buffer::_move_text(): specified text range is beyond end of buffer.");
         }
         // Bounds error
-        else if pos_to > (self.grapheme_count() - (pos_b - pos_a)) {
+        else if pos_to > (self.text.len_chars() - (pos_b - pos_a)) {
             panic!("Buffer::_move_text(): specified text destination is beyond end of buffer.");
         }
         // Nothing to do, because entire text specified
-        else if pos_a == 0 && pos_b == self.char_count() {
+        else if pos_a == 0 && pos_b == self.text.len_chars() {
             return;
         }
         // All other cases
         else {
             // TODO: a more efficient implementation that directly
             // manipulates the node tree.
-            let s = self.string_from_range(pos_a, pos_b);
-            self._remove_text(pos_a, pos_b);
-            self._insert_text(&s[..], pos_to);
+            let s = self.text.slice(pos_a, pos_b).to_string();
+            self.text.remove(pos_a, pos_b);
+            self.text.insert(pos_to, &s);
         }
     }
-
 
     /// Removes the lines in line indices [line_a, line_b).
     /// TODO: undo
@@ -231,35 +179,14 @@ impl Buffer {
         else if line_b > self.line_count() {
             panic!("Buffer::remove_lines(): attempt to remove lines past the last line of text.");
         }
-        // Complete removal of all lines
-        else if line_a == 0 && line_b == (self.text.line_ending_count() + 1) {
-            let mut temp_node = Rope::new();
-            mem::swap(&mut (self.text), &mut temp_node);
-        }
         // All other cases
         else {
-            let a = if line_a > 0 {
-                self.text.line_index_to_char_index(line_a) - 1
-            } else {
-                0
-            };
+            let a = self.text.line_to_char(line_a);
+            let b = self.text.line_to_char(line_b);
 
-            let b = if line_b < self.line_count() {
-                if line_a > 0 {
-                    self.text.line_index_to_char_index(line_b) - 1
-                } else {
-                    self.text.line_index_to_char_index(line_b)
-                }
-            } else {
-                self.text.char_count()
-            };
-
-            self.text.remove_text_between_char_indices(a, b);
+            self.text.remove(a, b);
         }
     }
-
-
-
 
     // ------------------------------------------------------------------------
     // Undo/redo functionality
@@ -271,19 +198,19 @@ impl Buffer {
         if let Some(op) = self.undo_stack.prev() {
             match op {
                 InsertText(ref s, p) => {
-                    let size = grapheme_count(&s[..]);
-                    self._remove_text(p, p + size);
+                    let size = char_count(s);
+                    self.text.remove(p, p + size);
                     return Some(p);
                 }
 
                 RemoveTextBefore(ref s, p) => {
-                    let size = grapheme_count(&s[..]);
-                    self._insert_text(&s[..], p);
+                    let size = char_count(s);
+                    self.text.insert(p, s);
                     return Some(p + size);
                 }
 
                 RemoveTextAfter(ref s, p) => {
-                    self._insert_text(&s[..], p);
+                    self.text.insert(p, s);
                     return Some(p);
                 }
 
@@ -302,21 +229,20 @@ impl Buffer {
         return None;
     }
 
-
     /// Redoes the last undone operation, and returns a cursor position that
     /// the cursor should jump to, if any.
     pub fn redo(&mut self) -> Option<usize> {
         if let Some(op) = self.undo_stack.next() {
             match op {
                 InsertText(ref s, p) => {
-                    let size = grapheme_count(&s[..]);
-                    self._insert_text(&s[..], p);
+                    let size = char_count(s);
+                    self.text.insert(p, s);
                     return Some(p + size);
                 }
 
                 RemoveTextBefore(ref s, p) | RemoveTextAfter(ref s, p) => {
-                    let size = grapheme_count(&s[..]);
-                    self._remove_text(p, p + size);
+                    let size = char_count(s);
+                    self.text.remove(p, p + size);
                     return Some(p);
                 }
 
@@ -334,37 +260,23 @@ impl Buffer {
         return None;
     }
 
-
-
     // ------------------------------------------------------------------------
     // Position conversions
     // ------------------------------------------------------------------------
 
-    /// Converts a grapheme index into a line number and grapheme-column
+    /// Converts a char index into a line number and char-column
     /// number.
     ///
     /// If the index is off the end of the text, returns the line and column
     /// number of the last valid text position.
     pub fn index_to_line_col(&self, pos: usize) -> (usize, usize) {
-        // Convert to char index
-        let cpos = if pos < self.text.grapheme_count() {
-            self.text.grapheme_index_to_char_index(pos)
-        } else {
-            self.text.char_count()
-        };
+        let line = self.text.char_to_line(pos);
+        let line_pos = self.text.line_to_char(line);
 
-        let line = self.text.char_index_to_line_index(cpos);
-        let line_pos = self.text.line_index_to_char_index(line);
-
-        // Convert back from char index
-        let gp = self.text.char_index_to_grapheme_index(cpos);
-        let gline_pos = self.text.char_index_to_grapheme_index(line_pos);
-
-        return (line, gp - gline_pos);
+        return (line, pos - line_pos);
     }
 
-
-    /// Converts a line number and grapheme-column number into a grapheme
+    /// Converts a line number and char-column number into a char
     /// index.
     ///
     /// If the column number given is beyond the end of the line, returns the
@@ -372,111 +284,62 @@ impl Buffer {
     /// beyond the end of the buffer, returns the index of the buffer's last
     /// valid position.
     pub fn line_col_to_index(&self, pos: (usize, usize)) -> usize {
-        if pos.0 <= self.text.line_ending_count() {
-            let temp1 = self.text.line_index_to_char_index(pos.0);
-            let l_begin_pos = self.text.char_index_to_grapheme_index(temp1);
-
-            let l_end_pos = if pos.0 < self.text.line_ending_count() {
-                let temp2 = self.text.line_index_to_char_index(pos.0 + 1);
-                self.text.char_index_to_grapheme_index(temp2) - 1
-            } else {
-                self.text.grapheme_count()
-            };
-
-            return min(l_begin_pos + pos.1, l_end_pos);
+        if pos.0 < self.text.len_lines() {
+            let l_begin_pos = self.text.line_to_char(pos.0);
+            return (l_begin_pos + pos.1).min(self.text.len_chars());
         } else {
-            return self.text.grapheme_count();
+            return self.text.len_chars();
         }
     }
-
 
     // ------------------------------------------------------------------------
     // Text reading functions
     // ------------------------------------------------------------------------
 
     pub fn get_grapheme<'a>(&'a self, index: usize) -> &'a str {
-        if index >= self.grapheme_count() {
-            panic!("Buffer::get_grapheme(): index past last grapheme.");
-        } else {
-            return self.text.grapheme_at_index(index);
-        }
+        self.text
+            .slice(index, index + 1)
+            .graphemes()
+            .nth(0)
+            .unwrap()
     }
-
 
     pub fn get_line<'a>(&'a self, index: usize) -> RopeSlice<'a> {
-        if index >= self.line_count() {
-            panic!("get_line(): index out of bounds.");
-        }
-
-        let a = self.text.line_index_to_char_index(index);
-        let b = if (index + 1) < self.line_count() {
-            self.text.line_index_to_char_index(index + 1)
-        } else {
-            self.text.char_count()
-        };
-
-        return self.text.slice(a, b);
+        self.text.line(index)
     }
-
 
     /// Creates a String from the buffer text in grapheme range [pos_a, posb).
     fn string_from_range(&self, pos_a: usize, pos_b: usize) -> String {
-        // Bounds checks
-        if pos_b < pos_a {
-            panic!("Buffer::string_from_range(): pos_a must be less than or equal to pos_b.");
-        } else if pos_b > self.grapheme_count() {
-            panic!("Buffer::string_from_range(): specified range is past end of buffer text.");
-        }
-
-        let mut s = String::with_capacity(pos_b - pos_a);
-
-        let mut i = 0;
-        let i_end = pos_b - pos_a;
-
-        for g in self.text.grapheme_iter_at_index(pos_a) {
-            if i == i_end {
-                break;
-            }
-
-            s.push_str(g);
-
-            i += 1;
-        }
-
-        return s;
+        self.text.slice(pos_a, pos_b).to_string()
     }
-
-
 
     // ------------------------------------------------------------------------
     // Iterator creators
     // ------------------------------------------------------------------------
 
     /// Creates an iterator at the first character
-    pub fn grapheme_iter<'a>(&'a self) -> RopeGraphemeIter<'a> {
-        self.text.grapheme_iter()
+    pub fn grapheme_iter<'a>(&'a self) -> ropey::iter::Graphemes<'a> {
+        self.text.graphemes()
     }
-
 
     /// Creates an iterator starting at the specified grapheme index.
     /// If the index is past the end of the text, then the iterator will
     /// return None on next().
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> RopeGraphemeIter<'a> {
-        self.text.grapheme_iter_at_index(index)
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> ropey::iter::Graphemes<'a> {
+        let len = self.text.len_chars();
+        self.text.slice(index, len).graphemes()
     }
 
-
-    pub fn line_iter<'a>(&'a self) -> RopeLineIter<'a> {
-        self.text.line_iter()
+    pub fn line_iter<'a>(&'a self) -> ropey::iter::Lines<'a> {
+        self.text.lines()
     }
 
-
-    pub fn line_iter_at_index<'a>(&'a self, index: usize) -> RopeLineIter<'a> {
-        self.text.line_iter_at_index(index)
+    pub fn line_iter_at_index<'a>(&'a self, line_idx: usize) -> ropey::iter::Lines<'a> {
+        let start = self.text.line_to_char(line_idx);
+        let len = self.text.len_chars();
+        self.text.slice(start, len).lines()
     }
 }
-
-
 
 // ================================================================
 // TESTS
@@ -509,7 +372,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn insert_text_with_newlines() {
         let mut buf = Buffer::new();
@@ -533,7 +395,6 @@ mod tests {
         assert!(Some("!") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn insert_text_in_non_empty_buffer_1() {
@@ -566,7 +427,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn insert_text_in_non_empty_buffer_2() {
         let mut buf = Buffer::new();
@@ -598,7 +458,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn insert_text_in_non_empty_buffer_3() {
         let mut buf = Buffer::new();
@@ -629,7 +488,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn insert_text_in_non_empty_buffer_4() {
         let mut buf = Buffer::new();
@@ -659,7 +517,6 @@ mod tests {
         assert!(Some("n") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn insert_text_in_non_empty_buffer_5() {
@@ -692,7 +549,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn insert_text_in_non_empty_buffer_6() {
         let mut buf = Buffer::new();
@@ -723,7 +579,6 @@ mod tests {
 
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn insert_text_in_non_empty_buffer_7() {
@@ -759,7 +614,6 @@ mod tests {
 
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn remove_text_1() {
@@ -804,7 +658,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_text_2() {
         let mut buf = Buffer::new();
@@ -839,7 +692,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_text_3() {
         let mut buf = Buffer::new();
@@ -873,7 +725,6 @@ mod tests {
         assert!(Some("!") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn remove_text_4() {
@@ -915,7 +766,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_text_5() {
         let mut buf = Buffer::new();
@@ -950,7 +800,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_text_6() {
         let mut buf = Buffer::new();
@@ -970,7 +819,6 @@ mod tests {
         assert!(Some("l") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn remove_text_7() {
@@ -994,7 +842,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_text_8() {
         let mut buf = Buffer::new();
@@ -1015,7 +862,6 @@ mod tests {
         assert!(Some("!") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn remove_text_9() {
@@ -1042,7 +888,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_text_10() {
         let mut buf = Buffer::new();
@@ -1063,7 +908,6 @@ mod tests {
         assert!(Some("3") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn remove_text_11() {
@@ -1090,7 +934,6 @@ mod tests {
         assert!(Some("9") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn move_text_1() {
@@ -1136,7 +979,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn move_text_2() {
         let mut buf = Buffer::new();
@@ -1180,7 +1022,6 @@ mod tests {
         assert!(Some("!") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn move_text_3() {
@@ -1226,7 +1067,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn move_text_4() {
         let mut buf = Buffer::new();
@@ -1270,7 +1110,6 @@ mod tests {
         assert!(Some("\n") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn move_text_5() {
@@ -1316,7 +1155,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_lines_1() {
         let mut buf = Buffer::new();
@@ -1347,7 +1185,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_lines_2() {
         let mut buf = Buffer::new();
@@ -1377,7 +1214,6 @@ mod tests {
         assert!(Some("!") == iter.next());
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn remove_lines_3() {
@@ -1411,7 +1247,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_lines_4() {
         let mut buf = Buffer::new();
@@ -1444,7 +1279,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn remove_lines_5() {
         let mut buf = Buffer::new();
@@ -1461,7 +1295,6 @@ mod tests {
         assert_eq!(buf.line_count(), 1);
         assert!(None == iter.next());
     }
-
 
     #[test]
     fn remove_lines_6() {
@@ -1480,7 +1313,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn line_col_to_index_1() {
         let mut buf = Buffer::new();
@@ -1490,7 +1322,6 @@ mod tests {
 
         assert!(pos == 12);
     }
-
 
     #[test]
     fn line_col_to_index_2() {
@@ -1512,7 +1343,6 @@ mod tests {
         assert!(pos == 29);
     }
 
-
     #[test]
     fn line_col_to_index_4() {
         let mut buf = Buffer::new();
@@ -1530,7 +1360,6 @@ mod tests {
         assert_eq!(buf.line_col_to_index((2, 1)), 13);
     }
 
-
     #[test]
     fn index_to_line_col_1() {
         let mut buf = Buffer::new();
@@ -1540,7 +1369,6 @@ mod tests {
 
         assert!(pos == (1, 2));
     }
-
 
     #[test]
     fn index_to_line_col_2() {
@@ -1565,7 +1393,6 @@ mod tests {
         assert_eq!(buf.index_to_line_col(14), (2, 0));
     }
 
-
     #[test]
     fn string_from_range_1() {
         let mut buf = Buffer::new();
@@ -1576,7 +1403,6 @@ mod tests {
         assert!(&s[..] == "i\nthere\npeo");
     }
 
-
     #[test]
     fn string_from_range_2() {
         let mut buf = Buffer::new();
@@ -1586,7 +1412,6 @@ mod tests {
 
         assert!(&s[..] == "Hi\nthere\npeople\nof\nthe\nworld!");
     }
-
 
     #[test]
     fn grapheme_iter_at_index_1() {
@@ -1611,7 +1436,6 @@ mod tests {
         assert!(None == iter.next());
     }
 
-
     #[test]
     fn grapheme_iter_at_index_2() {
         let mut buf = Buffer::new();
@@ -1621,6 +1445,5 @@ mod tests {
 
         assert!(None == iter.next());
     }
-
 
 }

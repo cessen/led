@@ -4,7 +4,7 @@ version = "0.0.1"
 dependencies = [
  "docopt 0.6.86 (registry+https://github.com/rust-lang/crates.io-index)",
  "encoding 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
- "ropey 0.3.0",
+ "ropey 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustbox 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-segmentation 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -253,8 +253,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "ropey"
-version = "0.3.0"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
+ "smallvec 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-segmentation 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -273,6 +275,11 @@ dependencies = [
 [[package]]
 name = "rustc-serialize"
 version = "0.3.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "smallvec"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -370,8 +377,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum redox_syscall 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)" = "8dde11f18c108289bef24469638a04dce49da56084f2d50618b226e47eb04509"
 "checksum regex 0.1.80 (registry+https://github.com/rust-lang/crates.io-index)" = "4fd4ace6a8cf7860714a2c2280d6c1f7e6a413486c13298bbc86fd3da019402f"
 "checksum regex-syntax 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "f9ec002c35e86791825ed294b50008eea9ddfc8def4420124fbc6b08db834957"
+"checksum ropey 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)" = "6eb4b74f76bc72338d8aebb193e9575398703552530e329dae718e38e4bf2ca0"
 "checksum rustbox 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "67db7a8f30d0cadb67687a8c25ee32aaa57bf9d6497fd0fc92584b267bad975a"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
+"checksum smallvec 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "44db0ecb22921ef790d17ae13a3f6d15784183ff5f2a01aa32098c7498d2b4b9"
 "checksum strsim 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "67f84c44fbb2f91db7fef94554e6b2ac05909c9c0b0bc23bb98d3a1aebfe7f7c"
 "checksum tempfile 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "11ce2fe9db64b842314052e2421ac61a73ce41b898dc8e3750398b219c5fc1e0"
 "checksum termbox-sys 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)" = "e32daa27881ea4b2ef36e4972d6cdefb241c19ac48d318381b688d1a631b8760"

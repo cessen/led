@@ -4,13 +4,12 @@ use buffer::Buffer;
 use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
 use std::path::{Path, PathBuf};
-use std::cmp::{min, max};
+use std::cmp::{max, min};
 use string_utils::{grapheme_count, str_to_line_ending, LineEnding};
 use utils::digit_count;
 use self::cursor::CursorSet;
 
 mod cursor;
-
 
 pub struct Editor<T: LineFormatter> {
     pub buffer: Buffer,
@@ -33,7 +32,6 @@ pub struct Editor<T: LineFormatter> {
     pub cursors: CursorSet,
 }
 
-
 impl<T: LineFormatter> Editor<T> {
     /// Create a new blank editor
     pub fn new(formatter: T) -> Editor<T> {
@@ -51,7 +49,6 @@ impl<T: LineFormatter> Editor<T> {
             cursors: CursorSet::new(),
         }
     }
-
 
     pub fn new_from_file(formatter: T, path: &Path) -> Editor<T> {
         let buf = match Buffer::new_from_file(path) {
@@ -87,14 +84,12 @@ impl<T: LineFormatter> Editor<T> {
         return ed;
     }
 
-
     pub fn save_if_dirty(&mut self) {
         if self.dirty && self.file_path != PathBuf::new() {
             let _ = self.buffer.save_to_file(&self.file_path);
             self.dirty = false;
         }
     }
-
 
     pub fn auto_detect_line_ending(&mut self) {
         let mut line_ending_histogram: [usize; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -103,8 +98,8 @@ impl<T: LineFormatter> Editor<T> {
         let mut line_i: usize = 0;
         for line in self.buffer.line_iter() {
             // Get the line ending
-            let ending = if line.grapheme_count() > 0 {
-                let g = line.grapheme_at_index(line.grapheme_count() - 1);
+            let ending = if line.len_chars() > 0 {
+                let g = line.slice(line.len_chars() - 1, line.len_chars()).graphemes().nth(0).unwrap();
                 str_to_line_ending(g)
             } else {
                 LineEnding::None
@@ -172,18 +167,17 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-
     pub fn auto_detect_indentation_style(&mut self) {
         let mut tab_blocks: usize = 0;
         let mut space_blocks: usize = 0;
         let mut space_histogram: [usize; 9] = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-        let mut last_indent = (false, 0usize);  // (was_tabs, indent_count)
+        let mut last_indent = (false, 0usize); // (was_tabs, indent_count)
 
         // Collect statistics
         let mut line_i: usize = 0;
         for line in self.buffer.line_iter() {
-            let mut g_iter = line.grapheme_iter();
+            let mut g_iter = line.graphemes();
             match g_iter.next() {
                 Some("\t") => {
                     // Count leading tabs
@@ -263,12 +257,10 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-
     pub fn update_dim(&mut self, h: usize, w: usize) {
         self.editor_dim = (h, w);
         self.update_view_dim();
     }
-
 
     pub fn update_view_dim(&mut self) {
         // TODO: generalize for non-terminal UI.  Maybe this isn't where it
@@ -277,10 +269,11 @@ impl<T: LineFormatter> Editor<T> {
         let line_count_digits = digit_count(self.buffer.line_count() as u32, 10) as usize;
         // Minus 1 vertically for the header, minus one more than the digits in
         // the line count for the gutter.
-        self.view_dim = (self.editor_dim.0 - 1,
-                         self.editor_dim.1 - line_count_digits - 1);
+        self.view_dim = (
+            self.editor_dim.0 - 1,
+            self.editor_dim.1 - line_count_digits - 1,
+        );
     }
-
 
     pub fn undo(&mut self) {
         // TODO: handle multiple cursors properly
@@ -298,7 +291,6 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-
     pub fn redo(&mut self) {
         // TODO: handle multiple cursors properly
         if let Some(pos) = self.buffer.redo() {
@@ -315,7 +307,6 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
         // TODO: account for the horizontal offset of the editor view.
@@ -325,26 +316,31 @@ impl<T: LineFormatter> Editor<T> {
         // the closest cursor.
 
         // Find the first and last grapheme index visible within the editor.
-        let g_first = self.formatter
-                          .index_set_horizontal_v2d(&self.buffer, self.view_pos.0, 0, Floor);
-        let mut g_last = self.formatter.index_offset_vertical_v2d(&self.buffer,
-                                                                  g_first,
-                                                                  self.view_dim.0 as isize,
-                                                                  (Floor, Floor));
-        g_last = self.formatter
-                     .index_set_horizontal_v2d(&self.buffer, g_last, self.view_dim.1, Floor);
+        let g_first =
+            self.formatter
+                .index_set_horizontal_v2d(&self.buffer, self.view_pos.0, 0, Floor);
+        let mut g_last = self.formatter.index_offset_vertical_v2d(
+            &self.buffer,
+            g_first,
+            self.view_dim.0 as isize,
+            (Floor, Floor),
+        );
+        g_last =
+            self.formatter
+                .index_set_horizontal_v2d(&self.buffer, g_last, self.view_dim.1, Floor);
 
         // Adjust the view depending on where the cursor is
         if self.cursors[0].range.0 < g_first {
             self.view_pos.0 = self.cursors[0].range.0;
         } else if self.cursors[0].range.0 > g_last {
-            self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer,
-                                                                       self.cursors[0].range.0,
-                                                                       -(self.view_dim.0 as isize),
-                                                                       (Floor, Floor));
+            self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
+                &self.buffer,
+                self.cursors[0].range.0,
+                -(self.view_dim.0 as isize),
+                (Floor, Floor),
+            );
         }
     }
-
 
     pub fn insert_text_at_cursor(&mut self, text: &str) {
         self.cursors.make_consistent();
@@ -370,7 +366,6 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn insert_tab_at_cursor(&mut self) {
         self.cursors.make_consistent();
 
@@ -383,16 +378,17 @@ impl<T: LineFormatter> Editor<T> {
                 c.range.1 += offset;
 
                 // Figure out how many spaces to insert
-                let vis_pos = self.formatter.index_to_horizontal_v2d(&self.buffer, c.range.0);
+                let vis_pos = self.formatter
+                    .index_to_horizontal_v2d(&self.buffer, c.range.0);
                 // TODO: handle tab settings
-                let next_tab_stop = ((vis_pos / self.soft_tab_width as usize) + 1) *
-                                    self.soft_tab_width as usize;
+                let next_tab_stop =
+                    ((vis_pos / self.soft_tab_width as usize) + 1) * self.soft_tab_width as usize;
                 let space_count = min(next_tab_stop - vis_pos, 8);
 
-
                 // Insert spaces
-                let space_strs = ["", " ", "  ", "   ", "    ", "     ", "      ", "       ",
-                                  "        "];
+                let space_strs = [
+                    "", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        "
+                ];
                 self.buffer.insert_text(space_strs[space_count], c.range.0);
                 self.dirty = true;
 
@@ -412,23 +408,16 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-
     pub fn backspace_at_cursor(&mut self) {
         self.remove_text_behind_cursor(1);
     }
 
-
     pub fn insert_text_at_grapheme(&mut self, text: &str, pos: usize) {
         self.dirty = true;
         let buf_len = self.buffer.grapheme_count();
-        self.buffer.insert_text(text,
-                                if pos < buf_len {
-                                    pos
-                                } else {
-                                    buf_len
-                                });
+        self.buffer
+            .insert_text(text, if pos < buf_len { pos } else { buf_len });
     }
-
 
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: usize) {
         self.cursors.make_consistent();
@@ -465,7 +454,6 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
-
 
     pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: usize) {
         self.cursors.make_consistent();
@@ -506,7 +494,6 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn remove_text_inside_cursor(&mut self) {
         self.cursors.make_consistent();
 
@@ -521,7 +508,8 @@ impl<T: LineFormatter> Editor<T> {
             if c.range.0 < c.range.1 {
                 let len = c.range.1 - c.range.0;
 
-                self.buffer.remove_text_before(c.range.0, c.range.1 - c.range.0);
+                self.buffer
+                    .remove_text_before(c.range.0, c.range.1 - c.range.0);
                 self.dirty = true;
 
                 // Move cursor
@@ -540,7 +528,6 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn cursor_to_beginning_of_buffer(&mut self) {
         self.cursors = CursorSet::new();
 
@@ -550,7 +537,6 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
-
 
     pub fn cursor_to_end_of_buffer(&mut self) {
         let end = self.buffer.grapheme_count();
@@ -562,7 +548,6 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
-
 
     pub fn cursor_left(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
@@ -580,7 +565,6 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn cursor_right(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
             c.range.1 += n;
@@ -597,22 +581,25 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn cursor_up(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
             let vmove = -1 * (n * self.formatter.single_line_height()) as isize;
-            let mut temp_index = self.formatter.index_offset_vertical_v2d(&self.buffer,
-                                                                          c.range.0,
-                                                                          vmove,
-                                                                          (Round, Round));
+            let mut temp_index = self.formatter.index_offset_vertical_v2d(
+                &self.buffer,
+                c.range.0,
+                vmove,
+                (Round, Round),
+            );
 
             if temp_index == 0 {
                 c.update_vis_start(&(self.buffer), &(self.formatter));
             } else {
-                temp_index = self.formatter.index_set_horizontal_v2d(&self.buffer,
-                                                                     temp_index,
-                                                                     c.vis_start,
-                                                                     Round);
+                temp_index = self.formatter.index_set_horizontal_v2d(
+                    &self.buffer,
+                    temp_index,
+                    c.vis_start,
+                    Round,
+                );
             }
 
             c.range.0 = temp_index;
@@ -622,23 +609,26 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust view
         self.move_view_to_cursor();
     }
-
 
     pub fn cursor_down(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
             let vmove = (n * self.formatter.single_line_height()) as isize;
-            let mut temp_index = self.formatter.index_offset_vertical_v2d(&self.buffer,
-                                                                          c.range.0,
-                                                                          vmove,
-                                                                          (Round, Round));
+            let mut temp_index = self.formatter.index_offset_vertical_v2d(
+                &self.buffer,
+                c.range.0,
+                vmove,
+                (Round, Round),
+            );
 
             if temp_index == self.buffer.grapheme_count() {
                 c.update_vis_start(&(self.buffer), &(self.formatter));
             } else {
-                temp_index = self.formatter.index_set_horizontal_v2d(&self.buffer,
-                                                                     temp_index,
-                                                                     c.vis_start,
-                                                                     Round);
+                temp_index = self.formatter.index_set_horizontal_v2d(
+                    &self.buffer,
+                    temp_index,
+                    c.vis_start,
+                    Round,
+                );
             }
 
             c.range.0 = temp_index;
@@ -649,14 +639,15 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn page_up(&mut self) {
-        let move_amount = self.view_dim.0 -
-                          max((self.view_dim.0 / 8), self.formatter.single_line_height());
-        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer,
-                                                                   self.view_pos.0,
-                                                                   -1 * move_amount as isize,
-                                                                   (Round, Round));
+        let move_amount =
+            self.view_dim.0 - max((self.view_dim.0 / 8), self.formatter.single_line_height());
+        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
+            &self.buffer,
+            self.view_pos.0,
+            -1 * move_amount as isize,
+            (Round, Round),
+        );
 
         self.cursor_up(move_amount);
 
@@ -664,14 +655,15 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn page_down(&mut self) {
-        let move_amount = self.view_dim.0 -
-                          max((self.view_dim.0 / 8), self.formatter.single_line_height());
-        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(&self.buffer,
-                                                                   self.view_pos.0,
-                                                                   move_amount as isize,
-                                                                   (Round, Round));
+        let move_amount =
+            self.view_dim.0 - max((self.view_dim.0 / 8), self.formatter.single_line_height());
+        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
+            &self.buffer,
+            self.view_pos.0,
+            move_amount as isize,
+            (Round, Round),
+        );
 
         self.cursor_down(move_amount);
 
@@ -679,15 +671,15 @@ impl<T: LineFormatter> Editor<T> {
         self.move_view_to_cursor();
     }
 
-
     pub fn jump_to_line(&mut self, n: usize) {
         let pos = self.buffer.line_col_to_index((n, 0));
         self.cursors.truncate(1);
-        self.cursors[0].range.0 = self.formatter.index_set_horizontal_v2d(&self.buffer,
-                                                                          pos,
-                                                                          self.cursors[0]
-                                                                              .vis_start,
-                                                                          Round);
+        self.cursors[0].range.0 = self.formatter.index_set_horizontal_v2d(
+            &self.buffer,
+            pos,
+            self.cursors[0].vis_start,
+            Round,
+        );
         self.cursors[0].range.1 = self.cursors[0].range.0;
 
         // Adjust view

@@ -1,13 +1,13 @@
 // #![feature(test)]
 
 // extern crate test;
-extern crate rustbox;
 extern crate docopt;
+extern crate encoding;
+extern crate ropey;
+extern crate rustbox;
 extern crate rustc_serialize;
 extern crate unicode_segmentation;
 extern crate unicode_width;
-extern crate encoding;
-extern crate ropey;
 // extern crate freetype;
 // extern crate sdl2;
 
@@ -28,9 +28,6 @@ mod term_ui;
 // mod font;
 // mod gui;
 
-
-
-
 // Usage documentation string
 static USAGE: &'static str = "
 Usage: led [options] [<file>]
@@ -41,7 +38,6 @@ Options:
     -h, --help  Show this message
 ";
 
-
 // Struct for storing command-line arguments
 #[derive(RustcDecodable, Debug)]
 struct Args {
@@ -50,13 +46,11 @@ struct Args {
     flag_help: bool,
 }
 
-
-
-
 fn main() {
     // Get command-line arguments
-    let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
-
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| e.exit());
 
     // Initialize and start UI
     if args.flag_gui {

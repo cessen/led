@@ -1,6 +1,5 @@
 use std::collections::LinkedList;
 
-
 /// A text editing operation
 #[derive(Clone)]
 pub enum Operation {
@@ -10,7 +9,6 @@ pub enum Operation {
     MoveText(usize, usize, usize),
     CompositeOp(Vec<Operation>),
 }
-
 
 /// An undo/redo stack of text editing operations
 pub struct UndoStack {
@@ -26,12 +24,10 @@ impl UndoStack {
         }
     }
 
-
     pub fn push(&mut self, op: Operation) {
         self.stack_a.push_back(op);
         self.stack_b.clear();
     }
-
 
     pub fn prev(&mut self) -> Option<Operation> {
         if let Some(op) = self.stack_a.pop_back() {
@@ -41,7 +37,6 @@ impl UndoStack {
             return None;
         }
     }
-
 
     pub fn next(&mut self) -> Option<Operation> {
         if let Some(op) = self.stack_b.pop_back() {
