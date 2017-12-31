@@ -5,7 +5,7 @@ use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
 use std::path::{Path, PathBuf};
 use std::cmp::{max, min};
-use string_utils::{grapheme_count, str_to_line_ending, LineEnding};
+use string_utils::{char_count, str_to_line_ending, LineEnding};
 use utils::digit_count;
 use self::cursor::CursorSet;
 
@@ -26,7 +26,7 @@ pub struct Editor<T: LineFormatter> {
 
     // The dimensions and position of just the text view portion of the editor
     pub view_dim: (usize, usize), // (height, width)
-    pub view_pos: (usize, usize), // (grapheme index, visual horizontal offset)
+    pub view_pos: (usize, usize), // (char index, visual horizontal offset)
 
     // The editing cursor position
     pub cursors: CursorSet,
@@ -324,24 +324,24 @@ impl<T: LineFormatter> Editor<T> {
         // there are no cursors currently in view, and should jump to
         // the closest cursor.
 
-        // Find the first and last grapheme index visible within the editor.
-        let g_first =
+        // Find the first and last char index visible within the editor.
+        let c_first =
             self.formatter
                 .index_set_horizontal_v2d(&self.buffer, self.view_pos.0, 0, Floor);
-        let mut g_last = self.formatter.index_offset_vertical_v2d(
+        let mut c_last = self.formatter.index_offset_vertical_v2d(
             &self.buffer,
-            g_first,
+            c_first,
             self.view_dim.0 as isize,
             (Floor, Floor),
         );
-        g_last =
+        c_last =
             self.formatter
-                .index_set_horizontal_v2d(&self.buffer, g_last, self.view_dim.1, Floor);
+                .index_set_horizontal_v2d(&self.buffer, c_last, self.view_dim.1, Floor);
 
         // Adjust the view depending on where the cursor is
-        if self.cursors[0].range.0 < g_first {
+        if self.cursors[0].range.0 < c_first {
             self.view_pos.0 = self.cursors[0].range.0;
-        } else if self.cursors[0].range.0 > g_last {
+        } else if self.cursors[0].range.0 >= c_last {
             self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
                 &self.buffer,
                 self.cursors[0].range.0,
@@ -354,7 +354,7 @@ impl<T: LineFormatter> Editor<T> {
     pub fn insert_text_at_cursor(&mut self, text: &str) {
         self.cursors.make_consistent();
 
-        let str_len = grapheme_count(text);
+        let str_len = char_count(text);
         let mut offset = 0;
 
         for c in self.cursors.iter_mut() {
@@ -421,13 +421,6 @@ impl<T: LineFormatter> Editor<T> {
         self.remove_text_behind_cursor(1);
     }
 
-    pub fn insert_text_at_grapheme(&mut self, text: &str, pos: usize) {
-        self.dirty = true;
-        let buf_len = self.buffer.grapheme_count();
-        self.buffer
-            .insert_text(text, if pos < buf_len { pos } else { buf_len });
-    }
-
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: usize) {
         self.cursors.make_consistent();
 
@@ -443,7 +436,7 @@ impl<T: LineFormatter> Editor<T> {
                 continue;
             }
 
-            let len = min(c.range.0, grapheme_count);
+            let len = c.range.0 - self.buffer.nth_prev_grapheme(c.range.0, grapheme_count);
 
             // Remove text
             self.buffer.remove_text_before(c.range.0, len);
@@ -475,16 +468,11 @@ impl<T: LineFormatter> Editor<T> {
             c.range.1 -= min(c.range.1, offset);
 
             // Do nothing if there's nothing to delete.
-            if c.range.1 == self.buffer.grapheme_count() {
+            if c.range.1 == self.buffer.char_count() {
                 return;
             }
 
-            let max_len = if self.buffer.grapheme_count() > c.range.1 {
-                self.buffer.grapheme_count() - c.range.1
-            } else {
-                0
-            };
-            let len = min(max_len, grapheme_count);
+            let len = self.buffer.nth_next_grapheme(c.range.1, grapheme_count) - c.range.1;
 
             // Remove text
             self.buffer.remove_text_after(c.range.1, len);
@@ -548,7 +536,7 @@ impl<T: LineFormatter> Editor<T> {
     }
 
     pub fn cursor_to_end_of_buffer(&mut self) {
-        let end = self.buffer.grapheme_count();
+        let end = self.buffer.char_count();
 
         self.cursors = CursorSet::new();
         self.cursors[0].range = (end, end);
@@ -560,12 +548,7 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn cursor_left(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
-            if c.range.0 >= n {
-                c.range.0 -= n;
-            } else {
-                c.range.0 = 0;
-            }
-
+            c.range.0 = self.buffer.nth_prev_grapheme(c.range.0, n);
             c.range.1 = c.range.0;
             c.update_vis_start(&(self.buffer), &(self.formatter));
         }
@@ -576,12 +559,7 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn cursor_right(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
-            c.range.1 += n;
-
-            if c.range.1 > self.buffer.grapheme_count() {
-                c.range.1 = self.buffer.grapheme_count();
-            }
-
+            c.range.1 = self.buffer.nth_next_grapheme(c.range.1, n);
             c.range.0 = c.range.1;
             c.update_vis_start(&(self.buffer), &(self.formatter));
         }
@@ -629,7 +607,7 @@ impl<T: LineFormatter> Editor<T> {
                 (Round, Round),
             );
 
-            if temp_index == self.buffer.grapheme_count() {
+            if temp_index == self.buffer.char_count() {
                 c.update_vis_start(&(self.buffer), &(self.formatter));
             } else {
                 temp_index = self.formatter.index_set_horizontal_v2d(

@@ -69,9 +69,20 @@ impl Buffer {
         self.text.len_chars()
     }
 
-    pub fn grapheme_count(&self) -> usize {
-        // TODO: be correct
-        self.text.len_chars()
+    pub fn nth_next_grapheme(&self, char_idx: usize, n: usize) -> usize {
+        let mut char_idx = char_idx;
+        for _ in 0..n {
+            char_idx = self.text.next_grapheme_boundary(char_idx);
+        }
+        char_idx
+    }
+
+    pub fn nth_prev_grapheme(&self, char_idx: usize, n: usize) -> usize {
+        let mut char_idx = char_idx;
+        for _ in 0..n {
+            char_idx = self.text.prev_grapheme_boundary(char_idx);
+        }
+        char_idx
     }
 
     pub fn line_count(&self) -> usize {

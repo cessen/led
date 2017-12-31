@@ -26,13 +26,13 @@ pub trait LineFormatter {
     where
         T: Iterator<Item = &'a str>;
 
-    /// Converts a grapheme index within a text into a visual 2d position.
+    /// Converts a char index within a text into a visual 2d position.
     /// The text to be formatted is passed as a grapheme iterator.
-    fn index_to_v2d<'a, T>(&'a self, g_iter: T, index: usize) -> (usize, usize)
+    fn index_to_v2d<'a, T>(&'a self, g_iter: T, char_idx: usize) -> (usize, usize)
     where
         T: Iterator<Item = &'a str>;
 
-    /// Converts a visual 2d position into a grapheme index within a text.
+    /// Converts a visual 2d position into a char index within a text.
     /// The text to be formatted is passed as a grapheme iterator.
     fn v2d_to_index<'a, T>(
         &'a self,
@@ -43,8 +43,8 @@ pub trait LineFormatter {
     where
         T: Iterator<Item = &'a str>;
 
-    fn index_to_horizontal_v2d(&self, buf: &Buffer, index: usize) -> usize {
-        let (line_i, col_i) = buf.index_to_line_col(index);
+    fn index_to_horizontal_v2d(&self, buf: &Buffer, char_idx: usize) -> usize {
+        let (line_i, col_i) = buf.index_to_line_col(char_idx);
         let line = buf.get_line(line_i);
 
         // Find the right block in the line, and the index within that block
@@ -57,12 +57,12 @@ pub trait LineFormatter {
         return self.index_to_v2d(g_iter, col_i_adjusted).1;
     }
 
-    /// Takes a grapheme index and a visual vertical offset, and returns the grapheme
+    /// Takes a char index and a visual vertical offset, and returns the char
     /// index after that visual offset is applied.
     fn index_offset_vertical_v2d(
         &self,
         buf: &Buffer,
-        index: usize,
+        char_idx: usize,
         offset: isize,
         rounding: (RoundingBehavior, RoundingBehavior),
     ) -> usize {
@@ -70,7 +70,7 @@ pub trait LineFormatter {
         // TODO: do this with bidirectional line iterator
 
         // Get the line and block index of the given index
-        let (mut line_i, mut col_i) = buf.index_to_line_col(index);
+        let (mut line_i, mut col_i) = buf.index_to_line_col(char_idx);
 
         // Find the right block in the line, and the index within that block
         let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
@@ -104,7 +104,7 @@ pub trait LineFormatter {
 
                     // Check for off-the-end
                     if is_last_block && (line_i + 1) >= buf.line_count() {
-                        return buf.grapheme_count();
+                        return buf.char_count();
                     }
 
                     if is_last_block {
@@ -153,17 +153,17 @@ pub trait LineFormatter {
         return buf.line_col_to_index((line_i, col_i));
     }
 
-    /// Takes a grapheme index and a desired visual horizontal position, and
-    /// returns a grapheme index on the same visual line as the given index,
+    /// Takes a char index and a desired visual horizontal position, and
+    /// returns a char index on the same visual line as the given index,
     /// but offset to have the desired horizontal position.
     fn index_set_horizontal_v2d(
         &self,
         buf: &Buffer,
-        index: usize,
+        char_idx: usize,
         horizontal: usize,
         rounding: RoundingBehavior,
     ) -> usize {
-        let (line_i, col_i) = buf.index_to_line_col(index);
+        let (line_i, col_i) = buf.index_to_line_col(char_idx);
         let line = buf.get_line(line_i);
 
         // Find the right block in the line, and the index within that block
@@ -189,7 +189,7 @@ pub trait LineFormatter {
             new_col_i = line.len_chars() - 1;
         }
 
-        return (index + new_col_i) - col_i;
+        return (char_idx + new_col_i) - col_i;
     }
 }
 

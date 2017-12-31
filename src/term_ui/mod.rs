@@ -345,8 +345,8 @@ impl TermUI {
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
         // than one cursor.
-        let percentage: usize = if editor.buffer.grapheme_count() > 0 {
-            (((editor.cursors[0].range.0 as f32) / (editor.buffer.grapheme_count() as f32)) * 100.0)
+        let percentage: usize = if editor.buffer.char_count() > 0 {
+            (((editor.cursors[0].range.0 as f32) / (editor.buffer.char_count() as f32)) * 100.0)
                 as usize
         } else {
             100
@@ -584,7 +584,7 @@ impl TermUI {
             // Calculate the cell coordinates at which to draw the cursor
             let pos_x = editor
                 .formatter
-                .index_to_horizontal_v2d(&self.editor.buffer, self.editor.buffer.grapheme_count());
+                .index_to_horizontal_v2d(&self.editor.buffer, self.editor.buffer.char_count());
             let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
             let py = screen_line - 1;
 
