@@ -98,10 +98,16 @@ impl<T: LineFormatter> Editor<T> {
         let mut line_i: usize = 0;
         for line in self.buffer.line_iter() {
             // Get the line ending
-            let ending = if line.len_chars() > 0 {
+            let ending = if line.len_chars() == 1 {
                 let g = line.slice(line.len_chars() - 1, line.len_chars())
                     .graphemes()
-                    .nth(0)
+                    .last()
+                    .unwrap();
+                str_to_line_ending(g)
+            } else if line.len_chars() > 1 {
+                let g = line.slice(line.len_chars() - 2, line.len_chars())
+                    .graphemes()
+                    .last()
                     .unwrap();
                 str_to_line_ending(g)
             } else {
