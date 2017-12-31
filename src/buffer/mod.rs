@@ -42,12 +42,8 @@ impl Buffer {
     }
 
     pub fn new_from_file(path: &Path) -> io::Result<Buffer> {
-        let mut f = BufReader::new(try!(File::open(path)));
-        let mut string = String::new();
-        try!(f.read_to_string(&mut string));
-
         let buf = Buffer {
-            text: Rope::from_str(&string[..]),
+            text: Rope::from_reader(BufReader::new(try!(File::open(path))))?,
             file_path: Some(path.to_path_buf()),
             undo_stack: UndoStack::new(),
         };
