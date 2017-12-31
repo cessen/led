@@ -401,7 +401,7 @@ impl TermUI {
         let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
         let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
         let (mut line_block_index, _) = block_index_and_offset(col_i);
-        let mut grapheme_index = editor
+        let mut char_index = editor
             .buffer
             .line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
         let temp_line = editor.buffer.get_line(line_index);
@@ -415,7 +415,7 @@ impl TermUI {
                     ),
                 )
                 .graphemes(),
-            editor.view_pos.0 - grapheme_index,
+            editor.view_pos.0 - char_index,
         );
 
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
@@ -480,7 +480,7 @@ impl TermUI {
                         // Check if the character is within a cursor
                         let mut at_cursor = false;
                         for c in editor.cursors.iter() {
-                            if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
+                            if char_index >= c.range.0 && char_index <= c.range.1 {
                                 at_cursor = true;
                             }
                         }
@@ -544,12 +544,12 @@ impl TermUI {
                             }
                         }
                     }
+
+                    char_index += g.chars().count();
+                    line_g_index += 1;
                 } else {
                     break;
                 }
-
-                grapheme_index += 1;
-                line_g_index += 1;
 
                 if line_g_index >= LINE_BLOCK_LENGTH {
                     line_block_index += 1;
@@ -575,7 +575,7 @@ impl TermUI {
         // Check if the character is within a cursor
         let mut at_cursor = false;
         for c in editor.cursors.iter() {
-            if grapheme_index >= c.range.0 && grapheme_index <= c.range.1 {
+            if char_index >= c.range.0 && char_index <= c.range.1 {
                 at_cursor = true;
             }
         }
