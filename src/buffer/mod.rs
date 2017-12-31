@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, BufWriter, Write};
 
 use ropey;
 use ropey::{Rope, RopeSlice};
