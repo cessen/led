@@ -571,30 +571,33 @@ impl<T: LineFormatter> Editor<T> {
     pub fn cursor_up(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
             let vmove = -1 * (n * self.formatter.single_line_height()) as isize;
+
             let mut temp_index = self.formatter.index_offset_vertical_v2d(
                 &self.buffer,
                 c.range.0,
                 vmove,
                 (Round, Round),
             );
-
-            if temp_index == 0 {
-                c.update_vis_start(&(self.buffer), &(self.formatter));
-            } else {
-                temp_index = self.formatter.index_set_horizontal_v2d(
-                    &self.buffer,
-                    temp_index,
-                    c.vis_start,
-                    Round,
-                );
-            }
+            temp_index = self.formatter.index_set_horizontal_v2d(
+                &self.buffer,
+                temp_index,
+                c.vis_start,
+                Round,
+            );
 
             if !self.buffer.is_grapheme(temp_index) {
                 temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
             }
 
-            c.range.0 = temp_index;
-            c.range.1 = temp_index;
+            if temp_index == c.range.0 {
+                // We were already at the top.
+                c.range.0 = 0;
+                c.range.1 = 0;
+                c.update_vis_start(&(self.buffer), &(self.formatter));
+            } else {
+                c.range.0 = temp_index;
+                c.range.1 = temp_index;
+            }
         }
 
         // Adjust view
@@ -604,30 +607,33 @@ impl<T: LineFormatter> Editor<T> {
     pub fn cursor_down(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
             let vmove = (n * self.formatter.single_line_height()) as isize;
+
             let mut temp_index = self.formatter.index_offset_vertical_v2d(
                 &self.buffer,
                 c.range.0,
                 vmove,
                 (Round, Round),
             );
-
-            if temp_index == self.buffer.char_count() {
-                c.update_vis_start(&(self.buffer), &(self.formatter));
-            } else {
-                temp_index = self.formatter.index_set_horizontal_v2d(
-                    &self.buffer,
-                    temp_index,
-                    c.vis_start,
-                    Round,
-                );
-            }
+            temp_index = self.formatter.index_set_horizontal_v2d(
+                &self.buffer,
+                temp_index,
+                c.vis_start,
+                Round,
+            );
 
             if !self.buffer.is_grapheme(temp_index) {
                 temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
             }
 
-            c.range.0 = temp_index;
-            c.range.1 = temp_index;
+            if temp_index == c.range.0 {
+                // We were already at the bottom.
+                c.range.0 = self.buffer.char_count();
+                c.range.1 = self.buffer.char_count();
+                c.update_vis_start(&(self.buffer), &(self.formatter));
+            } else {
+                c.range.0 = temp_index;
+                c.range.1 = temp_index;
+            }
         }
 
         // Adjust view
