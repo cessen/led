@@ -589,6 +589,10 @@ impl<T: LineFormatter> Editor<T> {
                 );
             }
 
+            if !self.buffer.is_grapheme(temp_index) {
+                temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
+            }
+
             c.range.0 = temp_index;
             c.range.1 = temp_index;
         }
@@ -616,6 +620,10 @@ impl<T: LineFormatter> Editor<T> {
                     c.vis_start,
                     Round,
                 );
+            }
+
+            if !self.buffer.is_grapheme(temp_index) {
+                temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
             }
 
             c.range.0 = temp_index;

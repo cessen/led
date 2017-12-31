@@ -81,7 +81,7 @@ impl LineFormatter for ConsoleLineFormatter {
         return dim;
     }
 
-    fn index_to_v2d<'a, T>(&'a self, g_iter: T, index: usize) -> (usize, usize)
+    fn index_to_v2d<'a, T>(&'a self, g_iter: T, char_idx: usize) -> (usize, usize)
     where
         T: Iterator<Item = &'a str>,
     {
@@ -89,12 +89,12 @@ impl LineFormatter for ConsoleLineFormatter {
         let mut i = 0;
         let mut last_width = 0;
 
-        for (_, _pos, width) in self.iter(g_iter) {
+        for (g, _pos, width) in self.iter(g_iter) {
             pos = _pos;
             last_width = width;
-            i += 1;
+            i += g.chars().count();
 
-            if i > index {
+            if i > char_idx {
                 return pos;
             }
         }
@@ -112,17 +112,19 @@ impl LineFormatter for ConsoleLineFormatter {
         T: Iterator<Item = &'a str>,
     {
         // TODO: handle rounding modes
+        let mut prev_i = 0;
         let mut i = 0;
 
-        for (_, pos, _) in self.iter(g_iter) {
+        for (g, pos, _) in self.iter(g_iter) {
             if pos.0 > v2d.0 {
-                i -= 1;
+                i = prev_i;
                 break;
             } else if pos.0 == v2d.0 && pos.1 >= v2d.1 {
                 break;
             }
 
-            i += 1;
+            prev_i = i;
+            i += g.chars().count();
         }
 
         return i;
