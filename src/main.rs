@@ -33,7 +33,6 @@ Options:
 #[derive(Debug, Deserialize)]
 struct Args {
     arg_file: Option<String>,
-    flag_gui: bool,
     flag_help: bool,
 }
 
