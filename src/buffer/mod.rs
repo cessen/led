@@ -270,10 +270,17 @@ impl Buffer {
     /// If the index is off the end of the text, returns the line and column
     /// number of the last valid text position.
     pub fn index_to_line_col(&self, pos: usize) -> (usize, usize) {
-        let line = self.text.char_to_line(pos);
-        let line_pos = self.text.line_to_char(line);
+        if pos < self.text.len_chars() {
+            let line = self.text.char_to_line(pos);
+            let line_pos = self.text.line_to_char(line);
 
-        return (line, pos - line_pos);
+            return (line, pos - line_pos);
+        } else {
+            let line = self.text.len_lines() - 1;
+            let line_pos = self.text.line_to_char(line);
+
+            return (line, pos - line_pos);
+        }
     }
 
     /// Converts a line number and char-column number into a char

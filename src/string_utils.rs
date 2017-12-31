@@ -39,9 +39,8 @@ pub fn is_whitespace(text: &str) -> bool {
         | "\u{205F}" // MEDIUM MATHEMATICAL SPACE
         | "\u{3000}" // IDEOGRAPHIC SPACE
         | "\u{FEFF}" // ZERO WIDTH NO-BREAK SPACE
-        => true, 
-        
-        _ => false
+        => true,
+        _ => false,
     }
 }
 

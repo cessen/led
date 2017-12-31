@@ -44,7 +44,7 @@ pub struct TermUI {
 impl TermUI {
     pub fn new() -> TermUI {
         let rb = match rustbox::RustBox::init(rustbox::InitOptions {
-            buffer_stderr: false,
+            buffer_stderr: true,
             ..Default::default()
         }) {
             Ok(rbox) => rbox,
@@ -65,7 +65,7 @@ impl TermUI {
 
     pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
         let rb = match rustbox::RustBox::init(rustbox::InitOptions {
-            buffer_stderr: false,
+            buffer_stderr: true,
             ..Default::default()
         }) {
             Ok(rbox) => rbox,
@@ -406,13 +406,15 @@ impl TermUI {
             .line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
         let temp_line = editor.buffer.get_line(line_index);
         let (vis_line_offset, _) = editor.formatter.index_to_v2d(
-            temp_line.slice(
-                line_block_index * LINE_BLOCK_LENGTH,
-                min(
-                    temp_line.len_chars(),
-                    (line_block_index + 1) * LINE_BLOCK_LENGTH,
-                ),
-            ).graphemes(),
+            temp_line
+                .slice(
+                    line_block_index * LINE_BLOCK_LENGTH,
+                    min(
+                        temp_line.len_chars(),
+                        (line_block_index + 1) * LINE_BLOCK_LENGTH,
+                    ),
+                )
+                .graphemes(),
             editor.view_pos.0 - grapheme_index,
         );
 
@@ -451,9 +453,10 @@ impl TermUI {
             let mut last_pos_y = 0;
             let mut lines_traversed: usize = 0;
             let line_len = line.len_chars();
-            let mut g_iter = editor
-                .formatter
-                .iter(line.slice(line_block_index * LINE_BLOCK_LENGTH, line_len).graphemes());
+            let mut g_iter = editor.formatter.iter(line.slice(
+                line_block_index * LINE_BLOCK_LENGTH,
+                line_len,
+            ).graphemes());
 
             loop {
                 if let Some((g, (pos_y, pos_x), width)) = g_iter.next() {
@@ -552,9 +555,10 @@ impl TermUI {
                     line_block_index += 1;
                     line_g_index = 0;
                     let line_len = line.len_chars();
-                    g_iter = editor
-                        .formatter
-                        .iter(line.slice(line_block_index * LINE_BLOCK_LENGTH, line_len).graphemes());
+                    g_iter = editor.formatter.iter(line.slice(
+                        line_block_index * LINE_BLOCK_LENGTH,
+                        line_len,
+                    ).graphemes());
                     lines_traversed += 1;
                 }
             }
