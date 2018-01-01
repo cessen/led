@@ -1,15 +1,12 @@
 #![allow(dead_code)]
 
-use std::cell::RefCell;
 use std::cmp::min;
 use std::io;
-use std::io::Write;
 
 use termion;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
 use termion::color;
-use termion::raw::{IntoRawMode, RawTerminal};
 
 use editor::Editor;
 use formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH};
@@ -18,6 +15,9 @@ use string_utils::{is_line_ending, line_ending_to_str, LineEnding};
 use utils::digit_count;
 
 pub mod formatter;
+mod screen;
+
+use self::screen::Screen;
 
 /// Generalized ui loop.
 macro_rules! ui_loop {
@@ -27,7 +27,7 @@ macro_rules! ui_loop {
         loop {
             // Draw the editor to screen
             {$draw};
-            $term_ui.present();
+            $term_ui.screen.present();
 
             // Handle input
             match $term_ui.inp.next() {
@@ -63,7 +63,7 @@ macro_rules! ui_loop {
 
 pub struct TermUI<'a> {
     inp: termion::input::Events<io::StdinLock<'a>>,
-    out: RefCell<RawTerminal<io::Stdout>>,
+    screen: Screen,
     editor: Editor<ConsoleLineFormatter>,
     width: usize,
     height: usize,
@@ -76,18 +76,6 @@ enum LoopStatus {
     Continue,
 }
 
-impl<'a> Drop for TermUI<'a> {
-    fn drop(&mut self) {
-        self.clear();
-        write!(
-            self.out.borrow_mut(),
-            "{}{}",
-            termion::cursor::Show,
-            termion::cursor::Goto(0, 0),
-        ).unwrap();
-    }
-}
-
 impl<'a> TermUI<'a> {
     pub fn new<'b>(stdin: &'b mut io::Stdin) -> TermUI<'b> {
         TermUI::new_from_editor(stdin, Editor::new(ConsoleLineFormatter::new(4)))
@@ -97,14 +85,13 @@ impl<'a> TermUI<'a> {
         stdin: &'b mut io::Stdin,
         ed: Editor<ConsoleLineFormatter>,
     ) -> TermUI<'b> {
-        let out = io::stdout().into_raw_mode().unwrap();
         let (w, h) = termion::terminal_size().unwrap();
         let mut editor = ed;
         editor.update_dim(h as usize - 1, w as usize);
 
         TermUI {
             inp: stdin.lock().events(),
-            out: RefCell::new(out),
+            screen: Screen::new(),
             editor: editor,
             width: w as usize,
             height: h as usize,
@@ -114,7 +101,7 @@ impl<'a> TermUI<'a> {
 
     pub fn main_ui_loop(&mut self) {
         // Hide cursor
-        write!(self.out.borrow_mut(), "{}", termion::cursor::Hide).unwrap();
+        self.screen.hide_cursor();
 
         self.editor.update_dim(self.height - 1, self.width);
         self.editor.formatter.set_wrap_width(self.width as usize);
@@ -126,7 +113,7 @@ impl<'a> TermUI<'a> {
             draw {
                 self.editor.update_view_dim();
                 self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
-                self.clear();
+                self.screen.clear();
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
             },
 
@@ -229,13 +216,13 @@ impl<'a> TermUI<'a> {
             draw {
                 self.editor.update_view_dim();
                 self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
-                self.clear();
+                self.screen.clear();
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
                 for i in 0..self.width {
-                    self.draw(i, 0, " ", foreground, background);
+                    self.screen.draw(i, 0, " ", foreground, background);
                 }
-                self.draw(1, 0, prefix, foreground, background);
-                self.draw(
+                self.screen.draw(1, 0, prefix, foreground, background);
+                self.screen.draw(
                     prefix.len() + 1,
                     0,
                     &line[..],
@@ -298,14 +285,14 @@ impl<'a> TermUI<'a> {
 
         // Fill in top row with info line color
         for i in c1.1..(c2.1 + 1) {
-            self.draw(i, c1.0, " ", fg, bg);
+            self.screen.draw(i, c1.0, " ", fg, bg);
         }
 
         // Filename and dirty marker
         let filename = editor.file_path.display();
         let dirty_char = if editor.dirty { "*" } else { "" };
         let name = format!("{}{}", filename, dirty_char);
-        self.draw(c1.1 + 1, c1.0, &name[..], fg, bg);
+        self.screen.draw(c1.1 + 1, c1.0, &name[..], fg, bg);
 
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
@@ -317,7 +304,8 @@ impl<'a> TermUI<'a> {
             100
         };
         let pstring = format!("{}%", percentage);
-        self.draw(c2.1 - pstring.len(), c1.0, &pstring[..], fg, bg);
+        self.screen
+            .draw(c2.1 - pstring.len(), c1.0, &pstring[..], fg, bg);
 
         // Text encoding info and tab style
         let nl = match editor.line_ending_type {
@@ -336,7 +324,7 @@ impl<'a> TermUI<'a> {
             "UTF8:{}  {}:{}",
             nl, soft_tabs_str, editor.soft_tab_width as usize
         );
-        self.draw(c2.1 - 30, c1.0, &info_line[..], fg, bg);
+        self.screen.draw(c2.1 - 30, c1.0, &info_line[..], fg, bg);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
@@ -375,7 +363,7 @@ impl<'a> TermUI<'a> {
         // Fill in the gutter with the appropriate background
         for y in c1.0..(c2.0 + 1) {
             for x in c1.1..(c1.1 + gutter_width - 1) {
-                self.draw(x, y, " ", color::White, color::Blue);
+                self.screen.draw(x, y, " ", color::White, color::Blue);
             }
         }
 
@@ -386,7 +374,7 @@ impl<'a> TermUI<'a> {
                 let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
-                    self.draw(
+                    self.screen.draw(
                         lnx,
                         lny,
                         &format!("{}", line_num)[..],
@@ -437,7 +425,7 @@ impl<'a> TermUI<'a> {
                         // Actually print the character
                         if is_line_ending(g) {
                             if at_cursor {
-                                self.draw(
+                                self.screen.draw(
                                     px as usize,
                                     py as usize,
                                     " ",
@@ -449,7 +437,7 @@ impl<'a> TermUI<'a> {
                             for i in 0..width {
                                 let tpx = px as usize + i;
                                 if tpx <= c2.1 {
-                                    self.draw(
+                                    self.screen.draw(
                                         tpx as usize,
                                         py as usize,
                                         " ",
@@ -460,7 +448,7 @@ impl<'a> TermUI<'a> {
                             }
 
                             if at_cursor {
-                                self.draw(
+                                self.screen.draw(
                                     px as usize,
                                     py as usize,
                                     " ",
@@ -470,9 +458,21 @@ impl<'a> TermUI<'a> {
                             }
                         } else {
                             if at_cursor {
-                                self.draw(px as usize, py as usize, g, color::Black, color::White);
+                                self.screen.draw(
+                                    px as usize,
+                                    py as usize,
+                                    g,
+                                    color::Black,
+                                    color::White,
+                                );
                             } else {
-                                self.draw(px as usize, py as usize, g, color::White, color::Black);
+                                self.screen.draw(
+                                    px as usize,
+                                    py as usize,
+                                    g,
+                                    color::White,
+                                    color::Black,
+                                );
                             }
                         }
                     }
@@ -523,40 +523,9 @@ impl<'a> TermUI<'a> {
             if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize)
                 && (py <= c2.0 as isize)
             {
-                self.draw(px as usize, py as usize, " ", color::Black, color::White);
+                self.screen
+                    .draw(px as usize, py as usize, " ", color::Black, color::White);
             }
         }
-    }
-
-    fn clear(&self) {
-        write!(
-            self.out.borrow_mut(),
-            "{}{}",
-            color::Bg(color::Black),
-            termion::clear::All
-        ).unwrap();
-        self.out.borrow_mut().flush().unwrap();
-    }
-
-    fn present(&self) {
-        // TODO
-    }
-
-    fn draw<C1: color::Color, C2: color::Color>(
-        &self,
-        x: usize,
-        y: usize,
-        text: &str,
-        fg: C1,
-        bg: C2,
-    ) {
-        write!(
-            self.out.borrow_mut(),
-            "{}{}{}{}",
-            termion::cursor::Goto((x + 1) as u16, (y + 1) as u16),
-            color::Fg(fg),
-            color::Bg(bg),
-            text
-        ).unwrap();
     }
 }
