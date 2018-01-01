@@ -114,7 +114,7 @@ impl<'a> TermUI<'a> {
             draw {
                 self.editor.update_view_dim();
                 self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
-                self.screen.clear();
+                self.screen.clear(Color::Black);
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
             },
 
@@ -216,7 +216,7 @@ impl<'a> TermUI<'a> {
             draw {
                 self.editor.update_view_dim();
                 self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
-                self.screen.clear();
+                self.screen.clear(Color::Black);
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
                 for i in 0..self.width {
                     self.screen.draw(i, 0, " ", style);

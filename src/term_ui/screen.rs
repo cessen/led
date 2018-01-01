@@ -32,16 +32,16 @@ impl Screen {
         }
     }
 
-    pub(crate) fn clear(&self) {
+    pub(crate) fn clear(&self, col: Color) {
         for cell in self.buf.borrow_mut().iter_mut() {
             match *cell {
                 Some((ref mut style, ref mut text)) => {
-                    *style = Style(Color::Black, Color::Black);
+                    *style = Style(col, col);
                     text.clear();
                     text.push_str(" ");
                 }
                 _ => {
-                    *cell = Some((Style(Color::Black, Color::Black), " ".into()));
+                    *cell = Some((Style(col, col), " ".into()));
                 }
             }
         }
@@ -57,12 +57,14 @@ impl Screen {
 
     pub(crate) fn present(&self) {
         let buf = self.buf.borrow();
-        let mut tmp_string = String::new();
+
+        // Double the minimum needed space, because of formatting characters and such.
+        let mut tmp_string = String::with_capacity(self.w * self.h * 2);
+
+        // Write everything to the tmp_string first.
         for y in 0..self.h {
             let mut x = 0;
             let mut last_style = Style(Color::Black, Color::Black);
-            let mut left_x = 0;
-            tmp_string.clear();
             tmp_string.push_str(&format!("{}", last_style));
             while x < self.w {
                 if let Some((style, ref text)) = buf[y * self.w + x] {
@@ -73,23 +75,18 @@ impl Screen {
                     tmp_string.push_str(text);
                     x += 1;
                 } else {
-                    write!(
-                        self.out.borrow_mut(),
-                        "{}{}",
-                        termion::cursor::Goto((left_x + 1) as u16, (y + 1) as u16),
-                        tmp_string,
-                    ).unwrap();
                     x += 1;
-                    left_x = x;
                 }
             }
-            write!(
-                self.out.borrow_mut(),
-                "{}{}",
-                termion::cursor::Goto((left_x + 1) as u16, (y + 1) as u16),
-                tmp_string,
-            ).unwrap();
         }
+
+        // Then write the tmp_string to screen all at once.
+        write!(
+            self.out.borrow_mut(),
+            "{}{}",
+            termion::cursor::Goto(0, 0),
+            tmp_string,
+        ).unwrap();
         self.out.borrow_mut().flush().unwrap();
     }
 
@@ -122,11 +119,11 @@ impl Drop for Screen {
     fn drop(&mut self) {
         write!(
             self.out.borrow_mut(),
-            "{}{}",
+            "{}{}{}",
             color::Fg(color::Reset),
-            color::Bg(color::Reset)
+            color::Bg(color::Reset),
+            termion::clear::All,
         ).unwrap();
-        self.clear();
         self.show_cursor();
     }
 }
