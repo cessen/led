@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+
 use buffer::Buffer;
 use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
@@ -172,7 +174,7 @@ impl<T: LineFormatter> Editor<T> {
     pub fn auto_detect_indentation_style(&mut self) {
         let mut tab_blocks: usize = 0;
         let mut space_blocks: usize = 0;
-        let mut space_histogram: [usize; 9] = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut space_histogram: HashMap<usize, usize> = HashMap::new();
 
         let mut last_indent = (false, 0usize); // (was_tabs, indent_count)
 
@@ -215,11 +217,7 @@ impl<T: LineFormatter> Editor<T> {
                     if !last_indent.0 && last_indent.1 < count {
                         space_blocks += 1;
                         let amount = count - last_indent.1;
-                        if amount < 9 {
-                            space_histogram[amount] += 1;
-                        } else {
-                            space_histogram[8] += 1;
-                        }
+                        *space_histogram.entry(amount).or_insert(0) += 1;
                     }
 
                     // Store last line info
@@ -238,10 +236,10 @@ impl<T: LineFormatter> Editor<T> {
         if space_blocks > (tab_blocks * 2) {
             let mut width = 0;
             let mut width_count = 0;
-            for i in 0usize..9 {
-                if space_histogram[i] > width_count {
-                    width = i;
-                    width_count = space_histogram[i];
+            for (w, count) in space_histogram.iter() {
+                if *count > width_count {
+                    width = *w;
+                    width_count = *count;
                 }
             }
 
