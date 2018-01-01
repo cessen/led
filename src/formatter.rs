@@ -7,7 +7,7 @@ use buffer::Buffer;
 // This is necessary to prevent pathological formatting cases which
 // could slow down the editor arbitrarily for arbitrarily long
 // lines.
-pub const LINE_BLOCK_LENGTH: usize = 4096;
+pub const LINE_BLOCK_LENGTH: usize = 1 << 12;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum RoundingBehavior {

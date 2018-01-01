@@ -89,16 +89,22 @@ impl Screen {
     }
 
     pub(crate) fn draw(&self, x: usize, y: usize, text: &str, style: Style) {
-        let mut buf = self.buf.borrow_mut();
-        let mut x = x;
-        for g in UnicodeSegmentation::graphemes(text, true) {
-            let width = UnicodeWidthStr::width(g);
-            if width > 0 {
-                buf[y * self.w + x] = Some((style, g.into()));
-                x += 1;
-                for _ in 0..(width - 1) {
-                    buf[y * self.w + x] = None;
+        if y < self.h {
+            let mut buf = self.buf.borrow_mut();
+            let mut x = x;
+            for g in UnicodeSegmentation::graphemes(text, true) {
+                let width = UnicodeWidthStr::width(g);
+                if width > 0 {
+                    if x < self.w {
+                        buf[y * self.w + x] = Some((style, g.into()));
+                    }
                     x += 1;
+                    for _ in 0..(width - 1) {
+                        if x < self.w {
+                            buf[y * self.w + x] = None;
+                        }
+                        x += 1;
+                    }
                 }
             }
         }

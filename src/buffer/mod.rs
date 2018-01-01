@@ -320,7 +320,7 @@ impl Buffer {
             let l_start = self.text.line_to_char(pos.0);
             let l_end = self.text.line_to_char(pos.0 + 1);
             return (l_start + pos.1)
-                .min(l_start.max(l_end - 1))
+                .min(l_start.max(l_end - 1.min(l_end)))
                 .min(self.text.len_chars());
         } else {
             return self.text.len_chars();
