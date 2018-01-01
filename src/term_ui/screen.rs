@@ -1,7 +1,7 @@
 use std;
 use std::cell::RefCell;
 use std::io;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 
 use super::smallstring::SmallString;
 use unicode_width::UnicodeWidthStr;
@@ -12,7 +12,7 @@ use termion::color;
 use termion::raw::{IntoRawMode, RawTerminal};
 
 pub(crate) struct Screen {
-    out: RefCell<AlternateScreen<RawTerminal<io::Stdout>>>,
+    out: RefCell<AlternateScreen<RawTerminal<BufWriter<io::Stdout>>>>,
     buf: RefCell<Vec<Option<(Style, SmallString)>>>,
     w: usize,
     h: usize,
@@ -25,7 +25,11 @@ impl Screen {
             .take(w as usize * h as usize)
             .collect();
         Screen {
-            out: RefCell::new(AlternateScreen::from(io::stdout().into_raw_mode().unwrap())),
+            out: RefCell::new(AlternateScreen::from(
+                BufWriter::with_capacity(1 << 14, io::stdout())
+                    .into_raw_mode()
+                    .unwrap(),
+            )),
             buf: RefCell::new(buf),
             w: w as usize,
             h: h as usize,
@@ -56,39 +60,31 @@ impl Screen {
     }
 
     pub(crate) fn present(&self) {
+        let mut out = self.out.borrow_mut();
         let buf = self.buf.borrow();
 
-        // Double the minimum needed space, because of formatting characters and such.
-        let mut tmp_string = String::with_capacity(self.w * self.h * 2);
-        tmp_string.push_str(&format!("{}", termion::cursor::Goto(1, 1)));
+        let mut last_style = Style(Color::Black, Color::Black);
+        write!(out, "{}", last_style).unwrap();
 
         // Write everything to the tmp_string first.
         for y in 0..self.h {
             let mut x = 0;
-            let mut last_style = Style(Color::Black, Color::Black);
-            tmp_string.push_str(&format!("{}", last_style));
+            write!(out, "{}", termion::cursor::Goto(1, y as u16 + 2)).unwrap();
             while x < self.w {
                 if let Some((style, ref text)) = buf[y * self.w + x] {
                     if style != last_style {
-                        tmp_string.push_str(&format!("{}", style));
+                        write!(out, "{}", style).unwrap();
                         last_style = style;
                     }
-                    tmp_string.push_str(text);
+                    write!(out, "{}", text).unwrap();
                     x += 1;
                 } else {
                     x += 1;
                 }
             }
-            tmp_string.push_str(&format!("{}", termion::cursor::Goto(1, y as u16 + 2)));
         }
 
-        // Write tmp_string to the screen all at once.
-        write!(
-            self.out.borrow_mut(),
-            "{}{}",
-            termion::cursor::Goto(0, 0),
-            tmp_string,
-        ).unwrap();
+        // Make sure everything is written out
         self.out.borrow_mut().flush().unwrap();
     }
 
