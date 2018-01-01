@@ -52,6 +52,7 @@ macro_rules! ui_loop {
                 $term_ui.width = w as usize;
                 $term_ui.height = h as usize;
                 $term_ui.editor.update_dim($term_ui.height - 1, $term_ui.width);
+                $term_ui.screen.resize(w as usize, h as usize);
             }
 
             if stop || $term_ui.quit {
