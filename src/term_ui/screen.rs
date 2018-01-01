@@ -85,7 +85,7 @@ impl Screen {
         }
 
         // Make sure everything is written out
-        self.out.borrow_mut().flush().unwrap();
+        out.flush().unwrap();
     }
 
     pub(crate) fn draw(&self, x: usize, y: usize, text: &str, style: Style) {
