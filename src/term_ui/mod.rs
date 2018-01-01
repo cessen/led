@@ -120,9 +120,16 @@ impl TermUI {
         // Hide cursor
         self.screen.hide_cursor();
 
+        // Set terminal size info
+        let (w, h) = termion::terminal_size().unwrap();
+        self.width = w as usize;
+        self.height = h as usize;
         self.editor.update_dim(self.height - 1, self.width);
-        self.editor.formatter.set_wrap_width(self.width as usize);
+        self.editor.update_view_dim();
+        self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
+        self.screen.resize(w as usize, h as usize);
 
+        // Start the UI
         ui_loop!(
             self,
 
