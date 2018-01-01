@@ -1,315 +1,288 @@
 #![allow(dead_code)]
 
-use rustbox;
-use rustbox::Color;
-use editor::Editor;
-use std::time::Duration;
-use formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH};
-use std::char;
-use std::default::Default;
+use std::cell::RefCell;
 use std::cmp::min;
+use std::io;
+use std::io::Write;
+
+use termion;
+use termion::event::{Event, Key};
+use termion::input::TermRead;
+use termion::color;
+use termion::raw::{IntoRawMode, RawTerminal};
+
+use editor::Editor;
+use formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH};
+use self::formatter::ConsoleLineFormatter;
 use string_utils::{is_line_ending, line_ending_to_str, LineEnding};
 use utils::digit_count;
-use self::formatter::ConsoleLineFormatter;
 
 pub mod formatter;
 
-// Key codes
-const K_ENTER: u16 = 13;
-const K_TAB: u16 = 9;
-const K_SPACE: u16 = 32;
-const K_BACKSPACE: u16 = 127;
-const K_DELETE: u16 = 65522;
-const K_PAGEUP: u16 = 65519;
-const K_PAGEDOWN: u16 = 65518;
-const K_UP: u16 = 65517;
-const K_DOWN: u16 = 65516;
-const K_LEFT: u16 = 65515;
-const K_RIGHT: u16 = 65514;
-const K_ESC: u16 = 27;
-const K_CTRL_L: u16 = 12;
-const K_CTRL_O: u16 = 15;
-const K_CTRL_Q: u16 = 17;
-const K_CTRL_S: u16 = 19;
-const K_CTRL_Y: u16 = 25;
-const K_CTRL_Z: u16 = 26;
+/// Generalized ui loop.
+macro_rules! ui_loop {
+    ($term_ui:ident, draw $draw:block, key_press($key:ident) $key_press:block) => {
+        let mut stop = false;
 
-pub struct TermUI {
-    rb: rustbox::RustBox,
+        loop {
+            // Draw the editor to screen
+            {$draw};
+            $term_ui.present();
+
+            // Handle input
+            match $term_ui.inp.next() {
+                Some(Ok(Event::Key($key))) => {
+                    let status = || -> LoopStatus {
+                        $key_press
+                    }();
+                    if status == LoopStatus::Done {
+                        stop = true;
+                        // break;
+                    }
+                }
+
+                _ => {
+                    // break;
+                }
+            }
+
+            // Check for screen resize
+            let (w, h) = termion::terminal_size().unwrap();
+            if $term_ui.width != w as usize || $term_ui.height != h as usize {
+                $term_ui.width = w as usize;
+                $term_ui.height = h as usize;
+                $term_ui.editor.update_dim($term_ui.height - 1, $term_ui.width);
+            }
+
+            if stop || $term_ui.quit {
+                break;
+            }
+        }
+    };
+}
+
+pub struct TermUI<'a> {
+    inp: termion::input::Events<io::StdinLock<'a>>,
+    out: RefCell<RawTerminal<io::Stdout>>,
     editor: Editor<ConsoleLineFormatter>,
     width: usize,
     height: usize,
+    quit: bool,
 }
 
-impl TermUI {
-    pub fn new() -> TermUI {
-        let rb = match rustbox::RustBox::init(rustbox::InitOptions {
-            buffer_stderr: true,
-            ..Default::default()
-        }) {
-            Ok(rbox) => rbox,
-            Err(_) => panic!("Could not create Rustbox instance."),
-        };
-        let w = rb.width();
-        let h = rb.height();
-        let mut editor = Editor::new(ConsoleLineFormatter::new(4));
-        editor.update_dim(h - 1, w);
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum LoopStatus {
+    Done,
+    Continue,
+}
 
-        TermUI {
-            rb: rb,
-            editor: editor,
-            width: w,
-            height: h,
-        }
+impl<'a> Drop for TermUI<'a> {
+    fn drop(&mut self) {
+        self.clear();
+        write!(
+            self.out.borrow_mut(),
+            "{}{}",
+            termion::cursor::Show,
+            termion::cursor::Goto(0, 0),
+        ).unwrap();
+    }
+}
+
+impl<'a> TermUI<'a> {
+    pub fn new<'b>(stdin: &'b mut io::Stdin) -> TermUI<'b> {
+        TermUI::new_from_editor(stdin, Editor::new(ConsoleLineFormatter::new(4)))
     }
 
-    pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
-        let rb = match rustbox::RustBox::init(rustbox::InitOptions {
-            buffer_stderr: true,
-            ..Default::default()
-        }) {
-            Ok(rbox) => rbox,
-            Err(_) => panic!("Could not create Rustbox instance."),
-        };
-        let w = rb.width();
-        let h = rb.height();
+    pub fn new_from_editor<'b>(
+        stdin: &'b mut io::Stdin,
+        ed: Editor<ConsoleLineFormatter>,
+    ) -> TermUI<'b> {
+        let out = io::stdout().into_raw_mode().unwrap();
+        let (w, h) = termion::terminal_size().unwrap();
         let mut editor = ed;
-        editor.update_dim(h - 1, w);
+        editor.update_dim(h as usize - 1, w as usize);
 
         TermUI {
-            rb: rb,
+            inp: stdin.lock().events(),
+            out: RefCell::new(out),
             editor: editor,
-            width: w,
-            height: h,
+            width: w as usize,
+            height: h as usize,
+            quit: false,
         }
     }
 
     pub fn main_ui_loop(&mut self) {
-        // Quitting flag
-        let mut quit = false;
-        let mut resize: Option<(usize, usize)> = None;
+        // Hide cursor
+        write!(self.out.borrow_mut(), "{}", termion::cursor::Hide).unwrap();
 
         self.editor.update_dim(self.height - 1, self.width);
         self.editor.formatter.set_wrap_width(self.width as usize);
 
-        loop {
-            // Draw the editor to screen
-            self.editor.update_view_dim();
-            self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
-            self.rb.clear();
-            self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
-            self.rb.present();
+        ui_loop!(
+            self,
 
-            // Handle events.  We block on the first event, so that the
-            // program doesn't loop like crazy, but then continue pulling
-            // events in a non-blocking way until we run out of events
-            // to handle.
-            let mut e = self.rb.poll_event(true); // Block until we get an event
-            loop {
-                match e {
-                    Ok(rustbox::Event::KeyEventRaw(_, key, character)) => {
-                        // println!("      {} {} {}", modifier, key, character);
-                        match key {
-                            K_CTRL_Q => {
-                                quit = true;
-                                break;
-                            }
+            // Draw
+            draw {
+                self.editor.update_view_dim();
+                self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
+                self.clear();
+                self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
+            },
 
-                            K_CTRL_S => {
-                                self.editor.save_if_dirty();
-                            }
-
-                            K_CTRL_Z => {
-                                self.editor.undo();
-                            }
-
-                            K_CTRL_Y => {
-                                self.editor.redo();
-                            }
-
-                            K_CTRL_L => {
-                                self.go_to_line_ui_loop();
-                            }
-
-                            K_PAGEUP => {
-                                self.editor.page_up();
-                            }
-
-                            K_PAGEDOWN => {
-                                self.editor.page_down();
-                            }
-
-                            K_UP => {
-                                self.editor.cursor_up(1);
-                            }
-
-                            K_DOWN => {
-                                self.editor.cursor_down(1);
-                            }
-
-                            K_LEFT => {
-                                self.editor.cursor_left(1);
-                            }
-
-                            K_RIGHT => {
-                                self.editor.cursor_right(1);
-                            }
-
-                            K_ENTER => {
-                                let nl = line_ending_to_str(self.editor.line_ending_type);
-                                self.editor.insert_text_at_cursor(nl);
-                            }
-
-                            K_SPACE => {
-                                self.editor.insert_text_at_cursor(" ");
-                            }
-
-                            K_TAB => {
-                                self.editor.insert_tab_at_cursor();
-                            }
-
-                            K_BACKSPACE => {
-                                self.editor.backspace_at_cursor();
-                            }
-
-                            K_DELETE => {
-                                self.editor.remove_text_in_front_of_cursor(1);
-                            }
-
-                            // Character
-                            0 => {
-                                if let Option::Some(c) = char::from_u32(character) {
-                                    self.editor.insert_text_at_cursor(&c.to_string()[..]);
-                                }
-                            }
-
-                            _ => {}
-                        }
+            // Handle input
+            key_press(key) {
+                match key {
+                    Key::Ctrl('q') => {
+                        self.quit = true;
+                        return LoopStatus::Done;
                     }
 
-                    Ok(rustbox::Event::ResizeEvent(w, h)) => {
-                        resize = Some((h as usize, w as usize));
+                    Key::Ctrl('s') => {
+                        self.editor.save_if_dirty();
                     }
 
-                    _ => {
-                        break;
+                    Key::Ctrl('z') => {
+                        self.editor.undo();
+                    }
+
+                    Key::Ctrl('y') => {
+                        self.editor.redo();
+                    }
+
+                    Key::Ctrl('l') => {
+                        self.go_to_line_ui_loop();
+                    }
+
+                    Key::PageUp => {
+                        self.editor.page_up();
+                    }
+
+                    Key::PageDown => {
+                        self.editor.page_down();
+                    }
+
+                    Key::Up => {
+                        self.editor.cursor_up(1);
+                    }
+
+                    Key::Down => {
+                        self.editor.cursor_down(1);
+                    }
+
+                    Key::Left => {
+                        self.editor.cursor_left(1);
+                    }
+
+                    Key::Right => {
+                        self.editor.cursor_right(1);
+                    }
+
+                    Key::Char('\n') => {
+                        let nl = line_ending_to_str(self.editor.line_ending_type);
+                        self.editor.insert_text_at_cursor(nl);
+                    }
+
+                    Key::Char(' ') => {
+                        self.editor.insert_text_at_cursor(" ");
+                    }
+
+                    Key::Char('\t') => {
+                        self.editor.insert_tab_at_cursor();
+                    }
+
+                    Key::Backspace => {
+                        self.editor.backspace_at_cursor();
+                    }
+
+                    Key::Delete => {
+                        self.editor.remove_text_in_front_of_cursor(1);
+                    }
+
+                    // Character
+                    Key::Char(c) => {
+                        self.editor.insert_text_at_cursor(&c.to_string()[..]);
+                    }
+
+                    k => {
+                        println!("{:?}", k);
                     }
                 }
 
-                e = self.rb.peek_event(Duration::from_millis(0), true); // Get next event (if any)
+                LoopStatus::Continue
             }
-
-            if let Some((h, w)) = resize {
-                self.width = w as usize;
-                self.height = h as usize;
-                self.editor.update_dim(self.height, self.width);
-            }
-            resize = None;
-
-            // Quit if quit flag is set
-            if quit {
-                break;
-            }
-        }
+        );
     }
 
     fn go_to_line_ui_loop(&mut self) {
-        let foreground = Color::Black;
-        let background = Color::Cyan;
+        let foreground = color::Black;
+        let background = color::Cyan;
 
         let mut cancel = false;
-        let mut confirm = false;
         let prefix = "Jump to line: ";
         let mut line = String::new();
 
-        loop {
-            // Draw the editor to screen
-            self.editor.update_view_dim();
-            self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
-            self.rb.clear();
-            self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
-            for i in 0..self.width {
-                self.rb
-                    .print(i, 0, rustbox::RB_NORMAL, foreground, background, " ");
-            }
-            self.rb
-                .print(1, 0, rustbox::RB_NORMAL, foreground, background, prefix);
-            self.rb.print(
-                prefix.len() + 1,
-                0,
-                rustbox::RB_NORMAL,
-                foreground,
-                background,
-                &line[..],
-            );
-            self.rb.present();
+        ui_loop!(
+            self,
 
-            // Handle events.  We block on the first event, so that the
-            // program doesn't loop like crazy, but then continue pulling
-            // events in a non-blocking way until we run out of events
-            // to handle.
-            let mut e = self.rb.poll_event(true); // Block until we get an event
-            loop {
-                match e {
-                    Ok(rustbox::Event::KeyEventRaw(_, key, character)) => {
-                        match key {
-                            K_ESC => {
-                                cancel = true;
-                                break;
-                            }
+            // Draw
+            draw {
+                self.editor.update_view_dim();
+                self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
+                self.clear();
+                self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
+                for i in 0..self.width {
+                    self.draw(i, 0, " ", foreground, background);
+                }
+                self.draw(1, 0, prefix, foreground, background);
+                self.draw(
+                    prefix.len() + 1,
+                    0,
+                    &line[..],
+                    foreground,
+                    background,
+                );
+            },
 
-                            K_ENTER => {
-                                confirm = true;
-                                break;
-                            }
+            // Handle input
+            key_press(key) {
+                match key {
+                    Key::Esc => {
+                        cancel = true;
+                        return LoopStatus::Done;
+                    }
 
-                            K_BACKSPACE => {
-                                line.pop();
-                            }
+                    Key::Char('\n') => {
+                        return LoopStatus::Done;
+                    }
 
-                            // Character
-                            0 => {
-                                if let Option::Some(c) = char::from_u32(character) {
-                                    if c.is_numeric() {
-                                        line.push(c);
-                                    }
-                                }
-                            }
+                    Key::Backspace => {
+                        line.pop();
+                    }
 
-                            _ => {}
+                    // Character
+                    Key::Char(c) => {
+                        if c.is_numeric() {
+                            line.push(c);
                         }
                     }
 
-                    Ok(rustbox::Event::ResizeEvent(w, h)) => {
-                        self.width = w as usize;
-                        self.height = h as usize;
-                        self.editor.update_dim(self.height - 1, self.width);
-                    }
-
-                    _ => {
-                        break;
-                    }
+                    _ => {}
                 }
 
-                e = self.rb.peek_event(Duration::from_millis(0), true); // Get next event (if any)
+                return LoopStatus::Continue;
             }
+        );
 
-            // Cancel if flag is set
-            if cancel {
-                break;
-            }
-
-            // Jump to line!
-            if confirm {
-                if let Ok(n) = line.parse() {
-                    let n2: usize = n; // Weird work-around: the type of n wasn't being inferred
-                    if n2 > 0 {
-                        self.editor.jump_to_line(n2 - 1);
-                    } else {
-                        self.editor.jump_to_line(0);
-                    }
+        // Jump to line!
+        if !cancel {
+            if let Ok(n) = line.parse() {
+                let n2: usize = n; // Weird work-around: the type of n wasn't being inferred
+                if n2 > 0 {
+                    self.editor.jump_to_line(n2 - 1);
+                } else {
+                    self.editor.jump_to_line(0);
                 }
-                break;
             }
         }
     }
@@ -320,27 +293,19 @@ impl TermUI {
         c1: (usize, usize),
         c2: (usize, usize),
     ) {
-        let foreground = Color::Black;
-        let background = Color::Cyan;
+        let fg = color::Black;
+        let bg = color::Cyan;
 
         // Fill in top row with info line color
         for i in c1.1..(c2.1 + 1) {
-            self.rb
-                .print(i, c1.0, rustbox::RB_NORMAL, foreground, background, " ");
+            self.draw(i, c1.0, " ", fg, bg);
         }
 
         // Filename and dirty marker
         let filename = editor.file_path.display();
         let dirty_char = if editor.dirty { "*" } else { "" };
         let name = format!("{}{}", filename, dirty_char);
-        self.rb.print(
-            c1.1 + 1,
-            c1.0,
-            rustbox::RB_NORMAL,
-            foreground,
-            background,
-            &name[..],
-        );
+        self.draw(c1.1 + 1, c1.0, &name[..], fg, bg);
 
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
@@ -352,14 +317,7 @@ impl TermUI {
             100
         };
         let pstring = format!("{}%", percentage);
-        self.rb.print(
-            c2.1 - pstring.len(),
-            c1.0,
-            rustbox::RB_NORMAL,
-            foreground,
-            background,
-            &pstring[..],
-        );
+        self.draw(c2.1 - pstring.len(), c1.0, &pstring[..], fg, bg);
 
         // Text encoding info and tab style
         let nl = match editor.line_ending_type {
@@ -378,14 +336,7 @@ impl TermUI {
             "UTF8:{}  {}:{}",
             nl, soft_tabs_str, editor.soft_tab_width as usize
         );
-        self.rb.print(
-            c2.1 - 30,
-            c1.0,
-            rustbox::RB_NORMAL,
-            foreground,
-            background,
-            &info_line[..],
-        );
+        self.draw(c2.1 - 30, c1.0, &info_line[..], fg, bg);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
@@ -424,8 +375,7 @@ impl TermUI {
         // Fill in the gutter with the appropriate background
         for y in c1.0..(c2.0 + 1) {
             for x in c1.1..(c1.1 + gutter_width - 1) {
-                self.rb
-                    .print(x, y, rustbox::RB_NORMAL, Color::White, Color::Blue, " ");
+                self.draw(x, y, " ", color::White, color::Blue);
             }
         }
 
@@ -436,13 +386,12 @@ impl TermUI {
                 let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
-                    self.rb.print(
+                    self.draw(
                         lnx,
                         lny,
-                        rustbox::RB_NORMAL,
-                        Color::White,
-                        Color::Blue,
                         &format!("{}", line_num)[..],
+                        color::White,
+                        color::Blue,
                     );
                 }
             }
@@ -488,59 +437,42 @@ impl TermUI {
                         // Actually print the character
                         if is_line_ending(g) {
                             if at_cursor {
-                                self.rb.print(
+                                self.draw(
                                     px as usize,
                                     py as usize,
-                                    rustbox::RB_NORMAL,
-                                    Color::Black,
-                                    Color::White,
                                     " ",
+                                    color::White,
+                                    color::Black,
                                 );
                             }
                         } else if g == "\t" {
                             for i in 0..width {
                                 let tpx = px as usize + i;
                                 if tpx <= c2.1 {
-                                    self.rb.print(
+                                    self.draw(
                                         tpx as usize,
                                         py as usize,
-                                        rustbox::RB_NORMAL,
-                                        Color::White,
-                                        Color::Black,
                                         " ",
+                                        color::White,
+                                        color::Black,
                                     );
                                 }
                             }
 
                             if at_cursor {
-                                self.rb.print(
+                                self.draw(
                                     px as usize,
                                     py as usize,
-                                    rustbox::RB_NORMAL,
-                                    Color::Black,
-                                    Color::White,
                                     " ",
+                                    color::Black,
+                                    color::White,
                                 );
                             }
                         } else {
                             if at_cursor {
-                                self.rb.print(
-                                    px as usize,
-                                    py as usize,
-                                    rustbox::RB_NORMAL,
-                                    Color::Black,
-                                    Color::White,
-                                    g,
-                                );
+                                self.draw(px as usize, py as usize, g, color::Black, color::White);
                             } else {
-                                self.rb.print(
-                                    px as usize,
-                                    py as usize,
-                                    rustbox::RB_NORMAL,
-                                    Color::White,
-                                    Color::Black,
-                                    g,
-                                );
+                                self.draw(px as usize, py as usize, g, color::White, color::Black);
                             }
                         }
                     }
@@ -591,15 +523,40 @@ impl TermUI {
             if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize)
                 && (py <= c2.0 as isize)
             {
-                self.rb.print(
-                    px as usize,
-                    py as usize,
-                    rustbox::RB_NORMAL,
-                    Color::Black,
-                    Color::White,
-                    " ",
-                );
+                self.draw(px as usize, py as usize, " ", color::Black, color::White);
             }
         }
+    }
+
+    fn clear(&self) {
+        write!(
+            self.out.borrow_mut(),
+            "{}{}",
+            color::Bg(color::Black),
+            termion::clear::All
+        ).unwrap();
+        self.out.borrow_mut().flush().unwrap();
+    }
+
+    fn present(&self) {
+        // TODO
+    }
+
+    fn draw<C1: color::Color, C2: color::Color>(
+        &self,
+        x: usize,
+        y: usize,
+        text: &str,
+        fg: C1,
+        bg: C2,
+    ) {
+        write!(
+            self.out.borrow_mut(),
+            "{}{}{}{}",
+            termion::cursor::Goto((x + 1) as u16, (y + 1) as u16),
+            color::Fg(fg),
+            color::Bg(bg),
+            text
+        ).unwrap();
     }
 }

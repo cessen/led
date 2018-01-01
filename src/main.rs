@@ -1,9 +1,9 @@
 extern crate docopt;
 extern crate ropey;
-extern crate rustbox;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate termion;
 extern crate unicode_segmentation;
 extern crate unicode_width;
 
@@ -50,6 +50,7 @@ fn main() {
     };
 
     // Initialize and start UI
-    let mut ui = TermUI::new_from_editor(editor);
+    let mut stdin = std::io::stdin();
+    let mut ui = TermUI::new_from_editor(&mut stdin, editor);
     ui.main_ui_loop();
 }
