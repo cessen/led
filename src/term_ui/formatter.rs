@@ -267,16 +267,18 @@ where
                             self.indent_found = true;
                         }
 
-                        if self.f.maintain_indent {
-                            self.pos = (
-                                self.pos.0 + self.f.single_line_height(),
-                                self.indent + self.f.wrap_additional_indent,
-                            );
-                        } else {
-                            self.pos = (
-                                self.pos.0 + self.f.single_line_height(),
-                                self.f.wrap_additional_indent,
-                            );
+                        if self.pos.1 > 0 {
+                            if self.f.maintain_indent {
+                                self.pos = (
+                                    self.pos.0 + self.f.single_line_height(),
+                                    self.indent + self.f.wrap_additional_indent,
+                                );
+                            } else {
+                                self.pos = (
+                                    self.pos.0 + self.f.single_line_height(),
+                                    self.f.wrap_additional_indent,
+                                );
+                            }
                         }
                     }
 
@@ -353,6 +355,58 @@ mod tests {
         assert_eq!(
             f.dimensions(UnicodeSegmentation::graphemes(text, true)),
             (5, 12)
+        );
+    }
+
+    #[test]
+    fn dimensions_3() {
+        // 55 graphemes long
+        let text = "税マイミ文末\
+                    レ日題イぽじ\
+                    や男目統ス公\
+                    身みトしつ結\
+                    煮ヱマレ断西\
+                    ロ領視りいぽ\
+                    凱字テ式重反\
+                    てす献罪がご\
+                    く官俵呉嫁ー\
+                    。";
+
+        let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::CharWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
+        f.set_wrap_width(12);
+
+        assert_eq!(
+            f.dimensions(UnicodeSegmentation::graphemes(text, true)),
+            (10, 12)
+        );
+    }
+
+    #[test]
+    fn dimensions_4() {
+        // 55 graphemes long
+        let text = "税マイミ文末\
+                    レ日題イぽじ\
+                    や男目統ス公\
+                    身みトしつ結\
+                    煮ヱマレ断西\
+                    ロ領視りいぽ\
+                    凱字テ式重反\
+                    てす献罪がご\
+                    く官俵呉嫁ー\
+                    。";
+
+        let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::WordWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
+        f.set_wrap_width(12);
+
+        assert_eq!(
+            f.dimensions(UnicodeSegmentation::graphemes(text, true)),
+            (10, 12)
         );
     }
 
