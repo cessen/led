@@ -17,7 +17,7 @@ use utils::digit_count;
 pub mod formatter;
 mod screen;
 
-use self::screen::Screen;
+use self::screen::{Color, Screen, Style};
 
 /// Generalized ui loop.
 macro_rules! ui_loop {
@@ -203,8 +203,7 @@ impl<'a> TermUI<'a> {
     }
 
     fn go_to_line_ui_loop(&mut self) {
-        let foreground = color::Black;
-        let background = color::Cyan;
+        let style = Style(Color::Black, Color::Cyan);
 
         let mut cancel = false;
         let prefix = "Jump to line: ";
@@ -220,15 +219,14 @@ impl<'a> TermUI<'a> {
                 self.screen.clear();
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
                 for i in 0..self.width {
-                    self.screen.draw(i, 0, " ", foreground, background);
+                    self.screen.draw(i, 0, " ", style);
                 }
-                self.screen.draw(1, 0, prefix, foreground, background);
+                self.screen.draw(1, 0, prefix, style);
                 self.screen.draw(
                     prefix.len() + 1,
                     0,
                     &line[..],
-                    foreground,
-                    background,
+                    style,
                 );
             },
 
@@ -281,19 +279,18 @@ impl<'a> TermUI<'a> {
         c1: (usize, usize),
         c2: (usize, usize),
     ) {
-        let fg = color::Black;
-        let bg = color::Cyan;
+        let style = Style(Color::Black, Color::Cyan);
 
         // Fill in top row with info line color
         for i in c1.1..(c2.1 + 1) {
-            self.screen.draw(i, c1.0, " ", fg, bg);
+            self.screen.draw(i, c1.0, " ", style);
         }
 
         // Filename and dirty marker
         let filename = editor.file_path.display();
         let dirty_char = if editor.dirty { "*" } else { "" };
         let name = format!("{}{}", filename, dirty_char);
-        self.screen.draw(c1.1 + 1, c1.0, &name[..], fg, bg);
+        self.screen.draw(c1.1 + 1, c1.0, &name[..], style);
 
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
@@ -306,7 +303,7 @@ impl<'a> TermUI<'a> {
         };
         let pstring = format!("{}%", percentage);
         self.screen
-            .draw(c2.1 - pstring.len(), c1.0, &pstring[..], fg, bg);
+            .draw(c2.1 - pstring.len(), c1.0, &pstring[..], style);
 
         // Text encoding info and tab style
         let nl = match editor.line_ending_type {
@@ -325,7 +322,7 @@ impl<'a> TermUI<'a> {
             "UTF8:{}  {}:{}",
             nl, soft_tabs_str, editor.soft_tab_width as usize
         );
-        self.screen.draw(c2.1 - 30, c1.0, &info_line[..], fg, bg);
+        self.screen.draw(c2.1 - 30, c1.0, &info_line[..], style);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
@@ -364,7 +361,8 @@ impl<'a> TermUI<'a> {
         // Fill in the gutter with the appropriate background
         for y in c1.0..(c2.0 + 1) {
             for x in c1.1..(c1.1 + gutter_width - 1) {
-                self.screen.draw(x, y, " ", color::White, color::Blue);
+                self.screen
+                    .draw(x, y, " ", Style(Color::White, Color::Blue));
             }
         }
 
@@ -379,8 +377,7 @@ impl<'a> TermUI<'a> {
                         lnx,
                         lny,
                         &format!("{}", line_num)[..],
-                        color::White,
-                        color::Blue,
+                        Style(Color::White, Color::Blue),
                     );
                 }
             }
@@ -430,8 +427,7 @@ impl<'a> TermUI<'a> {
                                     px as usize,
                                     py as usize,
                                     " ",
-                                    color::Black,
-                                    color::White,
+                                    Style(Color::Black, Color::White),
                                 );
                             }
                         } else if g == "\t" {
@@ -442,8 +438,7 @@ impl<'a> TermUI<'a> {
                                         tpx as usize,
                                         py as usize,
                                         " ",
-                                        color::White,
-                                        color::Black,
+                                        Style(Color::White, Color::Black),
                                     );
                                 }
                             }
@@ -453,8 +448,7 @@ impl<'a> TermUI<'a> {
                                     px as usize,
                                     py as usize,
                                     " ",
-                                    color::Black,
-                                    color::White,
+                                    Style(Color::Black, Color::White),
                                 );
                             }
                         } else {
@@ -463,16 +457,14 @@ impl<'a> TermUI<'a> {
                                     px as usize,
                                     py as usize,
                                     g,
-                                    color::Black,
-                                    color::White,
+                                    Style(Color::Black, Color::White),
                                 );
                             } else {
                                 self.screen.draw(
                                     px as usize,
                                     py as usize,
                                     g,
-                                    color::White,
-                                    color::Black,
+                                    Style(Color::White, Color::Black),
                                 );
                             }
                         }
@@ -524,8 +516,12 @@ impl<'a> TermUI<'a> {
             if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize)
                 && (py <= c2.0 as isize)
             {
-                self.screen
-                    .draw(px as usize, py as usize, " ", color::Black, color::White);
+                self.screen.draw(
+                    px as usize,
+                    py as usize,
+                    " ",
+                    Style(Color::Black, Color::White),
+                );
             }
         }
     }

@@ -12,7 +12,7 @@ use termion::raw::{IntoRawMode, RawTerminal};
 
 pub(crate) struct Screen {
     out: RefCell<AlternateScreen<RawTerminal<io::Stdout>>>,
-    buf: RefCell<Vec<Option<String>>>,
+    buf: RefCell<Vec<Option<(Style, String)>>>,
     w: usize,
     h: usize,
 }
@@ -20,11 +20,8 @@ pub(crate) struct Screen {
 impl Screen {
     pub(crate) fn new() -> Self {
         let (w, h) = termion::terminal_size().unwrap();
-        let buf = std::iter::repeat(Some(format!(
-            "{}{} ",
-            color::Fg(color::Black),
-            color::Bg(color::Black)
-        ))).take(w as usize * h as usize)
+        let buf = std::iter::repeat(Some((Style(Color::Black, Color::Black), " ".to_string())))
+            .take(w as usize * h as usize)
             .collect();
         Screen {
             out: RefCell::new(AlternateScreen::from(io::stdout().into_raw_mode().unwrap())),
@@ -37,20 +34,13 @@ impl Screen {
     pub(crate) fn clear(&self) {
         for cell in self.buf.borrow_mut().iter_mut() {
             match *cell {
-                Some(ref mut text) => {
+                Some((ref mut style, ref mut text)) => {
+                    *style = Style(Color::Black, Color::Black);
                     text.clear();
-                    text.push_str(&format!(
-                        "{}{} ",
-                        color::Fg(color::Black),
-                        color::Bg(color::Black)
-                    ));
+                    text.push_str(" ");
                 }
                 _ => {
-                    *cell = Some(format!(
-                        "{}{} ",
-                        color::Fg(color::Black),
-                        color::Bg(color::Black)
-                    ));
+                    *cell = Some((Style(Color::Black, Color::Black), " ".to_string()));
                 }
             }
         }
@@ -61,45 +51,40 @@ impl Screen {
         self.h = h;
         self.buf.borrow_mut().resize(
             w * h,
-            Some(format!(
-                "{}{} ",
-                color::Fg(color::Black),
-                color::Bg(color::Black)
-            )),
+            Some((Style(Color::Black, Color::Black), " ".to_string())),
         );
     }
 
     pub(crate) fn present(&self) {
         let buf = self.buf.borrow();
+        let mut tmp_string = String::new();
         for y in 0..self.h {
-            for x in 0..self.w {
-                if let Some(ref cell) = buf[y * self.w + x] {
+            let mut x = 0;
+            let mut last_style = Style(Color::Black, Color::Black);
+            let mut left_x = 0;
+            while x < self.w {
+                if let Some((style, ref text)) = buf[y * self.w + x] {
                     write!(
                         self.out.borrow_mut(),
-                        "{}{}",
+                        "{}{}{}",
                         termion::cursor::Goto((x + 1) as u16, (y + 1) as u16),
-                        cell
+                        style,
+                        text,
                     ).unwrap();
                 }
+                x += 1;
             }
         }
         self.out.borrow_mut().flush().unwrap();
     }
 
-    pub(crate) fn draw<C1: color::Color + Copy, C2: color::Color + Copy>(
-        &self,
-        x: usize,
-        y: usize,
-        text: &str,
-        fg: C1,
-        bg: C2,
-    ) {
+    pub(crate) fn draw(&self, x: usize, y: usize, text: &str, style: Style) {
         let mut buf = self.buf.borrow_mut();
         let mut x = x;
         for g in UnicodeSegmentation::graphemes(text, true) {
             let width = UnicodeWidthStr::width(g);
             if width > 0 {
-                buf[y * self.w + x] = Some(format!("{}{}{}", color::Fg(fg), color::Bg(bg), g));
+                buf[y * self.w + x] = Some((style, g.to_string()));
                 x += 1;
                 for _ in 0..(width - 1) {
                     buf[y * self.w + x] = None;
@@ -128,5 +113,73 @@ impl Drop for Screen {
         ).unwrap();
         self.clear();
         self.show_cursor();
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum Color {
+    Black,
+    Blue,
+    Cyan,
+    Green,
+    LightBlack,
+    LightBlue,
+    LightCyan,
+    LightGreen,
+    LightMagenta,
+    LightRed,
+    LightWhite,
+    LightYellow,
+    Magenta,
+    Red,
+    Rgb(u8, u8, u8),
+    White,
+    Yellow,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) struct Style(pub Color, pub Color); // Fg, Bg
+
+impl std::fmt::Display for Style {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.0 {
+            Color::Black => write!(f, "{}", color::Fg(color::Black)),
+            Color::Blue => write!(f, "{}", color::Fg(color::Blue)),
+            Color::Cyan => write!(f, "{}", color::Fg(color::Cyan)),
+            Color::Green => write!(f, "{}", color::Fg(color::Green)),
+            Color::LightBlack => write!(f, "{}", color::Fg(color::LightBlack)),
+            Color::LightBlue => write!(f, "{}", color::Fg(color::LightBlue)),
+            Color::LightCyan => write!(f, "{}", color::Fg(color::LightCyan)),
+            Color::LightGreen => write!(f, "{}", color::Fg(color::LightGreen)),
+            Color::LightMagenta => write!(f, "{}", color::Fg(color::LightMagenta)),
+            Color::LightRed => write!(f, "{}", color::Fg(color::LightRed)),
+            Color::LightWhite => write!(f, "{}", color::Fg(color::LightWhite)),
+            Color::LightYellow => write!(f, "{}", color::Fg(color::LightYellow)),
+            Color::Magenta => write!(f, "{}", color::Fg(color::Magenta)),
+            Color::Red => write!(f, "{}", color::Fg(color::Red)),
+            Color::Rgb(r, g, b) => write!(f, "{}", color::Fg(color::Rgb(r, g, b))),
+            Color::White => write!(f, "{}", color::Fg(color::White)),
+            Color::Yellow => write!(f, "{}", color::Fg(color::Yellow)),
+        }?;
+
+        match self.1 {
+            Color::Black => write!(f, "{}", color::Bg(color::Black)),
+            Color::Blue => write!(f, "{}", color::Bg(color::Blue)),
+            Color::Cyan => write!(f, "{}", color::Bg(color::Cyan)),
+            Color::Green => write!(f, "{}", color::Bg(color::Green)),
+            Color::LightBlack => write!(f, "{}", color::Bg(color::LightBlack)),
+            Color::LightBlue => write!(f, "{}", color::Bg(color::LightBlue)),
+            Color::LightCyan => write!(f, "{}", color::Bg(color::LightCyan)),
+            Color::LightGreen => write!(f, "{}", color::Bg(color::LightGreen)),
+            Color::LightMagenta => write!(f, "{}", color::Bg(color::LightMagenta)),
+            Color::LightRed => write!(f, "{}", color::Bg(color::LightRed)),
+            Color::LightWhite => write!(f, "{}", color::Bg(color::LightWhite)),
+            Color::LightYellow => write!(f, "{}", color::Bg(color::LightYellow)),
+            Color::Magenta => write!(f, "{}", color::Bg(color::Magenta)),
+            Color::Red => write!(f, "{}", color::Bg(color::Red)),
+            Color::Rgb(r, g, b) => write!(f, "{}", color::Bg(color::Rgb(r, g, b))),
+            Color::White => write!(f, "{}", color::Bg(color::White)),
+            Color::Yellow => write!(f, "{}", color::Bg(color::Yellow)),
+        }
     }
 }
