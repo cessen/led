@@ -15,6 +15,7 @@ use utils::digit_count;
 
 pub mod formatter;
 mod screen;
+mod smallstring;
 
 use self::screen::{Color, Screen, Style};
 

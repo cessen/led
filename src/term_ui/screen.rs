@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::io;
 use std::io::Write;
 
+use super::smallstring::SmallString;
 use unicode_width::UnicodeWidthStr;
 use unicode_segmentation::UnicodeSegmentation;
 use termion;
@@ -12,7 +13,7 @@ use termion::raw::{IntoRawMode, RawTerminal};
 
 pub(crate) struct Screen {
     out: RefCell<AlternateScreen<RawTerminal<io::Stdout>>>,
-    buf: RefCell<Vec<Option<(Style, String)>>>,
+    buf: RefCell<Vec<Option<(Style, SmallString)>>>,
     w: usize,
     h: usize,
 }
@@ -20,7 +21,7 @@ pub(crate) struct Screen {
 impl Screen {
     pub(crate) fn new() -> Self {
         let (w, h) = termion::terminal_size().unwrap();
-        let buf = std::iter::repeat(Some((Style(Color::Black, Color::Black), " ".to_string())))
+        let buf = std::iter::repeat(Some((Style(Color::Black, Color::Black), " ".into())))
             .take(w as usize * h as usize)
             .collect();
         Screen {
@@ -40,7 +41,7 @@ impl Screen {
                     text.push_str(" ");
                 }
                 _ => {
-                    *cell = Some((Style(Color::Black, Color::Black), " ".to_string()));
+                    *cell = Some((Style(Color::Black, Color::Black), " ".into()));
                 }
             }
         }
@@ -49,10 +50,9 @@ impl Screen {
     pub(crate) fn resize(&mut self, w: usize, h: usize) {
         self.w = w;
         self.h = h;
-        self.buf.borrow_mut().resize(
-            w * h,
-            Some((Style(Color::Black, Color::Black), " ".to_string())),
-        );
+        self.buf
+            .borrow_mut()
+            .resize(w * h, Some((Style(Color::Black, Color::Black), " ".into())));
     }
 
     pub(crate) fn present(&self) {
@@ -99,7 +99,7 @@ impl Screen {
         for g in UnicodeSegmentation::graphemes(text, true) {
             let width = UnicodeWidthStr::width(g);
             if width > 0 {
-                buf[y * self.w + x] = Some((style, g.to_string()));
+                buf[y * self.w + x] = Some((style, g.into()));
                 x += 1;
                 for _ in 0..(width - 1) {
                     buf[y * self.w + x] = None;
