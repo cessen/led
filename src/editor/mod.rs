@@ -325,7 +325,7 @@ impl<T: LineFormatter> Editor<T> {
         // Adjust the view depending on where the cursor is
         if self.cursors[0].range.0 < c_first {
             self.view_pos.0 = self.cursors[0].range.0;
-        } else if self.cursors[0].range.0 >= c_last {
+        } else if self.cursors[0].range.0 > c_last {
             self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
                 &self.buffer,
                 self.cursors[0].range.0,
