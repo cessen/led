@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
+use std;
 use std::cmp::min;
-use std::io;
 
 use termion;
 use termion::event::{Event, Key};
@@ -24,26 +24,37 @@ macro_rules! ui_loop {
     ($term_ui:ident, draw $draw:block, key_press($key:ident) $key_press:block) => {
         let mut stop = false;
 
+        // Draw the editor to screen for the first time
+        {$draw};
+        $term_ui.screen.present();
+
+        // UI loop
         loop {
-            // Draw the editor to screen
-            {$draw};
-            $term_ui.screen.present();
+            let mut should_redraw = false;
 
             // Handle input
-            match $term_ui.inp.next() {
-                Some(Ok(Event::Key($key))) => {
-                    let status = || -> LoopStatus {
-                        $key_press
-                    }();
-                    if status == LoopStatus::Done {
-                        stop = true;
-                        // break;
+            loop {
+                match $term_ui.inp.next() {
+                    Some(Ok(Event::Key($key))) => {
+                        let (status, state_changed) = || -> (LoopStatus, bool) {
+                            $key_press
+                        }();
+                        should_redraw |= state_changed;
+                        if status == LoopStatus::Done {
+                            stop = true;
+                            break;
+                        }
+                    }
+
+                    _ => {
+                        break;
                     }
                 }
+            }
 
-                _ => {
-                    // break;
-                }
+            // Check if we're done
+            if stop || $term_ui.quit {
+                break;
             }
 
             // Check for screen resize
@@ -52,18 +63,26 @@ macro_rules! ui_loop {
                 $term_ui.width = w as usize;
                 $term_ui.height = h as usize;
                 $term_ui.editor.update_dim($term_ui.height - 1, $term_ui.width);
+                $term_ui.editor.update_view_dim();
+                $term_ui.editor.formatter.set_wrap_width($term_ui.editor.view_dim.1);
                 $term_ui.screen.resize(w as usize, h as usize);
+                should_redraw = true;
             }
 
-            if stop || $term_ui.quit {
-                break;
+            // Draw the editor to screen
+            if should_redraw {
+                {$draw};
+                $term_ui.screen.present();
             }
+
+            // Sleep for a small bit so we don't just spin on the CPU
+            std::thread::sleep(std::time::Duration::from_millis(5));
         }
     };
 }
 
-pub struct TermUI<'a> {
-    inp: termion::input::Events<io::StdinLock<'a>>,
+pub struct TermUI {
+    inp: termion::input::Events<termion::AsyncReader>,
     screen: Screen,
     editor: Editor<ConsoleLineFormatter>,
     width: usize,
@@ -77,21 +96,18 @@ enum LoopStatus {
     Continue,
 }
 
-impl<'a> TermUI<'a> {
-    pub fn new<'b>(stdin: &'b mut io::Stdin) -> TermUI<'b> {
-        TermUI::new_from_editor(stdin, Editor::new(ConsoleLineFormatter::new(4)))
+impl TermUI {
+    pub fn new() -> TermUI {
+        TermUI::new_from_editor(Editor::new(ConsoleLineFormatter::new(4)))
     }
 
-    pub fn new_from_editor<'b>(
-        stdin: &'b mut io::Stdin,
-        ed: Editor<ConsoleLineFormatter>,
-    ) -> TermUI<'b> {
+    pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
         let (w, h) = termion::terminal_size().unwrap();
         let mut editor = ed;
         editor.update_dim(h as usize - 1, w as usize);
 
         TermUI {
-            inp: stdin.lock().events(),
+            inp: termion::async_stdin().events(),
             screen: Screen::new(),
             editor: editor,
             width: w as usize,
@@ -112,18 +128,17 @@ impl<'a> TermUI<'a> {
 
             // Draw
             draw {
-                self.editor.update_view_dim();
-                self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
                 self.screen.clear(Color::Black);
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
             },
 
             // Handle input
             key_press(key) {
+                let mut state_changed = true;
                 match key {
                     Key::Ctrl('q') => {
                         self.quit = true;
-                        return LoopStatus::Done;
+                        return (LoopStatus::Done, true);
                     }
 
                     Key::Ctrl('s') => {
@@ -192,12 +207,12 @@ impl<'a> TermUI<'a> {
                         self.editor.insert_text_at_cursor(&c.to_string()[..]);
                     }
 
-                    k => {
-                        println!("{:?}", k);
+                    _ => {
+                        state_changed = false;
                     }
                 }
 
-                LoopStatus::Continue
+                (LoopStatus::Continue, state_changed)
             }
         );
     }
@@ -214,8 +229,6 @@ impl<'a> TermUI<'a> {
 
             // Draw
             draw {
-                self.editor.update_view_dim();
-                self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
                 self.screen.clear(Color::Black);
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
                 for i in 0..self.width {
@@ -232,14 +245,15 @@ impl<'a> TermUI<'a> {
 
             // Handle input
             key_press(key) {
+                let mut state_changed = true;
                 match key {
                     Key::Esc => {
                         cancel = true;
-                        return LoopStatus::Done;
+                        return (LoopStatus::Done, true);
                     }
 
                     Key::Char('\n') => {
-                        return LoopStatus::Done;
+                        return (LoopStatus::Done, true);
                     }
 
                     Key::Backspace => {
@@ -253,10 +267,12 @@ impl<'a> TermUI<'a> {
                         }
                     }
 
-                    _ => {}
+                    _ => {
+                        state_changed = false;
+                    }
                 }
 
-                return LoopStatus::Continue;
+                return (LoopStatus::Continue, state_changed);
             }
         );
 

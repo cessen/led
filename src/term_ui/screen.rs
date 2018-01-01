@@ -60,6 +60,7 @@ impl Screen {
 
         // Double the minimum needed space, because of formatting characters and such.
         let mut tmp_string = String::with_capacity(self.w * self.h * 2);
+        tmp_string.push_str(&format!("{}", termion::cursor::Goto(1, 1)));
 
         // Write everything to the tmp_string first.
         for y in 0..self.h {
@@ -78,9 +79,10 @@ impl Screen {
                     x += 1;
                 }
             }
+            tmp_string.push_str(&format!("{}", termion::cursor::Goto(1, y as u16 + 2)));
         }
 
-        // Then write the tmp_string to screen all at once.
+        // Write tmp_string to the screen all at once.
         write!(
             self.out.borrow_mut(),
             "{}{}",

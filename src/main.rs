@@ -51,7 +51,6 @@ fn main() {
     };
 
     // Initialize and start UI
-    let mut stdin = std::io::stdin();
-    let mut ui = TermUI::new_from_editor(&mut stdin, editor);
+    let mut ui = TermUI::new_from_editor(editor);
     ui.main_ui_loop();
 }
