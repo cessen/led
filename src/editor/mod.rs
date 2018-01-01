@@ -94,9 +94,8 @@ impl<T: LineFormatter> Editor<T> {
     pub fn auto_detect_line_ending(&mut self) {
         let mut line_ending_histogram: [usize; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 
-        // Collect statistics
-        let mut line_i: usize = 0;
-        for line in self.buffer.line_iter() {
+        // Collect statistics on the first 100 lines
+        for line in self.buffer.line_iter().take(100) {
             // Get the line ending
             let ending = if line.len_chars() == 1 {
                 let g = line.slice(line.len_chars() - 1, line.len_chars())
@@ -142,12 +141,6 @@ impl<T: LineFormatter> Editor<T> {
                     line_ending_histogram[7] += 1;
                 }
             }
-
-            // Stop after 100 lines
-            line_i += 1;
-            if line_i > 100 {
-                break;
-            }
         }
 
         // Analyze stats and make a determination
@@ -183,16 +176,15 @@ impl<T: LineFormatter> Editor<T> {
 
         let mut last_indent = (false, 0usize); // (was_tabs, indent_count)
 
-        // Collect statistics
-        let mut line_i: usize = 0;
-        for line in self.buffer.line_iter() {
-            let mut g_iter = line.graphemes();
-            match g_iter.next() {
-                Some("\t") => {
+        // Collect statistics on the first 1000 lines
+        for line in self.buffer.line_iter().take(1000) {
+            let mut c_iter = line.chars();
+            match c_iter.next() {
+                Some('\t') => {
                     // Count leading tabs
                     let mut count = 1;
-                    for g in g_iter {
-                        if g == "\t" {
+                    for c in c_iter {
+                        if c == '\t' {
                             count += 1;
                         } else {
                             break;
@@ -208,11 +200,11 @@ impl<T: LineFormatter> Editor<T> {
                     last_indent = (true, count);
                 }
 
-                Some(" ") => {
+                Some(' ') => {
                     // Count leading spaces
                     let mut count = 1;
-                    for g in g_iter {
-                        if g == " " {
+                    for c in c_iter {
+                        if c == ' ' {
                             count += 1;
                         } else {
                             break;
@@ -235,12 +227,6 @@ impl<T: LineFormatter> Editor<T> {
                 }
 
                 _ => {}
-            }
-
-            // Stop after 1000 lines
-            line_i += 1;
-            if line_i > 1000 {
-                break;
             }
         }
 
