@@ -69,7 +69,7 @@ impl Screen {
         // Write everything to the tmp_string first.
         for y in 0..self.h {
             let mut x = 0;
-            write!(out, "{}", termion::cursor::Goto(1, y as u16 + 2)).unwrap();
+            write!(out, "{}", termion::cursor::Goto(1, y as u16 + 1)).unwrap();
             while x < self.w {
                 if let Some((style, ref text)) = buf[y * self.w + x] {
                     if style != last_style {
