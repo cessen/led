@@ -429,8 +429,8 @@ impl<'a> TermUI<'a> {
                                     px as usize,
                                     py as usize,
                                     " ",
-                                    color::White,
                                     color::Black,
+                                    color::White,
                                 );
                             }
                         } else if g == "\t" {
