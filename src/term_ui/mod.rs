@@ -6,7 +6,6 @@ use std::io;
 use termion;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
-use termion::color;
 
 use editor::Editor;
 use formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH};

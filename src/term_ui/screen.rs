@@ -62,18 +62,33 @@ impl Screen {
             let mut x = 0;
             let mut last_style = Style(Color::Black, Color::Black);
             let mut left_x = 0;
+            tmp_string.clear();
+            tmp_string.push_str(&format!("{}", last_style));
             while x < self.w {
                 if let Some((style, ref text)) = buf[y * self.w + x] {
+                    if style != last_style {
+                        tmp_string.push_str(&format!("{}", style));
+                        last_style = style;
+                    }
+                    tmp_string.push_str(text);
+                    x += 1;
+                } else {
                     write!(
                         self.out.borrow_mut(),
-                        "{}{}{}",
-                        termion::cursor::Goto((x + 1) as u16, (y + 1) as u16),
-                        style,
-                        text,
+                        "{}{}",
+                        termion::cursor::Goto((left_x + 1) as u16, (y + 1) as u16),
+                        tmp_string,
                     ).unwrap();
+                    x += 1;
+                    left_x = x;
                 }
-                x += 1;
             }
+            write!(
+                self.out.borrow_mut(),
+                "{}{}",
+                termion::cursor::Goto((left_x + 1) as u16, (y + 1) as u16),
+                tmp_string,
+            ).unwrap();
         }
         self.out.borrow_mut().flush().unwrap();
     }
