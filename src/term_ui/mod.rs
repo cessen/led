@@ -319,7 +319,7 @@ impl TermUI {
         };
         let pstring = format!("{}%", percentage);
         self.screen
-            .draw(c2.1 - pstring.len(), c1.0, &pstring[..], style);
+            .draw(c2.1 - pstring.len().min(c2.1), c1.0, &pstring[..], style);
 
         // Text encoding info and tab style
         let nl = match editor.line_ending_type {
@@ -338,7 +338,8 @@ impl TermUI {
             "UTF8:{}  {}:{}",
             nl, soft_tabs_str, editor.soft_tab_width as usize
         );
-        self.screen.draw(c2.1 - 30, c1.0, &info_line[..], style);
+        self.screen
+            .draw(c2.1 - 30.min(c2.1), c1.0, &info_line[..], style);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
