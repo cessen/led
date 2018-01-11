@@ -369,11 +369,11 @@ impl TermUI {
         let (vis_line_offset, _) = editor.formatter.index_to_v2d(
             temp_line
                 .slice(
-                    line_block_index * LINE_BLOCK_LENGTH,
-                    min(
-                        temp_line.len_chars(),
-                        (line_block_index + 1) * LINE_BLOCK_LENGTH,
-                    ),
+                    (line_block_index * LINE_BLOCK_LENGTH)
+                        ..min(
+                            temp_line.len_chars(),
+                            (line_block_index + 1) * LINE_BLOCK_LENGTH,
+                        ),
                 )
                 .graphemes(),
             editor.view_pos.0 - char_index,
@@ -413,8 +413,7 @@ impl TermUI {
             let mut lines_traversed: usize = 0;
             let line_len = line.len_chars();
             let mut g_iter = editor.formatter.iter(line.slice(
-                line_block_index * LINE_BLOCK_LENGTH,
-                line_len,
+                (line_block_index * LINE_BLOCK_LENGTH)..line_len,
             ).graphemes());
 
             loop {
@@ -505,8 +504,7 @@ impl TermUI {
                     line_g_index = 0;
                     let line_len = line.len_chars();
                     g_iter = editor.formatter.iter(line.slice(
-                        line_block_index * LINE_BLOCK_LENGTH,
-                        line_len,
+                        (line_block_index * LINE_BLOCK_LENGTH)..line_len,
                     ).graphemes());
                     lines_traversed += 1;
                 }

@@ -107,9 +107,9 @@ impl Buffer {
     /// Remove the text before grapheme position 'pos' of length 'len'.
     pub fn remove_text_before(&mut self, pos: usize, len: usize) {
         if pos >= len {
-            let removed_text = self.text.slice(pos - len, pos).to_string();
+            let removed_text = self.text.slice((pos - len)..pos).to_string();
 
-            self.text.remove(pos - len, pos);
+            self.text.remove((pos - len)..pos);
 
             // Push operation to the undo stack
             self.undo_stack
@@ -124,9 +124,9 @@ impl Buffer {
 
     /// Remove the text after grapheme position 'pos' of length 'len'.
     pub fn remove_text_after(&mut self, pos: usize, len: usize) {
-        let removed_text = self.text.slice(pos, pos + len).to_string();
+        let removed_text = self.text.slice(pos..(pos + len)).to_string();
 
-        self.text.remove(pos, pos + len);
+        self.text.remove(pos..(pos + len));
 
         // Push operation to the undo stack
         self.undo_stack.push(RemoveTextAfter(removed_text, pos));
@@ -169,8 +169,8 @@ impl Buffer {
         else {
             // TODO: a more efficient implementation that directly
             // manipulates the node tree.
-            let s = self.text.slice(pos_a, pos_b).to_string();
-            self.text.remove(pos_a, pos_b);
+            let s = self.text.slice(pos_a..pos_b).to_string();
+            self.text.remove(pos_a..pos_b);
             self.text.insert(pos_to, &s);
         }
     }
@@ -209,7 +209,7 @@ impl Buffer {
                 self.text.line_to_char(line_b) - 1
             };
 
-            self.text.remove(a, b);
+            self.text.remove(a..b);
         }
     }
 
@@ -224,7 +224,7 @@ impl Buffer {
             match op {
                 InsertText(ref s, p) => {
                     let size = char_count(s);
-                    self.text.remove(p, p + size);
+                    self.text.remove(p..(p + size));
                     return Some(p);
                 }
 
@@ -267,7 +267,7 @@ impl Buffer {
 
                 RemoveTextBefore(ref s, p) | RemoveTextAfter(ref s, p) => {
                     let size = char_count(s);
-                    self.text.remove(p, p + size);
+                    self.text.remove(p..(p + size));
                     return Some(p);
                 }
 
@@ -333,7 +333,7 @@ impl Buffer {
 
     pub fn get_grapheme<'a>(&'a self, index: usize) -> &'a str {
         self.text
-            .slice(index, index + 1)
+            .slice(index..(index + 1))
             .graphemes()
             .nth(0)
             .unwrap()
@@ -345,7 +345,7 @@ impl Buffer {
 
     /// Creates a String from the buffer text in grapheme range [pos_a, posb).
     fn string_from_range(&self, pos_a: usize, pos_b: usize) -> String {
-        self.text.slice(pos_a, pos_b).to_string()
+        self.text.slice(pos_a..pos_b).to_string()
     }
 
     // ------------------------------------------------------------------------
@@ -362,7 +362,7 @@ impl Buffer {
     /// return None on next().
     pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> ropey::iter::Graphemes<'a> {
         let len = self.text.len_chars();
-        self.text.slice(index, len).graphemes()
+        self.text.slice(index..len).graphemes()
     }
 
     pub fn line_iter<'a>(&'a self) -> ropey::iter::Lines<'a> {
@@ -371,8 +371,7 @@ impl Buffer {
 
     pub fn line_iter_at_index<'a>(&'a self, line_idx: usize) -> ropey::iter::Lines<'a> {
         let start = self.text.line_to_char(line_idx);
-        let len = self.text.len_chars();
-        self.text.slice(start, len).lines()
+        self.text.slice(start..).lines()
     }
 }
 
@@ -658,7 +657,7 @@ mod tests {
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
 
-        buf.text.remove(0, 3);
+        buf.text.remove(0..3);
 
         let mut iter = buf.grapheme_iter();
 
@@ -701,7 +700,7 @@ mod tests {
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
 
-        buf.text.remove(0, 12);
+        buf.text.remove(0..12);
 
         let mut iter = buf.grapheme_iter();
 
@@ -735,7 +734,7 @@ mod tests {
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
 
-        buf.text.remove(5, 17);
+        buf.text.remove(5..17);
 
         let mut iter = buf.grapheme_iter();
 
@@ -769,7 +768,7 @@ mod tests {
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
 
-        buf.text.remove(23, 29);
+        buf.text.remove(23..29);
 
         let mut iter = buf.grapheme_iter();
 
@@ -809,7 +808,7 @@ mod tests {
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
 
-        buf.text.remove(17, 29);
+        buf.text.remove(17..29);
 
         let mut iter = buf.grapheme_iter();
 
@@ -843,7 +842,7 @@ mod tests {
         assert!(buf.char_count() == 12);
         assert!(buf.line_count() == 2);
 
-        buf.text.remove(3, 12);
+        buf.text.remove(3..12);
 
         let mut iter = buf.grapheme_iter();
 
@@ -863,7 +862,7 @@ mod tests {
         assert!(buf.char_count() == 15);
         assert!(buf.line_count() == 3);
 
-        buf.text.remove(5, 15);
+        buf.text.remove(5..15);
 
         let mut iter = buf.grapheme_iter();
 
@@ -885,7 +884,7 @@ mod tests {
         assert!(buf.char_count() == 12);
         assert!(buf.line_count() == 2);
 
-        buf.text.remove(3, 11);
+        buf.text.remove(3..11);
 
         let mut iter = buf.grapheme_iter();
 
@@ -906,7 +905,7 @@ mod tests {
         assert!(buf.char_count() == 12);
         assert!(buf.line_count() == 2);
 
-        buf.text.remove(8, 12);
+        buf.text.remove(8..12);
 
         let mut iter = buf.grapheme_iter();
 
@@ -931,7 +930,7 @@ mod tests {
         assert!(buf.char_count() == 11);
         assert!(buf.line_count() == 4);
 
-        buf.text.remove(4, 11);
+        buf.text.remove(4..11);
 
         let mut iter = buf.grapheme_iter();
 
@@ -952,7 +951,7 @@ mod tests {
         assert!(buf.char_count() == 10);
         assert!(buf.line_count() == 1);
 
-        buf.text.remove(9, 10);
+        buf.text.remove(9..10);
 
         let mut iter = buf.grapheme_iter();
 

@@ -53,7 +53,7 @@ pub trait LineFormatter {
         // Get an iter into the right block
         let a = line_block * LINE_BLOCK_LENGTH;
         let b = min(line.len_chars(), (line_block + 1) * LINE_BLOCK_LENGTH);
-        let g_iter = line.slice(a, b).graphemes();
+        let g_iter = line.slice(a..b).graphemes();
         return self.index_to_v2d(g_iter, col_i_adjusted).1;
     }
 
@@ -78,8 +78,8 @@ pub trait LineFormatter {
         let mut line = buf.get_line(line_i);
         let (mut y, x) = self.index_to_v2d(
             line.slice(
-                line_block * LINE_BLOCK_LENGTH,
-                min(line.len_chars(), (line_block + 1) * LINE_BLOCK_LENGTH),
+                (line_block * LINE_BLOCK_LENGTH)
+                    ..min(line.len_chars(), (line_block + 1) * LINE_BLOCK_LENGTH),
             ).graphemes(),
             col_i_adjusted,
         );
@@ -91,8 +91,8 @@ pub trait LineFormatter {
         loop {
             line = buf.get_line(line_i);
             let (h, _) = self.dimensions(line.slice(
-                block_index * LINE_BLOCK_LENGTH,
-                min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
+                (block_index * LINE_BLOCK_LENGTH)
+                    ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
             ).graphemes());
 
             if new_y >= 0 && new_y < h as isize {
@@ -128,8 +128,8 @@ pub trait LineFormatter {
                         block_index -= 1;
                     }
                     let (h, _) = self.dimensions(line.slice(
-                        block_index * LINE_BLOCK_LENGTH,
-                        min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
+                        (block_index * LINE_BLOCK_LENGTH)
+                            ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
                     ).graphemes());
                     new_y += h as isize;
                 } else {
@@ -141,8 +141,8 @@ pub trait LineFormatter {
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
         let block_slice = line.slice(
-            block_index * LINE_BLOCK_LENGTH,
-            min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
+            (block_index * LINE_BLOCK_LENGTH)
+                ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
         );
         let block_col_i = min(
             self.v2d_to_index(block_slice.graphemes(), (y, x), rounding),
@@ -173,11 +173,11 @@ pub trait LineFormatter {
 
         // Calculate the horizontal position
         let (v, _) = self.index_to_v2d(
-            line.slice(start_index, end_index).graphemes(),
+            line.slice(start_index..end_index).graphemes(),
             col_i_adjusted,
         );
         let block_col_i = self.v2d_to_index(
-            line.slice(start_index, end_index).graphemes(),
+            line.slice(start_index..end_index).graphemes(),
             (v, horizontal),
             (RoundingBehavior::Floor, rounding),
         );

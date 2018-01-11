@@ -100,13 +100,13 @@ impl<T: LineFormatter> Editor<T> {
         for line in self.buffer.line_iter().take(100) {
             // Get the line ending
             let ending = if line.len_chars() == 1 {
-                let g = line.slice(line.len_chars() - 1, line.len_chars())
+                let g = line.slice((line.len_chars() - 1)..)
                     .graphemes()
                     .last()
                     .unwrap();
                 str_to_line_ending(g)
             } else if line.len_chars() > 1 {
-                let g = line.slice(line.len_chars() - 2, line.len_chars())
+                let g = line.slice((line.len_chars() - 2)..)
                     .graphemes()
                     .last()
                     .unwrap();
