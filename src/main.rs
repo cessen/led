@@ -83,10 +83,16 @@ fn main() {
             Vert {
                 pos: [-0.75, -0.75, 0.0, 1.0],
             },
+            Vert {
+                pos: [-0.75, 0.75, 0.0, 1.0],
+            },
         ],
     ).unwrap();
-    let indices =
-        IndexBuffer::new(&display, index::PrimitiveType::TrianglesList, &[0u16, 1, 2]).unwrap();
+    let indices = IndexBuffer::new(
+        &display,
+        index::PrimitiveType::TrianglesList,
+        &[0u16, 1, 2, 2, 3, 0],
+    ).unwrap();
 
     // Event loop
     let mut stop = false;
@@ -118,6 +124,7 @@ fn main() {
 
         // Render
         let mut frame = display.draw();
+        let dimensions = display.gl_window().window().get_inner_size().unwrap();
         frame.clear(None, Some((0.18, 0.18, 0.18, 1.0)), true, None, None);
         frame
             .draw(
@@ -129,8 +136,8 @@ fn main() {
                     viewport: Some(glium::Rect {
                         left: 0,
                         bottom: 0,
-                        width: 512,
-                        height: 512,
+                        width: dimensions.0,
+                        height: dimensions.1,
                     }),
                     ..Default::default()
                 },
