@@ -1,3 +1,9 @@
+[workspace]
+members = [
+    "sub_crates/buffers",
+    "sub_crates/ui_layer"
+]
+
 [package]
 name = "Led"
 version = "0.0.3"
@@ -11,6 +17,11 @@ path = "src/main.rs"
 [dependencies]
 clap = "2.*"
 glium = "0.19"
-ropey = "0.6"
 unicode-segmentation = "1.2"
 unicode-width = "0.1"
+
+[dependencies.buffers]
+path = "sub_crates/buffers"
+
+[dependencies.ui_layer]
+path = "sub_crates/ui_layer"

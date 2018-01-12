@@ -1,0 +1,12 @@
+[package]
+name = "ui_layer"
+version = "0.1.0"
+authors = ["Nathan Vegdahl <cessen@cessen.com>"]
+license = "MIT"
+
+[lib]
+name = "ui_layer"
+path = "src/lib.rs"
+
+[dependencies]
+glium = "0.19"

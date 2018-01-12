@@ -2,9 +2,10 @@
 name = "Led"
 version = "0.0.3"
 dependencies = [
+ "buffers 0.1.0",
  "clap 2.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "glium 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ropey 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ui_layer 0.1.0",
  "unicode-segmentation 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-width 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -64,6 +65,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "buffers"
+version = "0.1.0"
+dependencies = [
+ "ropey 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "cc"
@@ -599,6 +607,13 @@ dependencies = [
 name = "token_store"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "ui_layer"
+version = "0.1.0"
+dependencies = [
+ "glium 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "unicode-segmentation"

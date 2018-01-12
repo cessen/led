@@ -1,0 +1,12 @@
+[package]
+name = "buffers"
+version = "0.1.0"
+authors = ["Nathan Vegdahl <cessen@cessen.com>"]
+license = "MIT"
+
+[lib]
+name = "buffers"
+path = "src/lib.rs"
+
+[dependencies]
+ropey = "0.6"

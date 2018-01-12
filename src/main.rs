@@ -1,17 +1,13 @@
 extern crate clap;
 #[macro_use]
 extern crate glium;
-extern crate ropey;
 extern crate unicode_segmentation;
 extern crate unicode_width;
 
-use std::fs::File;
-use std::io::BufReader;
-
 use clap::{App, Arg};
 use glium::{glutin, index, IndexBuffer, Program, Surface, VertexBuffer};
+use glium::draw_parameters::DrawParameters;
 use glium::glutin::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use ropey::Rope;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -59,14 +55,7 @@ fn main() {
         .get_matches();
 
     // Get file path, if specified
-    let filepath = args.value_of("file");
-
-    // Open file if specified
-    let _text = if let Some(fp) = filepath {
-        Rope::from_reader(BufReader::new(File::open(&fp).unwrap())).unwrap()
-    } else {
-        Rope::new()
-    };
+    let _filepath = args.value_of("file");
 
     // Create a window
     let mut events = glutin::EventsLoop::new();
@@ -136,7 +125,15 @@ fn main() {
                 &indices,
                 &shader_program,
                 &glium::uniforms::EmptyUniforms,
-                &Default::default(),
+                &DrawParameters {
+                    viewport: Some(glium::Rect {
+                        left: 0,
+                        bottom: 0,
+                        width: 512,
+                        height: 512,
+                    }),
+                    ..Default::default()
+                },
             )
             .unwrap();
         frame.finish().unwrap();
