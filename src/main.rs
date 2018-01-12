@@ -1,56 +1,145 @@
-extern crate docopt;
-extern crate ropey;
-extern crate serde;
+extern crate clap;
 #[macro_use]
-extern crate serde_derive;
-extern crate smallvec;
-extern crate termion;
+extern crate glium;
+extern crate ropey;
 extern crate unicode_segmentation;
 extern crate unicode_width;
 
-use std::path::Path;
-use docopt::Docopt;
-use editor::Editor;
-use term_ui::TermUI;
-use term_ui::formatter::ConsoleLineFormatter;
+use std::fs::File;
+use std::io::BufReader;
 
-mod string_utils;
-mod utils;
-mod buffer;
-mod formatter;
-mod editor;
-mod term_ui;
+use clap::{App, Arg};
+use glium::{glutin, index, IndexBuffer, Program, Surface, VertexBuffer};
+use glium::glutin::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use ropey::Rope;
 
-// Usage documentation string
-static USAGE: &'static str = "
-Usage: led [options] [<file>]
-       led --help
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
-Options:
-    -h, --help  Show this message
+//===========================================================================
+
+#[derive(Debug, Copy, Clone)]
+struct Vert {
+    pos: [f32; 4],
+}
+implement_vertex!(Vert, pos);
+
+//===========================================================================
+
+const VTX_SHADER: &str = "
+#version 330
+layout(location = 0) in vec4 pos;
+void main()
+{
+    gl_Position = pos;
+}
 ";
 
-// Struct for storing command-line arguments
-#[derive(Debug, Deserialize)]
-struct Args {
-    arg_file: Option<String>,
-    flag_help: bool,
+const FRAG_SHADER: &str = "
+#version 330
+out vec4 outputColor;
+void main()
+{
+    outputColor = vec4(0.0f, gl_FragCoord.y / 500.0, 1.0f, 1.0f);
 }
+";
+
+//===========================================================================
 
 fn main() {
-    // Get command-line arguments
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.deserialize())
-        .unwrap_or_else(|e| e.exit());
+    // Parse command line arguments.
+    let args = App::new("Led")
+        .version(VERSION)
+        .about("A humble text editor")
+        .arg(
+            Arg::with_name("file")
+                .value_name("FILE")
+                .help("Path to text file to open")
+                .required(false),
+        )
+        .get_matches();
 
-    // Load file, if specified
-    let editor = if let Option::Some(s) = args.arg_file {
-        Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(&s[..]))
+    // Get file path, if specified
+    let filepath = args.value_of("file");
+
+    // Open file if specified
+    let _text = if let Some(fp) = filepath {
+        Rope::from_reader(BufReader::new(File::open(&fp).unwrap())).unwrap()
     } else {
-        Editor::new(ConsoleLineFormatter::new(4))
+        Rope::new()
     };
 
-    // Initialize and start UI
-    let mut ui = TermUI::new_from_editor(editor);
-    ui.main_ui_loop();
+    // Create a window
+    let mut events = glutin::EventsLoop::new();
+    let display = {
+        let window = glutin::WindowBuilder::new()
+            .with_title("Hello world!")
+            .with_dimensions(512, 512);
+        let context = glutin::ContextBuilder::new();
+        glium::Display::new(window, context, &events).unwrap()
+    };
+
+    // Compile glsl program
+    let shader_program = Program::from_source(&display, VTX_SHADER, FRAG_SHADER, None).unwrap();
+
+    // Construct vertex buffer and triangle indices
+    let verts = VertexBuffer::new(
+        &display,
+        &[
+            Vert {
+                pos: [0.75, 0.75, 0.0, 1.0],
+            },
+            Vert {
+                pos: [0.75, -0.75, 0.0, 1.0],
+            },
+            Vert {
+                pos: [-0.75, -0.75, 0.0, 1.0],
+            },
+        ],
+    ).unwrap();
+    let indices =
+        IndexBuffer::new(&display, index::PrimitiveType::TrianglesList, &[0u16, 1, 2]).unwrap();
+
+    // Event loop
+    let mut stop = false;
+    while !stop {
+        // Process events
+        events.poll_events(|e| match e {
+            Event::WindowEvent {
+                event: WindowEvent::Closed,
+                ..
+            } => {
+                stop = true;
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                stop = true;
+            }
+            _ => {}
+        });
+
+        // Render
+        let mut frame = display.draw();
+        frame.clear(None, Some((0.18, 0.18, 0.18, 1.0)), true, None, None);
+        frame
+            .draw(
+                &verts,
+                &indices,
+                &shader_program,
+                &glium::uniforms::EmptyUniforms,
+                &Default::default(),
+            )
+            .unwrap();
+        frame.finish().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(16));
+    }
 }

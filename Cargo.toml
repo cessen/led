@@ -1,6 +1,6 @@
 [package]
 name = "Led"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 license = "MIT"
 
@@ -9,11 +9,8 @@ name = "led"
 path = "src/main.rs"
 
 [dependencies]
+clap = "2.*"
+glium = "0.19"
 ropey = "0.6"
 unicode-segmentation = "1.2"
 unicode-width = "0.1"
-serde = "1.*"
-serde_derive = "1.*"
-docopt = "0.8"
-smallvec = "0.6"
-termion = "1.5"
