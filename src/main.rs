@@ -1,45 +1,15 @@
 extern crate clap;
-#[macro_use]
 extern crate glium;
+extern crate ui_layer;
 extern crate unicode_segmentation;
 extern crate unicode_width;
 
+use ui_layer::Window;
 use clap::{App, Arg};
-use glium::{glutin, index, IndexBuffer, Program, Surface, VertexBuffer};
-use glium::draw_parameters::DrawParameters;
+use glium::glutin;
 use glium::glutin::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-
-//===========================================================================
-
-#[derive(Debug, Copy, Clone)]
-struct Vert {
-    pos: [f32; 4],
-}
-implement_vertex!(Vert, pos);
-
-//===========================================================================
-
-const VTX_SHADER: &str = "
-#version 330
-layout(location = 0) in vec4 pos;
-void main()
-{
-    gl_Position = pos;
-}
-";
-
-const FRAG_SHADER: &str = "
-#version 330
-out vec4 outputColor;
-void main()
-{
-    outputColor = vec4(0.0f, gl_FragCoord.y / 500.0, 1.0f, 1.0f);
-}
-";
-
-//===========================================================================
 
 fn main() {
     // Parse command line arguments.
@@ -66,33 +36,7 @@ fn main() {
         let context = glutin::ContextBuilder::new();
         glium::Display::new(window, context, &events).unwrap()
     };
-
-    // Compile glsl program
-    let shader_program = Program::from_source(&display, VTX_SHADER, FRAG_SHADER, None).unwrap();
-
-    // Construct vertex buffer and triangle indices
-    let verts = VertexBuffer::new(
-        &display,
-        &[
-            Vert {
-                pos: [0.75, 0.75, 0.0, 1.0],
-            },
-            Vert {
-                pos: [0.75, -0.75, 0.0, 1.0],
-            },
-            Vert {
-                pos: [-0.75, -0.75, 0.0, 1.0],
-            },
-            Vert {
-                pos: [-0.75, 0.75, 0.0, 1.0],
-            },
-        ],
-    ).unwrap();
-    let indices = IndexBuffer::new(
-        &display,
-        index::PrimitiveType::TrianglesList,
-        &[0u16, 1, 2, 2, 3, 0],
-    ).unwrap();
+    let window = Window::new(&display);
 
     // Event loop
     let mut stop = false;
@@ -123,26 +67,11 @@ fn main() {
         });
 
         // Render
-        let mut frame = display.draw();
-        let dimensions = display.gl_window().window().get_inner_size().unwrap();
-        frame.clear(None, Some((0.18, 0.18, 0.18, 1.0)), true, None, None);
-        frame
-            .draw(
-                &verts,
-                &indices,
-                &shader_program,
-                &glium::uniforms::EmptyUniforms,
-                &DrawParameters {
-                    viewport: Some(glium::Rect {
-                        left: 0,
-                        bottom: 0,
-                        width: dimensions.0,
-                        height: dimensions.1,
-                    }),
-                    ..Default::default()
-                },
-            )
-            .unwrap();
+        let mut frame = window.draw();
+        let res = frame.res();
+        frame.clear((0.18, 0.18, 0.18, 1.0));
+        frame.rect((0.0, 0.0), (32.0, 64.0), (0.8, 0.8, 0.1, 1.0));
+        frame.rect((0.0, res.1 - 64.0), (32.0, res.1), (0.8, 0.1, 0.8, 1.0));
         frame.finish().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(16));
     }
