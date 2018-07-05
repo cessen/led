@@ -11,6 +11,8 @@ use glium::glutin::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
+const default_font: &[u8] = include_bytes!("font/SourceCodePro-Regular.ttf");
+
 fn main() {
     // Parse command line arguments.
     let args = App::new("Led")

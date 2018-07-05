@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate glium;
+extern crate rusttype;
 
 use glium::{index, Blend, BlendingFunction, Display, DrawParameters, Frame, IndexBuffer,
             LinearBlendingFactor, Program, Surface, SwapBuffersError, VertexBuffer};
