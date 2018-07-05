@@ -15,7 +15,7 @@ use utils::{digit_count, RopeGraphemes};
 
 pub mod formatter;
 mod screen;
-mod smallstring;
+pub mod smallstring;
 
 use self::screen::{Color, Screen, Style};
 

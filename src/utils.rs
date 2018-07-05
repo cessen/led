@@ -16,9 +16,8 @@ pub fn digit_count(mut n: u32, b: u32) -> u32 {
 //=============================================================
 
 pub fn grapheme_width(slice: &RopeSlice) -> usize {
-    // TODO: use a small stack-allocated buffer to handle the common case
-    // without allocation.
-    let s = slice.to_string();
+    use term_ui::smallstring::SmallString;
+    let s = SmallString::from_rope_slice(slice);
     return UnicodeWidthStr::width(&s[..]);
 }
 
@@ -167,10 +166,16 @@ impl<'a> Iterator for RopeGraphemes<'a> {
             }
         }
 
-        let a_char = self.text.byte_to_char(a);
-        let b_char = self.text.byte_to_char(b);
+        if a < self.cur_chunk_start {
+            let a_char = self.text.byte_to_char(a);
+            let b_char = self.text.byte_to_char(b);
 
-        Some(self.text.slice(a_char..b_char))
+            Some(self.text.slice(a_char..b_char))
+        } else {
+            let a2 = a - self.cur_chunk_start;
+            let b2 = b - self.cur_chunk_start;
+            Some(RopeSlice::from_str(&self.cur_chunk[a2..b2]))
+        }
     }
 }
 
