@@ -7,8 +7,8 @@ use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
 use std::path::{Path, PathBuf};
 use std::cmp::{max, min};
-use string_utils::{char_count, str_to_line_ending, LineEnding};
-use utils::digit_count;
+use string_utils::{char_count, rope_slice_to_line_ending, LineEnding};
+use utils::{digit_count, RopeGraphemes};
 use self::cursor::CursorSet;
 
 mod cursor;
@@ -100,17 +100,15 @@ impl<T: LineFormatter> Editor<T> {
         for line in self.buffer.line_iter().take(100) {
             // Get the line ending
             let ending = if line.len_chars() == 1 {
-                let g = line.slice((line.len_chars() - 1)..)
-                    .graphemes()
+                let g = RopeGraphemes::new(&line.slice((line.len_chars() - 1)..))
                     .last()
                     .unwrap();
-                str_to_line_ending(g)
+                rope_slice_to_line_ending(&g)
             } else if line.len_chars() > 1 {
-                let g = line.slice((line.len_chars() - 2)..)
-                    .graphemes()
+                let g = RopeGraphemes::new(&line.slice((line.len_chars() - 2)..))
                     .last()
                     .unwrap();
-                str_to_line_ending(g)
+                rope_slice_to_line_ending(&g)
             } else {
                 LineEnding::None
             };
@@ -626,7 +624,7 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn page_up(&mut self) {
         let move_amount =
-            self.view_dim.0 - max((self.view_dim.0 / 8), self.formatter.single_line_height());
+            self.view_dim.0 - max(self.view_dim.0 / 8, self.formatter.single_line_height());
         self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
             &self.buffer,
             self.view_pos.0,
@@ -642,7 +640,7 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn page_down(&mut self) {
         let move_amount =
-            self.view_dim.0 - max((self.view_dim.0 / 8), self.formatter.single_line_height());
+            self.view_dim.0 - max(self.view_dim.0 / 8, self.formatter.single_line_height());
         self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
             &self.buffer,
             self.view_pos.0,

@@ -3,6 +3,8 @@ use std::cell::RefCell;
 use std::io;
 use std::io::{BufWriter, Write};
 
+use ropey::RopeSlice;
+use utils::{RopeGraphemes, grapheme_width};
 use super::smallstring::SmallString;
 use unicode_width::UnicodeWidthStr;
 use unicode_segmentation::UnicodeSegmentation;
@@ -97,6 +99,28 @@ impl Screen {
                 if width > 0 {
                     if x < self.w {
                         buf[y * self.w + x] = Some((style, g.into()));
+                    }
+                    x += 1;
+                    for _ in 0..(width - 1) {
+                        if x < self.w {
+                            buf[y * self.w + x] = None;
+                        }
+                        x += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    pub(crate) fn draw_rope_slice(&self, x: usize, y: usize, text: &RopeSlice, style: Style) {
+        if y < self.h {
+            let mut buf = self.buf.borrow_mut();
+            let mut x = x;
+            for g in RopeGraphemes::new(&text) {
+                let width = grapheme_width(&g);
+                if width > 0 {
+                    if x < self.w {
+                        buf[y * self.w + x] = Some((style, SmallString::from_rope_slice(&g)));
                     }
                     x += 1;
                     for _ in 0..(width - 1) {

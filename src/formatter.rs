@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 
 use std::cmp::min;
+use ropey::RopeSlice;
 use buffer::Buffer;
+use utils::RopeGraphemes;
 
 // Maximum graphemes in a line before a soft line break is forced.
 // This is necessary to prevent pathological formatting cases which
@@ -24,13 +26,13 @@ pub trait LineFormatter {
     /// The text to be formatted is passed as a grapheme iterator.
     fn dimensions<'a, T>(&'a self, g_iter: T) -> (usize, usize)
     where
-        T: Iterator<Item = &'a str>;
+        T: Iterator<Item = RopeSlice<'a>>;
 
     /// Converts a char index within a text into a visual 2d position.
     /// The text to be formatted is passed as a grapheme iterator.
     fn index_to_v2d<'a, T>(&'a self, g_iter: T, char_idx: usize) -> (usize, usize)
     where
-        T: Iterator<Item = &'a str>;
+        T: Iterator<Item = RopeSlice<'a>>;
 
     /// Converts a visual 2d position into a char index within a text.
     /// The text to be formatted is passed as a grapheme iterator.
@@ -41,7 +43,7 @@ pub trait LineFormatter {
         rounding: (RoundingBehavior, RoundingBehavior),
     ) -> usize
     where
-        T: Iterator<Item = &'a str>;
+        T: Iterator<Item = RopeSlice<'a>>;
 
     fn index_to_horizontal_v2d(&self, buf: &Buffer, char_idx: usize) -> usize {
         let (line_i, col_i) = buf.index_to_line_col(char_idx);
@@ -53,7 +55,7 @@ pub trait LineFormatter {
         // Get an iter into the right block
         let a = line_block * LINE_BLOCK_LENGTH;
         let b = min(line.len_chars(), (line_block + 1) * LINE_BLOCK_LENGTH);
-        let g_iter = line.slice(a..b).graphemes();
+        let g_iter = RopeGraphemes::new(&line.slice(a..b));
         return self.index_to_v2d(g_iter, col_i_adjusted).1;
     }
 
@@ -77,10 +79,10 @@ pub trait LineFormatter {
 
         let mut line = buf.get_line(line_i);
         let (mut y, x) = self.index_to_v2d(
-            line.slice(
+            RopeGraphemes::new(&line.slice(
                 (line_block * LINE_BLOCK_LENGTH)
                     ..min(line.len_chars(), (line_block + 1) * LINE_BLOCK_LENGTH),
-            ).graphemes(),
+            )),
             col_i_adjusted,
         );
 
@@ -90,10 +92,10 @@ pub trait LineFormatter {
         let mut block_index: usize = line_block;
         loop {
             line = buf.get_line(line_i);
-            let (h, _) = self.dimensions(line.slice(
+            let (h, _) = self.dimensions(RopeGraphemes::new(&line.slice(
                 (block_index * LINE_BLOCK_LENGTH)
                     ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
-            ).graphemes());
+            )));
 
             if new_y >= 0 && new_y < h as isize {
                 y = new_y as usize;
@@ -127,10 +129,10 @@ pub trait LineFormatter {
                     } else {
                         block_index -= 1;
                     }
-                    let (h, _) = self.dimensions(line.slice(
+                    let (h, _) = self.dimensions(RopeGraphemes::new(&line.slice(
                         (block_index * LINE_BLOCK_LENGTH)
                             ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
-                    ).graphemes());
+                    )));
                     new_y += h as isize;
                 } else {
                     unreachable!();
@@ -145,7 +147,7 @@ pub trait LineFormatter {
                 ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
         );
         let block_col_i = min(
-            self.v2d_to_index(block_slice.graphemes(), (y, x), rounding),
+            self.v2d_to_index(RopeGraphemes::new(&block_slice), (y, x), rounding),
             LINE_BLOCK_LENGTH - 1,
         );
         col_i = (block_index * LINE_BLOCK_LENGTH) + block_col_i;
@@ -173,11 +175,11 @@ pub trait LineFormatter {
 
         // Calculate the horizontal position
         let (v, _) = self.index_to_v2d(
-            line.slice(start_index..end_index).graphemes(),
+            RopeGraphemes::new(&line.slice(start_index..end_index)),
             col_i_adjusted,
         );
         let block_col_i = self.v2d_to_index(
-            line.slice(start_index..end_index).graphemes(),
+            RopeGraphemes::new(&line.slice(start_index..end_index)),
             (v, horizontal),
             (RoundingBehavior::Floor, rounding),
         );

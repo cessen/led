@@ -1,7 +1,8 @@
 use std::cmp::max;
 
-use unicode_width::UnicodeWidthStr;
-use string_utils::{is_line_ending, is_whitespace};
+use ropey::RopeSlice;
+use utils::grapheme_width;
+use string_utils::{rope_slice_is_line_ending, rope_slice_is_whitespace};
 use formatter::{LineFormatter, RoundingBehavior};
 
 pub enum WrapType {
@@ -47,7 +48,7 @@ impl ConsoleLineFormatter {
 
     pub fn iter<'a, T>(&'a self, g_iter: T) -> ConsoleLineFormatterVisIter<'a, T>
     where
-        T: Iterator<Item = &'a str>,
+        T: Iterator<Item = RopeSlice<'a>>,
     {
         ConsoleLineFormatterVisIter::<'a, T> {
             grapheme_iter: g_iter,
@@ -68,7 +69,7 @@ impl LineFormatter for ConsoleLineFormatter {
 
     fn dimensions<'a, T>(&'a self, g_iter: T) -> (usize, usize)
     where
-        T: Iterator<Item = &'a str>,
+        T: Iterator<Item = RopeSlice<'a>>,
     {
         let mut dim: (usize, usize) = (0, 0);
 
@@ -83,7 +84,7 @@ impl LineFormatter for ConsoleLineFormatter {
 
     fn index_to_v2d<'a, T>(&'a self, g_iter: T, char_idx: usize) -> (usize, usize)
     where
-        T: Iterator<Item = &'a str>,
+        T: Iterator<Item = RopeSlice<'a>>,
     {
         let mut pos = (0, 0);
         let mut i = 0;
@@ -109,7 +110,7 @@ impl LineFormatter for ConsoleLineFormatter {
         _: (RoundingBehavior, RoundingBehavior),
     ) -> usize
     where
-        T: Iterator<Item = &'a str>,
+        T: Iterator<Item = RopeSlice<'a>>,
     {
         // TODO: handle rounding modes
         let mut prev_i = 0;
@@ -137,7 +138,7 @@ impl LineFormatter for ConsoleLineFormatter {
 // ===================================================================
 pub struct ConsoleLineFormatterVisIter<'a, T>
 where
-    T: Iterator<Item = &'a str>,
+    T: Iterator<Item = RopeSlice<'a>>,
 {
     grapheme_iter: T,
     f: &'a ConsoleLineFormatter,
@@ -146,15 +147,15 @@ where
     indent: usize,
     indent_found: bool,
 
-    word_buf: Vec<&'a str>,
+    word_buf: Vec<RopeSlice<'a>>,
     word_i: usize,
 }
 
 impl<'a, T> ConsoleLineFormatterVisIter<'a, T>
 where
-    T: Iterator<Item = &'a str>,
+    T: Iterator<Item = RopeSlice<'a>>,
 {
-    fn next_nowrap(&mut self, g: &'a str) -> Option<(&'a str, (usize, usize), usize)> {
+    fn next_nowrap(&mut self, g: RopeSlice<'a>) -> Option<(RopeSlice<'a>, (usize, usize), usize)> {
         let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
 
         let pos = self.pos;
@@ -164,9 +165,9 @@ where
 
     fn next_charwrap(
         &mut self,
-        g: &'a str,
+        g: RopeSlice<'a>,
         wrap_width: usize,
-    ) -> Option<(&'a str, (usize, usize), usize)> {
+    ) -> Option<(RopeSlice<'a>, (usize, usize), usize)> {
         let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
 
         if (self.pos.1 + width) > wrap_width {
@@ -198,7 +199,7 @@ where
             }
         } else {
             if !self.indent_found {
-                if is_whitespace(g) {
+                if rope_slice_is_whitespace(&g) {
                     self.indent += width;
                 } else {
                     self.indent_found = true;
@@ -214,11 +215,11 @@ where
 
 impl<'a, T> Iterator for ConsoleLineFormatterVisIter<'a, T>
 where
-    T: Iterator<Item = &'a str>,
+    T: Iterator<Item = RopeSlice<'a>>,
 {
-    type Item = (&'a str, (usize, usize), usize);
+    type Item = (RopeSlice<'a>, (usize, usize), usize);
 
-    fn next(&mut self) -> Option<(&'a str, (usize, usize), usize)> {
+    fn next(&mut self) -> Option<(RopeSlice<'a>, (usize, usize), usize)> {
         match self.f.wrap_type {
             WrapType::NoWrap => {
                 if let Some(g) = self.grapheme_iter.next() {
@@ -249,14 +250,14 @@ where
                             self.f.tab_width as usize,
                         );
                         word_width += width;
-                        if is_whitespace(g) {
+                        if rope_slice_is_whitespace(&g) {
                             break;
                         }
                     }
 
                     if self.word_buf.len() == 0 {
                         return None;
-                    } else if !self.indent_found && !is_whitespace(self.word_buf[0]) {
+                    } else if !self.indent_found && !rope_slice_is_whitespace(&self.word_buf[0]) {
                         self.indent_found = true;
                     }
 
@@ -300,27 +301,22 @@ where
 
 /// Returns the visual width of a grapheme given a starting
 /// position on a line.
-fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize {
-    match g {
-        "\t" => {
-            let ending_pos = ((pos / tab_width) + 1) * tab_width;
-            return ending_pos - pos;
-        }
-
-        _ => {
-            if is_line_ending(g) {
-                return 1;
-            } else {
-                return UnicodeWidthStr::width(g);
-            }
-        }
+fn grapheme_vis_width_at_vis_pos(g: RopeSlice, pos: usize, tab_width: usize) -> usize {
+    if g == "\t" {
+        let ending_pos = ((pos / tab_width) + 1) * tab_width;
+        return ending_pos - pos;
+    } else if rope_slice_is_line_ending(&g) {
+        return 1;
+    } else {
+        return grapheme_width(&g);
     }
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(unused_imports)]
-    use unicode_segmentation::UnicodeSegmentation;
+    use ropey::Rope;
+    use utils::RopeGraphemes;
     use super::*;
     use formatter::{LineFormatter, LINE_BLOCK_LENGTH};
     use formatter::RoundingBehavior::{Ceiling, Floor, Round};
@@ -328,7 +324,7 @@ mod tests {
 
     #[test]
     fn dimensions_1() {
-        let text = "Hello there, stranger!"; // 22 graphemes long
+        let text = Rope::from_str("Hello there, stranger!"); // 22 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -337,14 +333,14 @@ mod tests {
         f.set_wrap_width(80);
 
         assert_eq!(
-            f.dimensions(UnicodeSegmentation::graphemes(text, true)),
+            f.dimensions(RopeGraphemes::new(&text.slice(..))),
             (1, 22)
         );
     }
 
     #[test]
     fn dimensions_2() {
-        let text = "Hello there, stranger!  How are you doing this fine day?"; // 56 graphemes long
+        let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -353,7 +349,7 @@ mod tests {
         f.set_wrap_width(12);
 
         assert_eq!(
-            f.dimensions(UnicodeSegmentation::graphemes(text, true)),
+            f.dimensions(RopeGraphemes::new(&text.slice(..))),
             (5, 12)
         );
     }
@@ -361,7 +357,7 @@ mod tests {
     #[test]
     fn dimensions_3() {
         // 55 graphemes long
-        let text = "税マイミ文末\
+        let text = Rope::from_str("税マイミ文末\
                     レ日題イぽじ\
                     や男目統ス公\
                     身みトしつ結\
@@ -370,7 +366,7 @@ mod tests {
                     凱字テ式重反\
                     てす献罪がご\
                     く官俵呉嫁ー\
-                    。";
+                    。");
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -379,7 +375,7 @@ mod tests {
         f.set_wrap_width(12);
 
         assert_eq!(
-            f.dimensions(UnicodeSegmentation::graphemes(text, true)),
+            f.dimensions(RopeGraphemes::new(&text.slice(..))),
             (10, 12)
         );
     }
@@ -387,7 +383,7 @@ mod tests {
     #[test]
     fn dimensions_4() {
         // 55 graphemes long
-        let text = "税マイミ文末\
+        let text = Rope::from_str("税マイミ文末\
                     レ日題イぽじ\
                     や男目統ス公\
                     身みトしつ結\
@@ -396,7 +392,7 @@ mod tests {
                     凱字テ式重反\
                     てす献罪がご\
                     く官俵呉嫁ー\
-                    。";
+                    。");
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::WordWrap(0);
@@ -405,14 +401,14 @@ mod tests {
         f.set_wrap_width(12);
 
         assert_eq!(
-            f.dimensions(UnicodeSegmentation::graphemes(text, true)),
+            f.dimensions(RopeGraphemes::new(&text.slice(..))),
             (10, 12)
         );
     }
 
     #[test]
     fn index_to_v2d_1() {
-        let text = "Hello there, stranger!"; // 22 graphemes long
+        let text = Rope::from_str("Hello there, stranger!"); // 22 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -421,26 +417,26 @@ mod tests {
         f.set_wrap_width(80);
 
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 0),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 0),
             (0, 0)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 5),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 5),
             (0, 5)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 22),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 22),
             (0, 22)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 23),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 23),
             (0, 22)
         );
     }
 
     #[test]
     fn index_to_v2d_2() {
-        let text = "Hello there, stranger!  How are you doing this fine day?"; // 56 graphemes long
+        let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -449,79 +445,79 @@ mod tests {
         f.set_wrap_width(12);
 
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 0),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 0),
             (0, 0)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 5),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 5),
             (0, 5)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 11),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 11),
             (0, 11)
         );
 
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 12),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 12),
             (1, 0)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 15),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 15),
             (1, 3)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 23),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 23),
             (1, 11)
         );
 
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 24),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 24),
             (2, 0)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 28),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 28),
             (2, 4)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 35),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 35),
             (2, 11)
         );
 
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 36),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 36),
             (3, 0)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 43),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 43),
             (3, 7)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 47),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 47),
             (3, 11)
         );
 
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 48),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 48),
             (4, 0)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 50),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 50),
             (4, 2)
         );
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 56),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 56),
             (4, 8)
         );
 
         assert_eq!(
-            f.index_to_v2d(UnicodeSegmentation::graphemes(text, true), 57),
+            f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 57),
             (4, 8)
         );
     }
 
     #[test]
     fn v2d_to_index_1() {
-        let text = "Hello there, stranger!"; // 22 graphemes long
+        let text = Rope::from_str("Hello there, stranger!"); // 22 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -531,7 +527,7 @@ mod tests {
 
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (0, 0),
                 (Floor, Floor)
             ),
@@ -539,7 +535,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (0, 5),
                 (Floor, Floor)
             ),
@@ -547,7 +543,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (0, 22),
                 (Floor, Floor)
             ),
@@ -555,7 +551,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (0, 23),
                 (Floor, Floor)
             ),
@@ -563,7 +559,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (1, 0),
                 (Floor, Floor)
             ),
@@ -571,7 +567,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (1, 1),
                 (Floor, Floor)
             ),
@@ -581,7 +577,7 @@ mod tests {
 
     #[test]
     fn v2d_to_index_2() {
-        let text = "Hello there, stranger!  How are you doing this fine day?"; // 56 graphemes long
+        let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -591,7 +587,7 @@ mod tests {
 
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (0, 0),
                 (Floor, Floor)
             ),
@@ -599,7 +595,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (0, 11),
                 (Floor, Floor)
             ),
@@ -607,7 +603,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (0, 12),
                 (Floor, Floor)
             ),
@@ -616,7 +612,7 @@ mod tests {
 
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (1, 0),
                 (Floor, Floor)
             ),
@@ -624,7 +620,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (1, 11),
                 (Floor, Floor)
             ),
@@ -632,7 +628,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (1, 12),
                 (Floor, Floor)
             ),
@@ -641,7 +637,7 @@ mod tests {
 
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (2, 0),
                 (Floor, Floor)
             ),
@@ -649,7 +645,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (2, 11),
                 (Floor, Floor)
             ),
@@ -657,7 +653,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (2, 12),
                 (Floor, Floor)
             ),
@@ -666,7 +662,7 @@ mod tests {
 
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (3, 0),
                 (Floor, Floor)
             ),
@@ -674,7 +670,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (3, 11),
                 (Floor, Floor)
             ),
@@ -682,7 +678,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (3, 12),
                 (Floor, Floor)
             ),
@@ -691,7 +687,7 @@ mod tests {
 
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (4, 0),
                 (Floor, Floor)
             ),
@@ -699,7 +695,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (4, 7),
                 (Floor, Floor)
             ),
@@ -707,7 +703,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (4, 8),
                 (Floor, Floor)
             ),
@@ -715,7 +711,7 @@ mod tests {
         );
         assert_eq!(
             f.v2d_to_index(
-                UnicodeSegmentation::graphemes(text, true),
+                RopeGraphemes::new(&text.slice(..)),
                 (4, 9),
                 (Floor, Floor)
             ),

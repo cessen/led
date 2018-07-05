@@ -10,8 +10,8 @@ use termion::input::TermRead;
 use editor::Editor;
 use formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH};
 use self::formatter::ConsoleLineFormatter;
-use string_utils::{is_line_ending, line_ending_to_str, LineEnding};
-use utils::digit_count;
+use string_utils::{rope_slice_is_line_ending, line_ending_to_str, LineEnding};
+use utils::{digit_count, RopeGraphemes};
 
 pub mod formatter;
 mod screen;
@@ -367,15 +367,14 @@ impl TermUI {
             .line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
         let temp_line = editor.buffer.get_line(line_index);
         let (vis_line_offset, _) = editor.formatter.index_to_v2d(
-            temp_line
+            RopeGraphemes::new(&temp_line
                 .slice(
                     (line_block_index * LINE_BLOCK_LENGTH)
                         ..min(
                             temp_line.len_chars(),
                             (line_block_index + 1) * LINE_BLOCK_LENGTH,
                         ),
-                )
-                .graphemes(),
+                )),
             editor.view_pos.0 - char_index,
         );
 
@@ -412,9 +411,9 @@ impl TermUI {
             let mut last_pos_y = 0;
             let mut lines_traversed: usize = 0;
             let line_len = line.len_chars();
-            let mut g_iter = editor.formatter.iter(line.slice(
+            let mut g_iter = editor.formatter.iter(RopeGraphemes::new(&line.slice(
                 (line_block_index * LINE_BLOCK_LENGTH)..line_len,
-            ).graphemes());
+            )));
 
             loop {
                 if let Some((g, (pos_y, pos_x), width)) = g_iter.next() {
@@ -444,7 +443,7 @@ impl TermUI {
                         }
 
                         // Actually print the character
-                        if is_line_ending(g) {
+                        if rope_slice_is_line_ending(&g) {
                             if at_cursor {
                                 self.screen.draw(
                                     px as usize,
@@ -476,17 +475,17 @@ impl TermUI {
                             }
                         } else {
                             if at_cursor {
-                                self.screen.draw(
+                                self.screen.draw_rope_slice(
                                     px as usize,
                                     py as usize,
-                                    g,
+                                    &g,
                                     Style(Color::Black, Color::White),
                                 );
                             } else {
-                                self.screen.draw(
+                                self.screen.draw_rope_slice(
                                     px as usize,
                                     py as usize,
-                                    g,
+                                    &g,
                                     Style(Color::White, Color::Black),
                                 );
                             }
@@ -503,9 +502,9 @@ impl TermUI {
                     line_block_index += 1;
                     line_g_index = 0;
                     let line_len = line.len_chars();
-                    g_iter = editor.formatter.iter(line.slice(
+                    g_iter = editor.formatter.iter(RopeGraphemes::new(&line.slice(
                         (line_block_index * LINE_BLOCK_LENGTH)..line_len,
-                    ).graphemes());
+                    )));
                     lines_traversed += 1;
                 }
             }

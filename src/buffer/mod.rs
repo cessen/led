@@ -10,6 +10,7 @@ use ropey::{Rope, RopeSlice};
 use self::undo_stack::UndoStack;
 use self::undo_stack::Operation::*;
 use string_utils::char_count;
+use utils::{prev_grapheme_boundary, next_grapheme_boundary, is_grapheme_boundary, RopeGraphemes};
 
 mod undo_stack;
 
@@ -70,21 +71,23 @@ impl Buffer {
     }
 
     pub fn is_grapheme(&self, char_idx: usize) -> bool {
-        self.text.is_grapheme_boundary(char_idx)
+        is_grapheme_boundary(&self.text.slice(..), char_idx)
     }
 
+    /// Finds the nth next grapheme boundary after the given char position.
     pub fn nth_next_grapheme(&self, char_idx: usize, n: usize) -> usize {
         let mut char_idx = char_idx;
         for _ in 0..n {
-            char_idx = self.text.next_grapheme_boundary(char_idx);
+            char_idx = next_grapheme_boundary(&self.text.slice(..), char_idx);
         }
         char_idx
     }
 
+    /// Finds the nth previous grapheme boundary before the given char position.
     pub fn nth_prev_grapheme(&self, char_idx: usize, n: usize) -> usize {
         let mut char_idx = char_idx;
         for _ in 0..n {
-            char_idx = self.text.prev_grapheme_boundary(char_idx);
+            char_idx = prev_grapheme_boundary(&self.text.slice(..), char_idx);
         }
         char_idx
     }
@@ -331,10 +334,8 @@ impl Buffer {
     // Text reading functions
     // ------------------------------------------------------------------------
 
-    pub fn get_grapheme<'a>(&'a self, index: usize) -> &'a str {
-        self.text
-            .slice(index..(index + 1))
-            .graphemes()
+    pub fn get_grapheme<'a>(&'a self, index: usize) -> RopeSlice<'a> {
+        RopeGraphemes::new(&self.text.slice(index..))
             .nth(0)
             .unwrap()
     }
@@ -353,16 +354,16 @@ impl Buffer {
     // ------------------------------------------------------------------------
 
     /// Creates an iterator at the first character
-    pub fn grapheme_iter<'a>(&'a self) -> ropey::iter::Graphemes<'a> {
-        self.text.graphemes()
+    pub fn grapheme_iter<'a>(&'a self) -> RopeGraphemes<'a> {
+        RopeGraphemes::new(&self.text.slice(..))
     }
 
     /// Creates an iterator starting at the specified grapheme index.
     /// If the index is past the end of the text, then the iterator will
     /// return None on next().
-    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> ropey::iter::Graphemes<'a> {
+    pub fn grapheme_iter_at_index<'a>(&'a self, index: usize) -> RopeGraphemes<'a> {
         let len = self.text.len_chars();
-        self.text.slice(index..len).graphemes()
+        RopeGraphemes::new(&self.text.slice(index..len))
     }
 
     pub fn line_iter<'a>(&'a self) -> ropey::iter::Lines<'a> {
@@ -394,15 +395,15 @@ mod tests {
 
         assert!(buf.char_count() == 9);
         assert!(buf.line_count() == 1);
-        assert!(Some("H") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some(" ") == iter.next());
-        assert!(Some("世") == iter.next());
-        assert!(Some("界") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!(" " == iter.next().unwrap());
+        assert!("世" == iter.next().unwrap());
+        assert!("界" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -416,17 +417,17 @@ mod tests {
 
         assert!(buf.char_count() == 12);
         assert!(buf.line_count() == 3);
-        assert!(Some("H") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some(" ") == iter.next());
-        assert!(Some("世") == iter.next());
-        assert!(Some("界") == iter.next());
-        assert!(Some("\r\n") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!(" " == iter.next().unwrap());
+        assert!("世" == iter.next().unwrap());
+        assert!("界" == iter.next().unwrap());
+        assert!("\r\n" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -441,23 +442,23 @@ mod tests {
 
         assert_eq!(buf.char_count(), 18);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("A"), iter.next());
-        assert_eq!(Some("g"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("世"), iter.next());
-        assert_eq!(Some("界"), iter.next());
-        assert_eq!(Some("\r\n"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("A", iter.next().unwrap());
+        assert_eq!("g", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("世", iter.next().unwrap());
+        assert_eq!("界", iter.next().unwrap());
+        assert_eq!("\r\n", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -472,23 +473,23 @@ mod tests {
 
         assert_eq!(buf.char_count(), 18);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("g"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("n"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("世"), iter.next());
-        assert_eq!(Some("界"), iter.next());
-        assert_eq!(Some("\r\n"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("g", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("n", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("世", iter.next().unwrap());
+        assert_eq!("界", iter.next().unwrap());
+        assert_eq!("\r\n", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -503,22 +504,22 @@ mod tests {
 
         assert_eq!(buf.char_count(), 17);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("g"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("世"), iter.next());
-        assert_eq!(Some("界"), iter.next());
-        assert_eq!(Some("\r\n"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("g", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("世", iter.next().unwrap());
+        assert_eq!("界", iter.next().unwrap());
+        assert_eq!("\r\n", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -533,22 +534,22 @@ mod tests {
 
         assert_eq!(buf.char_count(), 17);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("世"), iter.next());
-        assert_eq!(Some("界"), iter.next());
-        assert_eq!(Some("\r\n"), iter.next());
-        assert_eq!(Some("!"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("g"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("n"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("世", iter.next().unwrap());
+        assert_eq!("界", iter.next().unwrap());
+        assert_eq!("\r\n", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("g", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("n", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -563,22 +564,22 @@ mod tests {
 
         assert_eq!(buf.char_count(), 17);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("g"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("n"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("世"), iter.next());
-        assert_eq!(Some("界"), iter.next());
-        assert_eq!(Some("\r\n"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("g", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("n", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("世", iter.next().unwrap());
+        assert_eq!("界", iter.next().unwrap());
+        assert_eq!("\r\n", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
 
         assert_eq!(None, iter.next());
     }
@@ -594,22 +595,22 @@ mod tests {
 
         assert_eq!(buf.char_count(), 17);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("世"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("g"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("n"), iter.next());
-        assert_eq!(Some("界"), iter.next());
-        assert_eq!(Some("\r\n"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("世", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("g", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("n", iter.next().unwrap());
+        assert_eq!("界", iter.next().unwrap());
+        assert_eq!("\r\n", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
 
         assert_eq!(None, iter.next());
     }
@@ -625,26 +626,26 @@ mod tests {
 
         assert_eq!(buf.char_count(), 21);
         assert_eq!(buf.line_count(), 7);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("g"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("a"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("n"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some(" "), iter.next());
-        assert_eq!(Some("世"), iter.next());
-        assert_eq!(Some("界"), iter.next());
-        assert_eq!(Some("\r\n"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("g", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("a", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("n", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!(" ", iter.next().unwrap());
+        assert_eq!("世", iter.next().unwrap());
+        assert_eq!("界", iter.next().unwrap());
+        assert_eq!("\r\n", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
 
         assert_eq!(None, iter.next());
     }
@@ -663,32 +664,32 @@ mod tests {
 
         assert!(buf.char_count() == 26);
         assert!(buf.line_count() == 5);
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -706,23 +707,23 @@ mod tests {
 
         assert!(buf.char_count() == 17);
         assert!(buf.line_count() == 4);
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -740,23 +741,23 @@ mod tests {
 
         assert!(buf.char_count() == 17);
         assert!(buf.line_count() == 4);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -774,29 +775,29 @@ mod tests {
 
         assert!(buf.char_count() == 23);
         assert!(buf.line_count() == 6);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -814,23 +815,23 @@ mod tests {
 
         assert!(buf.char_count() == 17);
         assert!(buf.line_count() == 4);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -848,9 +849,9 @@ mod tests {
 
         assert!(buf.char_count() == 3);
         assert!(buf.line_count() == 1);
-        assert!(Some("H") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("l") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -868,11 +869,11 @@ mod tests {
 
         assert!(buf.char_count() == 5);
         assert!(buf.line_count() == 2);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -890,10 +891,10 @@ mod tests {
 
         assert!(buf.char_count() == 4);
         assert!(buf.line_count() == 1);
-        assert!(Some("H") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -911,14 +912,14 @@ mod tests {
 
         assert!(buf.char_count() == 8);
         assert!(buf.line_count() == 2);
-        assert!(Some("H") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -936,10 +937,10 @@ mod tests {
 
         assert!(buf.char_count() == 4);
         assert!(buf.line_count() == 2);
-        assert!(Some("1") == iter.next());
-        assert!(Some("2") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("3") == iter.next());
+        assert!("1" == iter.next().unwrap());
+        assert!("2" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("3" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -957,15 +958,15 @@ mod tests {
 
         assert!(buf.char_count() == 9);
         assert!(buf.line_count() == 1);
-        assert!(Some("1") == iter.next());
-        assert!(Some("2") == iter.next());
-        assert!(Some("3") == iter.next());
-        assert!(Some("4") == iter.next());
-        assert!(Some("5") == iter.next());
-        assert!(Some("6") == iter.next());
-        assert!(Some("7") == iter.next());
-        assert!(Some("8") == iter.next());
-        assert!(Some("9") == iter.next());
+        assert!("1" == iter.next().unwrap());
+        assert!("2" == iter.next().unwrap());
+        assert!("3" == iter.next().unwrap());
+        assert!("4" == iter.next().unwrap());
+        assert!("5" == iter.next().unwrap());
+        assert!("6" == iter.next().unwrap());
+        assert!("7" == iter.next().unwrap());
+        assert!("8" == iter.next().unwrap());
+        assert!("9" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -981,35 +982,35 @@ mod tests {
 
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -1025,35 +1026,35 @@ mod tests {
 
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -1069,35 +1070,35 @@ mod tests {
 
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -1113,35 +1114,35 @@ mod tests {
 
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -1157,35 +1158,35 @@ mod tests {
 
         assert!(buf.char_count() == 29);
         assert!(buf.line_count() == 6);
-        assert!(Some("H") == iter.next());
-        assert!(Some("i") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("p") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("H" == iter.next().unwrap());
+        assert!("i" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("p" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 
@@ -1203,19 +1204,19 @@ mod tests {
 
         assert_eq!(buf.char_count(), 13);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("f"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("t"), iter.next());
-        assert_eq!(Some("h"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("w"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("r"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("d"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("f", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("t", iter.next().unwrap());
+        assert_eq!("h", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("w", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("r", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("d", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -1233,19 +1234,19 @@ mod tests {
 
         assert_eq!(buf.char_count(), 13);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("t"), iter.next());
-        assert_eq!(Some("h"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("w"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("r"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("d"), iter.next());
-        assert_eq!(Some("!"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("t", iter.next().unwrap());
+        assert_eq!("h", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("w", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("r", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("d", iter.next().unwrap());
+        assert_eq!("!", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -1265,21 +1266,21 @@ mod tests {
 
         assert_eq!(buf.char_count(), 15);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("t"), iter.next());
-        assert_eq!(Some("h"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("r"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("p"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("p"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("e"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("t", iter.next().unwrap());
+        assert_eq!("h", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("r", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("p", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("p", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -1297,21 +1298,21 @@ mod tests {
 
         assert_eq!(buf.char_count(), 15);
         assert_eq!(buf.line_count(), 3);
-        assert_eq!(Some("H"), iter.next());
-        assert_eq!(Some("i"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("t"), iter.next());
-        assert_eq!(Some("h"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("r"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("\n"), iter.next());
-        assert_eq!(Some("p"), iter.next());
-        assert_eq!(Some("e"), iter.next());
-        assert_eq!(Some("o"), iter.next());
-        assert_eq!(Some("p"), iter.next());
-        assert_eq!(Some("l"), iter.next());
-        assert_eq!(Some("e"), iter.next());
+        assert_eq!("H", iter.next().unwrap());
+        assert_eq!("i", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("t", iter.next().unwrap());
+        assert_eq!("h", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("r", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("\n", iter.next().unwrap());
+        assert_eq!("p", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
+        assert_eq!("o", iter.next().unwrap());
+        assert_eq!("p", iter.next().unwrap());
+        assert_eq!("l", iter.next().unwrap());
+        assert_eq!("e", iter.next().unwrap());
         assert_eq!(None, iter.next());
     }
 
@@ -1456,19 +1457,19 @@ mod tests {
 
         let mut iter = buf.grapheme_iter_at_index(16);
 
-        assert!(Some("o") == iter.next());
-        assert!(Some("f") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("t") == iter.next());
-        assert!(Some("h") == iter.next());
-        assert!(Some("e") == iter.next());
-        assert!(Some("\n") == iter.next());
-        assert!(Some("w") == iter.next());
-        assert!(Some("o") == iter.next());
-        assert!(Some("r") == iter.next());
-        assert!(Some("l") == iter.next());
-        assert!(Some("d") == iter.next());
-        assert!(Some("!") == iter.next());
+        assert!("o" == iter.next().unwrap());
+        assert!("f" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("t" == iter.next().unwrap());
+        assert!("h" == iter.next().unwrap());
+        assert!("e" == iter.next().unwrap());
+        assert!("\n" == iter.next().unwrap());
+        assert!("w" == iter.next().unwrap());
+        assert!("o" == iter.next().unwrap());
+        assert!("r" == iter.next().unwrap());
+        assert!("l" == iter.next().unwrap());
+        assert!("d" == iter.next().unwrap());
+        assert!("!" == iter.next().unwrap());
         assert!(None == iter.next());
     }
 

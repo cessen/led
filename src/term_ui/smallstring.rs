@@ -5,6 +5,8 @@ use std::ops::Deref;
 use std::ptr;
 use std::str;
 
+use ropey::RopeSlice;
+
 use smallvec::SmallVec;
 
 #[derive(Clone, Default)]
@@ -34,6 +36,17 @@ impl SmallString {
     pub fn from_str(text: &str) -> Self {
         let mut string = SmallString::with_capacity(text.len());
         unsafe { string.insert_bytes(0, text.as_bytes()) };
+        string
+    }
+
+    /// Creates a new `SmallString` with the same contents as the given `&str`.
+    pub fn from_rope_slice(text: &RopeSlice) -> Self {
+        let mut string = SmallString::with_capacity(text.len_bytes());
+        let mut idx = 0;
+        for chunk in text.chunks() {
+            unsafe { string.insert_bytes(idx, chunk.as_bytes()) };
+            idx += chunk.len();
+        }
         string
     }
 
