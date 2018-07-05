@@ -1,9 +1,9 @@
 use std::cmp::max;
 
-use ropey::RopeSlice;
-use utils::grapheme_width;
-use string_utils::{rope_slice_is_line_ending, rope_slice_is_whitespace};
 use formatter::{LineFormatter, RoundingBehavior};
+use ropey::RopeSlice;
+use string_utils::{rope_slice_is_line_ending, rope_slice_is_whitespace};
+use utils::grapheme_width;
 
 pub enum WrapType {
     NoWrap,
@@ -315,12 +315,12 @@ fn grapheme_vis_width_at_vis_pos(g: RopeSlice, pos: usize, tab_width: usize) -> 
 #[cfg(test)]
 mod tests {
     #![allow(unused_imports)]
+    use super::*;
+    use buffer::Buffer;
+    use formatter::RoundingBehavior::{Ceiling, Floor, Round};
+    use formatter::{LineFormatter, LINE_BLOCK_LENGTH};
     use ropey::Rope;
     use utils::RopeGraphemes;
-    use super::*;
-    use formatter::{LineFormatter, LINE_BLOCK_LENGTH};
-    use formatter::RoundingBehavior::{Ceiling, Floor, Round};
-    use buffer::Buffer;
 
     #[test]
     fn dimensions_1() {
@@ -332,10 +332,7 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(80);
 
-        assert_eq!(
-            f.dimensions(RopeGraphemes::new(&text.slice(..))),
-            (1, 22)
-        );
+        assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (1, 22));
     }
 
     #[test]
@@ -348,25 +345,24 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
 
-        assert_eq!(
-            f.dimensions(RopeGraphemes::new(&text.slice(..))),
-            (5, 12)
-        );
+        assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (5, 12));
     }
 
     #[test]
     fn dimensions_3() {
         // 55 graphemes long
-        let text = Rope::from_str("税マイミ文末\
-                    レ日題イぽじ\
-                    や男目統ス公\
-                    身みトしつ結\
-                    煮ヱマレ断西\
-                    ロ領視りいぽ\
-                    凱字テ式重反\
-                    てす献罪がご\
-                    く官俵呉嫁ー\
-                    。");
+        let text = Rope::from_str(
+            "税マイミ文末\
+             レ日題イぽじ\
+             や男目統ス公\
+             身みトしつ結\
+             煮ヱマレ断西\
+             ロ領視りいぽ\
+             凱字テ式重反\
+             てす献罪がご\
+             く官俵呉嫁ー\
+             。",
+        );
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::CharWrap(0);
@@ -374,25 +370,24 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
 
-        assert_eq!(
-            f.dimensions(RopeGraphemes::new(&text.slice(..))),
-            (10, 12)
-        );
+        assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (10, 12));
     }
 
     #[test]
     fn dimensions_4() {
         // 55 graphemes long
-        let text = Rope::from_str("税マイミ文末\
-                    レ日題イぽじ\
-                    や男目統ス公\
-                    身みトしつ結\
-                    煮ヱマレ断西\
-                    ロ領視りいぽ\
-                    凱字テ式重反\
-                    てす献罪がご\
-                    く官俵呉嫁ー\
-                    。");
+        let text = Rope::from_str(
+            "税マイミ文末\
+             レ日題イぽじ\
+             や男目統ス公\
+             身みトしつ結\
+             煮ヱマレ断西\
+             ロ領視りいぽ\
+             凱字テ式重反\
+             てす献罪がご\
+             く官俵呉嫁ー\
+             。",
+        );
 
         let mut f = ConsoleLineFormatter::new(4);
         f.wrap_type = WrapType::WordWrap(0);
@@ -400,10 +395,7 @@ mod tests {
         f.wrap_additional_indent = 0;
         f.set_wrap_width(12);
 
-        assert_eq!(
-            f.dimensions(RopeGraphemes::new(&text.slice(..))),
-            (10, 12)
-        );
+        assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (10, 12));
     }
 
     #[test]
@@ -526,51 +518,27 @@ mod tests {
         f.set_wrap_width(80);
 
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (0, 0),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 0), (Floor, Floor)),
             0
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (0, 5),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 5), (Floor, Floor)),
             5
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (0, 22),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 22), (Floor, Floor)),
             22
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (0, 23),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 23), (Floor, Floor)),
             22
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (1, 0),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (1, 0), (Floor, Floor)),
             22
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (1, 1),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (1, 1), (Floor, Floor)),
             22
         );
     }
@@ -586,135 +554,71 @@ mod tests {
         f.set_wrap_width(12);
 
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (0, 0),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 0), (Floor, Floor)),
             0
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (0, 11),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 11), (Floor, Floor)),
             11
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (0, 12),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 12), (Floor, Floor)),
             11
         );
 
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (1, 0),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (1, 0), (Floor, Floor)),
             12
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (1, 11),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (1, 11), (Floor, Floor)),
             23
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (1, 12),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (1, 12), (Floor, Floor)),
             23
         );
 
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (2, 0),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (2, 0), (Floor, Floor)),
             24
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (2, 11),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (2, 11), (Floor, Floor)),
             35
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (2, 12),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (2, 12), (Floor, Floor)),
             35
         );
 
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (3, 0),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (3, 0), (Floor, Floor)),
             36
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (3, 11),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (3, 11), (Floor, Floor)),
             47
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (3, 12),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (3, 12), (Floor, Floor)),
             47
         );
 
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (4, 0),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (4, 0), (Floor, Floor)),
             48
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (4, 7),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (4, 7), (Floor, Floor)),
             55
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (4, 8),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (4, 8), (Floor, Floor)),
             56
         );
         assert_eq!(
-            f.v2d_to_index(
-                RopeGraphemes::new(&text.slice(..)),
-                (4, 9),
-                (Floor, Floor)
-            ),
+            f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (4, 9), (Floor, Floor)),
             56
         );
     }

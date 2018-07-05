@@ -7,10 +7,10 @@ use termion;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
 
+use self::formatter::ConsoleLineFormatter;
 use editor::Editor;
 use formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH};
-use self::formatter::ConsoleLineFormatter;
-use string_utils::{rope_slice_is_line_ending, line_ending_to_str, LineEnding};
+use string_utils::{line_ending_to_str, rope_slice_is_line_ending, LineEnding};
 use utils::{digit_count, RopeGraphemes};
 
 pub mod formatter;
@@ -21,11 +21,13 @@ use self::screen::{Color, Screen, Style};
 
 /// Generalized ui loop.
 macro_rules! ui_loop {
-    ($term_ui:ident, draw $draw:block, key_press($key:ident) $key_press:block) => {
+    ($term_ui:ident,draw $draw:block,key_press($key:ident) $key_press:block) => {
         let mut stop = false;
 
         // Draw the editor to screen for the first time
-        {$draw};
+        {
+            $draw
+        };
         $term_ui.screen.present();
 
         // UI loop
@@ -36,9 +38,7 @@ macro_rules! ui_loop {
             loop {
                 match $term_ui.inp.next() {
                     Some(Ok(Event::Key($key))) => {
-                        let (status, state_changed) = || -> (LoopStatus, bool) {
-                            $key_press
-                        }();
+                        let (status, state_changed) = || -> (LoopStatus, bool) { $key_press }();
                         should_redraw |= state_changed;
                         if status == LoopStatus::Done {
                             stop = true;
@@ -62,16 +62,23 @@ macro_rules! ui_loop {
             if $term_ui.width != w as usize || $term_ui.height != h as usize {
                 $term_ui.width = w as usize;
                 $term_ui.height = h as usize;
-                $term_ui.editor.update_dim($term_ui.height - 1, $term_ui.width);
+                $term_ui
+                    .editor
+                    .update_dim($term_ui.height - 1, $term_ui.width);
                 $term_ui.editor.update_view_dim();
-                $term_ui.editor.formatter.set_wrap_width($term_ui.editor.view_dim.1);
+                $term_ui
+                    .editor
+                    .formatter
+                    .set_wrap_width($term_ui.editor.view_dim.1);
                 $term_ui.screen.resize(w as usize, h as usize);
                 should_redraw = true;
             }
 
             // Draw the editor to screen
             if should_redraw {
-                {$draw};
+                {
+                    $draw
+                };
                 $term_ui.screen.present();
             }
 
@@ -367,14 +374,13 @@ impl TermUI {
             .line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
         let temp_line = editor.buffer.get_line(line_index);
         let (vis_line_offset, _) = editor.formatter.index_to_v2d(
-            RopeGraphemes::new(&temp_line
-                .slice(
-                    (line_block_index * LINE_BLOCK_LENGTH)
-                        ..min(
-                            temp_line.len_chars(),
-                            (line_block_index + 1) * LINE_BLOCK_LENGTH,
-                        ),
-                )),
+            RopeGraphemes::new(&temp_line.slice(
+                (line_block_index * LINE_BLOCK_LENGTH)
+                    ..min(
+                        temp_line.len_chars(),
+                        (line_block_index + 1) * LINE_BLOCK_LENGTH,
+                    ),
+            )),
             editor.view_pos.0 - char_index,
         );
 
@@ -534,7 +540,9 @@ impl TermUI {
             let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
             let py = screen_line - 1;
 
-            if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize)
+            if (px >= c1.1 as isize)
+                && (py >= c1.0 as isize)
+                && (px <= c2.1 as isize)
                 && (py <= c2.0 as isize)
             {
                 self.screen.draw(

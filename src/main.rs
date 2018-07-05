@@ -8,18 +8,18 @@ extern crate termion;
 extern crate unicode_segmentation;
 extern crate unicode_width;
 
-use std::path::Path;
 use docopt::Docopt;
 use editor::Editor;
-use term_ui::TermUI;
+use std::path::Path;
 use term_ui::formatter::ConsoleLineFormatter;
+use term_ui::TermUI;
 
-mod string_utils;
-mod utils;
 mod buffer;
-mod formatter;
 mod editor;
+mod formatter;
+mod string_utils;
 mod term_ui;
+mod utils;
 
 // Usage documentation string
 static USAGE: &'static str = "

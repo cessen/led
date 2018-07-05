@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use std::slice::{Iter, IterMut};
-use std::ops::{Index, IndexMut};
 use std::cmp::Ordering;
+use std::ops::{Index, IndexMut};
+use std::slice::{Iter, IterMut};
 
 use buffer::Buffer;
 use formatter::LineFormatter;

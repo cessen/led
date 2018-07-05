@@ -1,16 +1,16 @@
 #![allow(dead_code)]
 
-use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufWriter, Write};
+use std::path::{Path, PathBuf};
 
+use self::undo_stack::Operation::*;
+use self::undo_stack::UndoStack;
 use ropey;
 use ropey::{Rope, RopeSlice};
-use self::undo_stack::UndoStack;
-use self::undo_stack::Operation::*;
 use string_utils::char_count;
-use utils::{prev_grapheme_boundary, next_grapheme_boundary, is_grapheme_boundary, RopeGraphemes};
+use utils::{is_grapheme_boundary, next_grapheme_boundary, prev_grapheme_boundary, RopeGraphemes};
 
 mod undo_stack;
 

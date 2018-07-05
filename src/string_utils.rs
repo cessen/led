@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 //! Misc helpful utility functions for TextBuffer related stuff.
 
-use std::iter::repeat;
 use ropey::RopeSlice;
+use std::iter::repeat;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub fn is_line_ending(text: &str) -> bool {
@@ -53,7 +53,7 @@ pub fn rope_slice_is_whitespace(text: &RopeSlice) -> bool {
     // TODO: this is a naive categorization of whitespace characters.
     // For better categorization these should be split up into groups
     // based on e.g. breaking vs non-breaking spaces, among other things.
-    
+
     text == "\u{0020}" // SPACE
     || text == "\u{0009}" // CHARACTER TABULATION
     || text == "\u{00A0}" // NO-BREAK SPACE

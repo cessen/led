@@ -2,14 +2,14 @@
 
 use std::collections::HashMap;
 
+use self::cursor::CursorSet;
 use buffer::Buffer;
 use formatter::LineFormatter;
 use formatter::RoundingBehavior::*;
-use std::path::{Path, PathBuf};
 use std::cmp::{max, min};
+use std::path::{Path, PathBuf};
 use string_utils::{char_count, rope_slice_to_line_ending, LineEnding};
 use utils::{digit_count, RopeGraphemes};
-use self::cursor::CursorSet;
 
 mod cursor;
 
@@ -378,7 +378,7 @@ impl<T: LineFormatter> Editor<T> {
 
                 // Insert spaces
                 let space_strs = [
-                    "", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        "
+                    "", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        ",
                 ];
                 self.buffer.insert_text(space_strs[space_count], c.range.0);
                 self.dirty = true;
