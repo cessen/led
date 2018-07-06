@@ -54,27 +54,31 @@ pub fn rope_slice_is_whitespace(text: &RopeSlice) -> bool {
     // For better categorization these should be split up into groups
     // based on e.g. breaking vs non-breaking spaces, among other things.
 
-    text == "\u{0020}" // SPACE
-    || text == "\u{0009}" // CHARACTER TABULATION
-    || text == "\u{00A0}" // NO-BREAK SPACE
-    //|| "\u{1680}" // OGHAM SPACE MARK (here for completeness, but usually displayed as a dash, not as whitespace)
-    || text == "\u{180E}" // MONGOLIAN VOWEL SEPARATOR
-    || text == "\u{2000}" // EN QUAD
-    || text == "\u{2001}" // EM QUAD
-    || text == "\u{2002}" // EN SPACE
-    || text == "\u{2003}" // EM SPACE
-    || text == "\u{2004}" // THREE-PER-EM SPACE
-    || text == "\u{2005}" // FOUR-PER-EM SPACE
-    || text == "\u{2006}" // SIX-PER-EM SPACE
-    || text == "\u{2007}" // FIGURE SPACE
-    || text == "\u{2008}" // PUNCTUATION SPACE
-    || text == "\u{2009}" // THIN SPACE
-    || text == "\u{200A}" // HAIR SPACE
-    || text == "\u{200B}" // ZERO WIDTH SPACE
-    || text == "\u{202F}" // NARROW NO-BREAK SPACE
-    || text == "\u{205F}" // MEDIUM MATHEMATICAL SPACE
-    || text == "\u{3000}" // IDEOGRAPHIC SPACE
-    || text == "\u{FEFF}" // ZERO WIDTH NO-BREAK SPACE
+    if let Some(text) = text.as_str() {
+        is_whitespace(text)
+    } else {
+        text == "\u{0020}" // SPACE
+        || text == "\u{0009}" // CHARACTER TABULATION
+        || text == "\u{00A0}" // NO-BREAK SPACE
+        //|| "\u{1680}" // OGHAM SPACE MARK (here for completeness, but usually displayed as a dash, not as whitespace)
+        || text == "\u{180E}" // MONGOLIAN VOWEL SEPARATOR
+        || text == "\u{2000}" // EN QUAD
+        || text == "\u{2001}" // EM QUAD
+        || text == "\u{2002}" // EN SPACE
+        || text == "\u{2003}" // EM SPACE
+        || text == "\u{2004}" // THREE-PER-EM SPACE
+        || text == "\u{2005}" // FOUR-PER-EM SPACE
+        || text == "\u{2006}" // SIX-PER-EM SPACE
+        || text == "\u{2007}" // FIGURE SPACE
+        || text == "\u{2008}" // PUNCTUATION SPACE
+        || text == "\u{2009}" // THIN SPACE
+        || text == "\u{200A}" // HAIR SPACE
+        || text == "\u{200B}" // ZERO WIDTH SPACE
+        || text == "\u{202F}" // NARROW NO-BREAK SPACE
+        || text == "\u{205F}" // MEDIUM MATHEMATICAL SPACE
+        || text == "\u{3000}" // IDEOGRAPHIC SPACE
+        || text == "\u{FEFF}" // ZERO WIDTH NO-BREAK SPACE
+    }
 }
 
 pub fn line_ending_count(text: &str) -> usize {
@@ -320,7 +324,9 @@ pub fn str_to_line_ending(g: &str) -> LineEnding {
 }
 
 pub fn rope_slice_to_line_ending(g: &RopeSlice) -> LineEnding {
-    if g == "\u{000D}\u{000A}" {
+    if let Some(text) = g.as_str() {
+        str_to_line_ending(text)
+    } else if g == "\u{000D}\u{000A}" {
         LineEnding::CRLF
     } else if g == "\u{000A}" {
         LineEnding::LF
