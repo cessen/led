@@ -88,7 +88,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "ropey"
 version = "0.6.3"
-source = "git+https://github.com/cessen/ropey#41fb82d82279e8f20c2be680f661ee2f6c0e1c78"
+source = "git+https://github.com/cessen/ropey#48af097f84f458baa6e72a96fb7aa5905ad218ed"
 dependencies = [
  "smallvec 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
