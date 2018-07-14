@@ -1,4 +1,4 @@
-use ropey::{iter::Chunks, RopeSlice, str_utils::byte_to_char_idx};
+use ropey::{iter::Chunks, str_utils::byte_to_char_idx, RopeSlice};
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 use unicode_width::UnicodeWidthStr;
 
