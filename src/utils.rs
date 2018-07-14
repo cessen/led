@@ -1,4 +1,4 @@
-use ropey::{iter::Chunks, RopeSlice};
+use ropey::{iter::Chunks, RopeSlice, str_utils::byte_to_char_idx};
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 use unicode_width::UnicodeWidthStr;
 
@@ -34,7 +34,7 @@ pub fn prev_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
     let byte_idx = slice.char_to_byte(char_idx);
 
     // Get the chunk with our byte index in it.
-    let (mut chunk, mut chunk_byte_idx, mut chunk_char_idx) = slice.chunk_at_byte(byte_idx);
+    let (mut chunk, mut chunk_byte_idx, mut chunk_char_idx, _) = slice.chunk_at_byte(byte_idx);
 
     // Set up the grapheme cursor.
     let mut gc = GraphemeCursor::new(byte_idx, slice.len_bytes(), true);
@@ -44,11 +44,11 @@ pub fn prev_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
         match gc.prev_boundary(chunk, chunk_byte_idx) {
             Ok(None) => return 0,
             Ok(Some(n)) => {
-                let tmp = chunk[..(n - chunk_byte_idx)].chars().count();
+                let tmp = byte_to_char_idx(chunk, n - chunk_byte_idx);
                 return chunk_char_idx + tmp;
             }
             Err(GraphemeIncomplete::PrevChunk) => {
-                let (a, b, c) = slice.chunk_at_byte(chunk_byte_idx - 1);
+                let (a, b, c, _) = slice.chunk_at_byte(chunk_byte_idx - 1);
                 chunk = a;
                 chunk_byte_idx = b;
                 chunk_char_idx = c;
@@ -71,7 +71,7 @@ pub fn next_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
     let byte_idx = slice.char_to_byte(char_idx);
 
     // Get the chunk with our byte index in it.
-    let (mut chunk, mut chunk_byte_idx, mut chunk_char_idx) = slice.chunk_at_byte(byte_idx);
+    let (mut chunk, mut chunk_byte_idx, mut chunk_char_idx, _) = slice.chunk_at_byte(byte_idx);
 
     // Set up the grapheme cursor.
     let mut gc = GraphemeCursor::new(byte_idx, slice.len_bytes(), true);
@@ -81,12 +81,12 @@ pub fn next_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
         match gc.next_boundary(chunk, chunk_byte_idx) {
             Ok(None) => return slice.len_chars(),
             Ok(Some(n)) => {
-                let tmp = chunk[..(n - chunk_byte_idx)].chars().count();
+                let tmp = byte_to_char_idx(chunk, n - chunk_byte_idx);
                 return chunk_char_idx + tmp;
             }
             Err(GraphemeIncomplete::NextChunk) => {
                 chunk_byte_idx += chunk.len();
-                let (a, _, c) = slice.chunk_at_byte(chunk_byte_idx);
+                let (a, _, c, _) = slice.chunk_at_byte(chunk_byte_idx);
                 chunk = a;
                 chunk_char_idx = c;
             }
@@ -108,7 +108,7 @@ pub fn is_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> bool {
     let byte_idx = slice.char_to_byte(char_idx);
 
     // Get the chunk with our byte index in it.
-    let (chunk, chunk_byte_idx, _) = slice.chunk_at_byte(byte_idx);
+    let (chunk, chunk_byte_idx, _, _) = slice.chunk_at_byte(byte_idx);
 
     // Set up the grapheme cursor.
     let mut gc = GraphemeCursor::new(byte_idx, slice.len_bytes(), true);
@@ -118,7 +118,7 @@ pub fn is_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> bool {
         match gc.is_boundary(chunk, chunk_byte_idx) {
             Ok(n) => return n,
             Err(GraphemeIncomplete::PreContext(n)) => {
-                let (ctx_chunk, ctx_byte_start, _) = slice.chunk_at_byte(n - 1);
+                let (ctx_chunk, ctx_byte_start, _, _) = slice.chunk_at_byte(n - 1);
                 gc.provide_context(ctx_chunk, ctx_byte_start);
             }
             _ => unreachable!(),
