@@ -248,22 +248,26 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-    pub fn update_dim(&mut self, h: usize, w: usize) {
-        self.editor_dim = (h, w);
-        self.update_view_dim();
-    }
-
-    pub fn update_view_dim(&mut self) {
-        // TODO: generalize for non-terminal UI.  Maybe this isn't where it
-        // belongs, in fact.  But for now, this is the easiest place to put
-        // it.
+    /// Updates the view dimensions, and returns whether that
+    /// actually changed anything.
+    pub fn update_dim(&mut self, h: usize, w: usize) -> bool {
         let line_count_digits = digit_count(self.buffer.line_count() as u32, 10) as usize;
-        // Minus 1 vertically for the header, minus one more than the digits in
-        // the line count for the gutter.
-        self.view_dim = (
-            self.editor_dim.0 - 1,
-            self.editor_dim.1 - line_count_digits - 1,
-        );
+        if self.editor_dim.0 != h || self.editor_dim.1 != w {
+            self.editor_dim = (h, w);
+
+            // Minus 1 vertically for the header, minus one more than the digits in
+            // the line count for the gutter.
+            self.view_dim = (
+                self.editor_dim.0 - 1,
+                self.editor_dim.1 - line_count_digits - 1,
+            );
+            return true;
+        } else if self.view_dim.1 != (self.editor_dim.1 - line_count_digits - 1) {
+            self.view_dim.1 = self.editor_dim.1 - line_count_digits - 1;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     pub fn undo(&mut self) {

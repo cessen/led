@@ -59,18 +59,17 @@ macro_rules! ui_loop {
 
             // Check for screen resize
             let (w, h) = termion::terminal_size().unwrap();
-            if $term_ui.width != w as usize || $term_ui.height != h as usize {
+            let needs_update = $term_ui
+                .editor
+                .update_dim(h as usize - 1, w as usize);
+            if needs_update {
                 $term_ui.width = w as usize;
                 $term_ui.height = h as usize;
-                $term_ui
-                    .editor
-                    .update_dim($term_ui.height - 1, $term_ui.width);
-                $term_ui.editor.update_view_dim();
+                $term_ui.screen.resize(w as usize, h as usize);
                 $term_ui
                     .editor
                     .formatter
                     .set_wrap_width($term_ui.editor.view_dim.1);
-                $term_ui.screen.resize(w as usize, h as usize);
                 should_redraw = true;
             }
 
@@ -132,7 +131,6 @@ impl TermUI {
         self.width = w as usize;
         self.height = h as usize;
         self.editor.update_dim(self.height - 1, self.width);
-        self.editor.update_view_dim();
         self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
         self.screen.resize(w as usize, h as usize);
 
