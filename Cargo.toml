@@ -9,8 +9,8 @@ name = "led"
 path = "src/main.rs"
 
 [dependencies]
-ropey = "0.8"
-# ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
+# ropey = "0.8"
+ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
 unicode-segmentation = "1.2.1"
 unicode-width = "0.1"
 serde = "1.*"
