@@ -1,0 +1,14 @@
+[package]
+name = "backend"
+version = "0.1.0"
+authors = ["Nathan Vegdahl <cessen@cessen.com>"]
+license = "MIT"
+
+[lib]
+name = "backend"
+path = "src/lib.rs"
+
+[dependencies]
+# ropey = "0.8"
+ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
+unicode-segmentation = "1.2.1"

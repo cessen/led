@@ -1,3 +1,9 @@
+[workspace]
+members = [
+    "sub_crates/backend",
+    "sub_crates/text_encoding",
+]
+
 [package]
 name = "Led"
 version = "0.0.2"
@@ -18,3 +24,10 @@ serde_derive = "1.*"
 docopt = "0.8"
 smallvec = "0.6"
 termion = "1.5"
+
+# Local crate dependencies
+[dependencies.backend]
+path = "sub_crates/backend"
+
+[dependencies.text_encoding]
+path = "sub_crates/text_encoding"
