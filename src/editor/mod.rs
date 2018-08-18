@@ -373,7 +373,8 @@ impl<T: LineFormatter> Editor<T> {
                 c.range.1 += offset;
 
                 // Figure out how many spaces to insert
-                let vis_pos = self.formatter
+                let vis_pos = self
+                    .formatter
                     .index_to_horizontal_v2d(&self.buffer, c.range.0);
                 // TODO: handle tab settings
                 let next_tab_stop =

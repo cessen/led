@@ -59,9 +59,7 @@ macro_rules! ui_loop {
 
             // Check for screen resize
             let (w, h) = termion::terminal_size().unwrap();
-            let needs_update = $term_ui
-                .editor
-                .update_dim(h as usize - 1, w as usize);
+            let needs_update = $term_ui.editor.update_dim(h as usize - 1, w as usize);
             if needs_update {
                 $term_ui.width = w as usize;
                 $term_ui.height = h as usize;
@@ -415,9 +413,9 @@ impl TermUI {
             let mut last_pos_y = 0;
             let mut lines_traversed: usize = 0;
             let line_len = line.len_chars();
-            let mut g_iter = editor.formatter.iter(RopeGraphemes::new(&line.slice(
-                (line_block_index * LINE_BLOCK_LENGTH)..line_len,
-            )));
+            let mut g_iter = editor.formatter.iter(RopeGraphemes::new(
+                &line.slice((line_block_index * LINE_BLOCK_LENGTH)..line_len),
+            ));
 
             loop {
                 if let Some((g, (pos_y, pos_x), width)) = g_iter.next() {
@@ -506,9 +504,9 @@ impl TermUI {
                     line_block_index += 1;
                     line_g_index = 0;
                     let line_len = line.len_chars();
-                    g_iter = editor.formatter.iter(RopeGraphemes::new(&line.slice(
-                        (line_block_index * LINE_BLOCK_LENGTH)..line_len,
-                    )));
+                    g_iter = editor.formatter.iter(RopeGraphemes::new(
+                        &line.slice((line_block_index * LINE_BLOCK_LENGTH)..line_len),
+                    ));
                     lines_traversed += 1;
                 }
             }
