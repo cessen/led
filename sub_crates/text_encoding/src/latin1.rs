@@ -8,7 +8,7 @@
 use std;
 use {DecodeResult, EncodeError, EncodeResult};
 
-pub fn encode_from_utf8(input: &str, output: &mut [u8]) -> EncodeResult {
+pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     // Do the encode.
     let mut input_i = 0;
     let mut output_i = 0;
@@ -19,8 +19,8 @@ pub fn encode_from_utf8(input: &str, output: &mut [u8]) -> EncodeResult {
         if c as u32 > 255 {
             return Err(EncodeError {
                 character: c,
-                byte_offset: offset,
-                bytes_written: output_i,
+                error_range: (offset, offset + c.len_utf8()),
+                output_bytes_written: output_i,
             });
         }
         output[output_i] = c as u8;
@@ -38,7 +38,7 @@ pub fn encode_from_utf8(input: &str, output: &mut [u8]) -> EncodeResult {
         }
     }
 
-    Ok((input_i, output_i))
+    Ok((input_i, &output[..output_i]))
 }
 
 pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {

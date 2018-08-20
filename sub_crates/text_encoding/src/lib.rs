@@ -7,7 +7,11 @@ mod utf16_le;
 mod utf8;
 
 /// Encodes text from utf8 to a destination encoding.
-pub fn encode_from_utf8(output_encoding: Encoding, input: &str, output: &mut [u8]) -> EncodeResult {
+pub fn encode_from_utf8<'a>(
+    output_encoding: Encoding,
+    input: &str,
+    output: &'a mut [u8],
+) -> EncodeResult<'a> {
     match output_encoding {
         Encoding::Utf8 => utf8::encode_from_utf8(input, output),
         Encoding::Utf16BE => utf16_be::encode_from_utf8(input, output),
@@ -48,9 +52,9 @@ pub enum Encoding {
 
 /// Result type for encoding text from utf8 to a target encoding.
 ///
-/// The Ok() variant provides the number of bytes consumed and the
-/// number of bytes written, in that order.
-pub type EncodeResult = Result<(usize, usize), EncodeError>;
+/// The Ok() variant provides the number of bytes consumed and a reference
+/// to the valid encoded text data.
+pub type EncodeResult<'a> = Result<(usize, &'a [u8]), EncodeError>;
 
 /// Result type for decoding text from a target encoding to utf8.
 ///
@@ -64,17 +68,17 @@ pub type DecodeResult<'a> = Result<(usize, &'a str), DecodeError>;
 /// error is encountering a char that is not representable in the target
 /// encoding.
 ///
-/// The problematic character, the byte offset of that character
-/// in the input utf8, and the number of bytes already written to the output
-/// buffer is provided.
+/// The problematic character, the byte index range of that character in the
+/// input utf8, and the number of bytes already written to the output buffer
+/// are provided.
 ///
 /// It is guaranteed that all input leading up to the problem character has
 /// already been encoded and written to the output buffer.
 #[derive(Debug, Copy, Clone)]
 pub struct EncodeError {
     pub character: char,
-    pub byte_offset: usize,
-    pub bytes_written: usize,
+    pub error_range: (usize, usize),
+    pub output_bytes_written: usize,
 }
 
 /// Represents an error when decoding to utf8 from some other format.
@@ -84,14 +88,13 @@ pub struct EncodeError {
 /// input data that are invalid for the text encoding we're attempting
 /// to decode from.
 ///
-/// The byte offset of the invalid input data and in the number of bytes
-/// already written to the output buffer are.
-/// already been encoded and written to the output buffer.
+/// The byte index range of the invalid input data and the number of bytes
+/// already encoded and written to the output buffer are provided.
 ///
 /// It is guaranteed that all input leading up to the invalid data has
 /// already been encoded and written to the output buffer.
 #[derive(Debug, Copy, Clone)]
 pub struct DecodeError {
-    pub byte_offset: usize,
-    pub bytes_written: usize,
+    pub error_range: (usize, usize),
+    pub output_bytes_written: usize,
 }

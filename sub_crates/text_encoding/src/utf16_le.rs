@@ -35,7 +35,7 @@ fn from_little_endian(n: [u8; 2]) -> u16 {
     x
 }
 
-pub fn encode_from_utf8(input: &str, output: &mut [u8]) -> EncodeResult {
+pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     // Do the encode.
     let mut input_i = 0;
     let mut output_i = 0;
@@ -78,7 +78,7 @@ pub fn encode_from_utf8(input: &str, output: &mut [u8]) -> EncodeResult {
         }
     }
 
-    Ok((input_i, output_i))
+    Ok((input_i, &output[..output_i]))
 }
 
 pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
@@ -101,8 +101,8 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
             } else if (code_1 & 0xFC00) == 0xDC00 {
                 // Error: orphaned second half of a surrogate pair.
                 return Err(DecodeError {
-                    byte_offset: input_i,
-                    bytes_written: output_i,
+                    error_range: (input_i, input_i + 2),
+                    output_bytes_written: output_i,
                 });
             } else {
                 // Two code units.
@@ -116,8 +116,8 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
                 if !(code_2 & 0xFC00) == 0xDC00 {
                     // Error: second half is not valid surrogate.
                     return Err(DecodeError {
-                        byte_offset: input_i,
-                        bytes_written: output_i,
+                        error_range: (input_i, input_i + 2),
+                        output_bytes_written: output_i,
                     });
                 }
 
