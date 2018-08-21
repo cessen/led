@@ -113,7 +113,7 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
                 }
                 let bytes_2 = itr.next().unwrap();
                 let code_2 = from_big_endian([bytes_2[0], bytes_2[1]]);
-                if !(code_2 & 0xFC00) == 0xDC00 {
+                if (code_2 & 0xFC00) != 0xDC00 {
                     // Error: second half is not valid surrogate.
                     return Err(DecodeError {
                         error_range: (input_i, input_i + 2),

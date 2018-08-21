@@ -7,3 +7,6 @@ license = "MIT"
 [lib]
 name = "text_encoding"
 path = "src/lib.rs"
+
+[dev-dependencies]
+proptest = "0.8"
