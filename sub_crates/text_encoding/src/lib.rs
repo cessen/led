@@ -5,6 +5,7 @@ mod latin1;
 mod utf16_be;
 mod utf16_le;
 mod utf8;
+mod windows1252;
 
 /// Encodes text from utf8 to a destination encoding.
 pub fn encode_from_utf8<'a>(
@@ -17,7 +18,7 @@ pub fn encode_from_utf8<'a>(
         Encoding::Utf16BE => utf16_be::encode_from_utf8(input, output),
         Encoding::Utf16LE => utf16_le::encode_from_utf8(input, output),
         Encoding::Latin1 => latin1::encode_from_utf8(input, output),
-        _ => unimplemented!(),
+        Encoding::Windows1252 => windows1252::encode_from_utf8(input, output),
     }
 }
 
@@ -32,7 +33,7 @@ pub fn decode_to_utf8<'a>(
         Encoding::Utf16BE => utf16_be::decode_to_utf8(input, output),
         Encoding::Utf16LE => utf16_le::decode_to_utf8(input, output),
         Encoding::Latin1 => latin1::decode_to_utf8(input, output),
-        _ => unimplemented!(),
+        Encoding::Windows1252 => windows1252::decode_to_utf8(input, output),
     }
 }
 
@@ -42,10 +43,11 @@ pub enum Encoding {
     Utf8,
     Utf16BE, // Big endian
     Utf16LE, // Little endian
-    Utf32BE, // Big endian
-    Utf32LE, // Little endian
-    ShiftJIS,
-    Big5,
+    // Utf32BE, // Big endian
+    // Utf32LE, // Little endian
+    // ShiftJIS,
+    // EUC_JP,
+    // Big5,
     Latin1,      // ISO/IEC 8859-1
     Windows1252, // Windows code page 1252
 }
