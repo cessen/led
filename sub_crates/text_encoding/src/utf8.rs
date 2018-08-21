@@ -6,7 +6,6 @@
 use std;
 use {DecodeError, DecodeResult, EncodeResult};
 
-// Encode from utf8
 pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     let copy_len = {
         if output.len() >= input.len() {

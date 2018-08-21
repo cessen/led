@@ -105,6 +105,68 @@ proptest! {
     }
 
     #[test]
+    fn pt_utf32be_roundtrip(ref text in "\\PC*\\PC*\\PC*") {
+        let mut buf = [0u8; 32];
+        let mut utf32: Vec<u8> = Vec::new();
+        let mut utf8 = String::new();
+
+        // Encode to utf32 big endian
+        let mut tmp = &text[..];
+        while !tmp.is_empty() {
+            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Utf32BE, tmp, &mut buf) {
+                tmp = &tmp[n..];
+                utf32.extend_from_slice(encoded);
+            } else {
+                panic!("Error when encoding.");
+            }
+        }
+
+        // Decode back from utf32 big endian
+        let mut tmp = &utf32[..];
+        while !tmp.is_empty() {
+            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Utf32BE, tmp, &mut buf) {
+                tmp = &tmp[n..];
+                utf8.extend(decoded.chars());
+            } else {
+                panic!("Error when decoding.");
+            }
+        }
+
+        assert_eq!(&text[..], &utf8[..]);
+    }
+
+    #[test]
+    fn pt_utf32le_roundtrip(ref text in "\\PC*\\PC*\\PC*") {
+        let mut buf = [0u8; 32];
+        let mut utf32: Vec<u8> = Vec::new();
+        let mut utf8 = String::new();
+
+        // Encode to utf32 little endian
+        let mut tmp = &text[..];
+        while !tmp.is_empty() {
+            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Utf32LE, tmp, &mut buf) {
+                tmp = &tmp[n..];
+                utf32.extend_from_slice(encoded);
+            } else {
+                panic!("Error when encoding.");
+            }
+        }
+
+        // Decode back from utf32 little endian
+        let mut tmp = &utf32[..];
+        while !tmp.is_empty() {
+            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Utf32LE, tmp, &mut buf) {
+                tmp = &tmp[n..];
+                utf8.extend(decoded.chars());
+            } else {
+                panic!("Error when decoding.");
+            }
+        }
+
+        assert_eq!(&text[..], &utf8[..]);
+    }
+
+    #[test]
     fn pt_latin1_roundtrip(ref data in vec(0u8..=255, 0..1000)) {
         let mut buf = [0u8; 32];
         let mut utf8 = String::new();
