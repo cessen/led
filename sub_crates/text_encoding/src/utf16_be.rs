@@ -80,7 +80,7 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
                 // Two code units.
 
                 // Get the second code unit, if possible.
-                if !(input_i + 3) < input.len() {
+                if (input_i + 3) >= input.len() {
                     break;
                 }
                 let bytes_2 = itr.next().unwrap();
@@ -232,6 +232,33 @@ mod tests {
     fn decode_06() {
         let data = [0xD8, 0x3D, 0xDE, 0x3A, 0xD8, 0x3D, 0xDE, 0x3C]; // "😺😼"
         let mut buf = [0u8; 7];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_07() {
+        let data = [0xD8, 0x3D, 0xDE, 0x3A, 0xD8, 0x3D]; // "😺😼" with last codepoint chopped off.
+        let mut buf = [0u8; 64];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_08() {
+        let data = [0xD8, 0x3D, 0xDE, 0x3A, 0xD8, 0x3D, 0xDE]; // "😺😼" with last byte chopped off.
+        let mut buf = [0u8; 64];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_09() {
+        let data = [0xD8, 0x3D, 0xDE, 0x3A, 0xD8]; // "😺😼" with last 3 bytes chopped off.
+        let mut buf = [0u8; 64];
         let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "😺");
