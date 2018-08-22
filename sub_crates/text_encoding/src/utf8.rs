@@ -3,7 +3,7 @@
 //! is still useful for validating unknown input.  And they allow a uniform
 //! API for all encodings.
 
-use std;
+use core;
 use {DecodeError, DecodeResult, EncodeResult};
 
 pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
@@ -25,7 +25,7 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
 }
 
 pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
-    let valid_up_to = match std::str::from_utf8(input) {
+    let valid_up_to = match core::str::from_utf8(input) {
         Ok(text) => text.len(),
         Err(e) => {
             if e.valid_up_to() > 0 {
@@ -40,11 +40,11 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
     };
 
     let (in_consumed, out_slice) = encode_from_utf8(
-        unsafe { std::str::from_utf8_unchecked(&input[..valid_up_to]) },
+        unsafe { core::str::from_utf8_unchecked(&input[..valid_up_to]) },
         output,
     ).unwrap();
 
     Ok((in_consumed, unsafe {
-        std::str::from_utf8_unchecked(out_slice)
+        core::str::from_utf8_unchecked(out_slice)
     }))
 }

@@ -5,7 +5,7 @@
 //! decoding cannot fail.  However, encoding will fail with scalar values
 //! greater than 255.
 
-use std;
+use core;
 use {DecodeResult, EncodeError, EncodeResult};
 
 pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
@@ -66,6 +66,6 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
     }
 
     Ok((input_i, unsafe {
-        std::str::from_utf8_unchecked(&output[..output_i])
+        core::str::from_utf8_unchecked(&output[..output_i])
     }))
 }

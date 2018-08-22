@@ -4,40 +4,9 @@
 //! only possible error is when invalid utf32 is encountered when decoding
 //! to utf8.
 
-use std;
+use core;
+use utils::{from_big_endian_u32, to_big_endian_u32};
 use {DecodeError, DecodeResult, EncodeResult};
-
-fn to_big_endian(n: u32) -> [u8; 4] {
-    use std::mem::transmute;
-    let ptr = unsafe { transmute::<*const u32, *const u8>(&n as *const u32) };
-    if cfg!(target_endian = "little") {
-        unsafe { [*ptr.offset(3), *ptr.offset(2), *ptr.offset(1), *ptr] }
-    } else {
-        unsafe { [*ptr, *ptr.offset(1), *ptr.offset(2), *ptr.offset(3)] }
-    }
-}
-
-fn from_big_endian(n: [u8; 4]) -> u32 {
-    use std::mem::transmute;
-    let mut x: u32 = 0;
-    let ptr = unsafe { transmute::<*mut u32, *mut u8>(&mut x as *mut u32) };
-    if cfg!(target_endian = "little") {
-        unsafe {
-            *ptr = n[3];
-            *ptr.offset(1) = n[2];
-            *ptr.offset(2) = n[1];
-            *ptr.offset(3) = n[0];
-        }
-    } else {
-        unsafe {
-            *ptr = n[0];
-            *ptr.offset(1) = n[1];
-            *ptr.offset(2) = n[2];
-            *ptr.offset(3) = n[3];
-        }
-    }
-    x
-}
 
 pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     // Do the encode.
@@ -45,7 +14,7 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
     let mut output_i = 0;
     for (offset, c) in input.char_indices() {
         if (output_i + 3) < output.len() {
-            let mut code = to_big_endian(c as u32);
+            let mut code = to_big_endian_u32(c as u32);
             output[output_i] = code[0];
             output[output_i + 1] = code[1];
             output[output_i + 2] = code[2];
@@ -82,9 +51,9 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
         }
 
         // Do the decode.
-        if let Some(code) =
-            std::char::from_u32(from_big_endian([bytes[0], bytes[1], bytes[2], bytes[3]]))
-        {
+        if let Some(code) = core::char::from_u32(from_big_endian_u32([
+            bytes[0], bytes[1], bytes[2], bytes[3],
+        ])) {
             // Encode to utf8.
             let mut buf = [0u8; 4];
             let s = code.encode_utf8(&mut buf);
@@ -106,6 +75,6 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
     }
 
     Ok((input_i, unsafe {
-        std::str::from_utf8_unchecked(&output[..output_i])
+        core::str::from_utf8_unchecked(&output[..output_i])
     }))
 }

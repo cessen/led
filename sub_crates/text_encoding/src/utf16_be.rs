@@ -4,36 +4,9 @@
 //! only possible error is when invalid utf16 is encountered when decoding
 //! to utf8.
 
-use std;
+use core;
+use utils::{from_big_endian_u16, to_big_endian_u16};
 use {DecodeError, DecodeResult, EncodeResult};
-
-fn to_big_endian(n: u16) -> [u8; 2] {
-    use std::mem::transmute;
-    let ptr = unsafe { transmute::<*const u16, *const u8>(&n as *const u16) };
-    if cfg!(target_endian = "little") {
-        unsafe { [*ptr.offset(1), *ptr] }
-    } else {
-        unsafe { [*ptr, *ptr.offset(1)] }
-    }
-}
-
-fn from_big_endian(n: [u8; 2]) -> u16 {
-    use std::mem::transmute;
-    let mut x: u16 = 0;
-    let ptr = unsafe { transmute::<*mut u16, *mut u8>(&mut x as *mut u16) };
-    if cfg!(target_endian = "little") {
-        unsafe {
-            *ptr = n[1];
-            *ptr.offset(1) = n[0];
-        }
-    } else {
-        unsafe {
-            *ptr = n[0];
-            *ptr.offset(1) = n[1];
-        }
-    }
-    x
-}
 
 pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     // Do the encode.
@@ -44,7 +17,7 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
         if code <= 0xFFFF {
             // One code unit
             if (output_i + 1) < output.len() {
-                let val = to_big_endian(code as u16);
+                let val = to_big_endian_u16(code as u16);
                 output[output_i] = val[0];
                 output[output_i + 1] = val[1];
                 output_i += 2;
@@ -55,8 +28,8 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
         } else if (output_i + 3) < output.len() {
             // Two code units
             code -= 0x10000;
-            let first = to_big_endian(0xD800 | ((code >> 10) as u16));
-            let second = to_big_endian(0xDC00 | ((code as u16) & 0x3FF));
+            let first = to_big_endian_u16(0xD800 | ((code >> 10) as u16));
+            let second = to_big_endian_u16(0xDC00 | ((code as u16) & 0x3FF));
             output[output_i] = first[0];
             output[output_i + 1] = first[1];
             output[output_i + 2] = second[0];
@@ -94,10 +67,10 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
 
         // Decode to scalar value.
         let code = {
-            let code_1 = from_big_endian([bytes[0], bytes[1]]);
+            let code_1 = from_big_endian_u16([bytes[0], bytes[1]]);
             if code_1 < 0xD800 || code_1 > 0xDFFF {
                 // Single code unit.
-                unsafe { std::char::from_u32_unchecked(code_1 as u32) }
+                unsafe { core::char::from_u32_unchecked(code_1 as u32) }
             } else if (code_1 & 0xFC00) == 0xDC00 {
                 // Error: orphaned second half of a surrogate pair.
                 return Err(DecodeError {
@@ -112,7 +85,7 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
                     break;
                 }
                 let bytes_2 = itr.next().unwrap();
-                let code_2 = from_big_endian([bytes_2[0], bytes_2[1]]);
+                let code_2 = from_big_endian_u16([bytes_2[0], bytes_2[1]]);
                 if (code_2 & 0xFC00) != 0xDC00 {
                     // Error: second half is not valid surrogate.
                     return Err(DecodeError {
@@ -122,7 +95,7 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
                 }
 
                 unsafe {
-                    std::char::from_u32_unchecked(
+                    core::char::from_u32_unchecked(
                         (((code_1 as u32 - 0xD800) << 10) | (code_2 as u32 - 0xDC00)) + 0x10000,
                     )
                 }
@@ -143,6 +116,6 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
     }
 
     Ok((input_i, unsafe {
-        std::str::from_utf8_unchecked(&output[..output_i])
+        core::str::from_utf8_unchecked(&output[..output_i])
     }))
 }

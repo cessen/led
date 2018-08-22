@@ -1,3 +1,5 @@
+#![no_std]
+
 //! A library for incrementally encoding/decoding between utf8 and various
 //! text encodings.
 
@@ -7,6 +9,7 @@ mod utf16_le;
 mod utf32_be;
 mod utf32_le;
 mod utf8;
+mod utils;
 mod windows1252;
 
 /// Encodes text from utf8 to a destination encoding.
