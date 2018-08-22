@@ -20,14 +20,13 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
             output[output_i + 2] = code[2];
             output[output_i + 3] = code[3];
             output_i += 4;
-            input_i = offset;
+            input_i = offset + 1;
         } else {
             break;
         }
     }
 
     // Calculate how much of the input was consumed.
-    input_i += 1;
     if input_i > input.len() {
         input_i = input.len();
     } else {
@@ -77,4 +76,252 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
     Ok((input_i, unsafe {
         core::str::from_utf8_unchecked(&output[..output_i])
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encode_01() {
+        let text = "こんにちは！";
+        let mut buf = [0u8; 3];
+        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        assert_eq!(consumed_count, 0);
+        assert_eq!(encoded, &[]);
+    }
+
+    #[test]
+    fn encode_02() {
+        let text = "こんにちは！";
+        let mut buf = [0u8; 4];
+        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        assert_eq!(consumed_count, 3);
+        assert_eq!(encoded, &[0x00, 0x00, 0x30, 0x53]);
+    }
+
+    #[test]
+    fn encode_03() {
+        let text = "こんにちは！";
+        let mut buf = [0u8; 7];
+        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        assert_eq!(consumed_count, 3);
+        assert_eq!(encoded, &[0x00, 0x00, 0x30, 0x53]);
+    }
+
+    #[test]
+    fn encode_04() {
+        let text = "😺😼";
+        let mut buf = [0u8; 3];
+        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        assert_eq!(consumed_count, 0);
+        assert_eq!(encoded, &[]);
+    }
+
+    #[test]
+    fn encode_05() {
+        let text = "😺😼";
+        let mut buf = [0u8; 4];
+        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(encoded, &[0x00, 0x01, 0xF6, 0x3A]);
+    }
+
+    #[test]
+    fn encode_06() {
+        let text = "😺😼";
+        let mut buf = [0u8; 7];
+        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(encoded, &[0x00, 0x01, 0xF6, 0x3A]);
+    }
+
+    #[test]
+    fn decode_01() {
+        let data = [
+            0x00, 0x00, 0x30, 0x53, 0x00, 0x00, 0x30, 0x93, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！"
+        let mut buf = [0u8; 2];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 0);
+        assert_eq!(decoded, "");
+    }
+
+    #[test]
+    fn decode_02() {
+        let data = [
+            0x00, 0x00, 0x30, 0x53, 0x00, 0x00, 0x30, 0x93, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！"
+        let mut buf = [0u8; 3];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "こ");
+    }
+
+    #[test]
+    fn decode_03() {
+        let data = [
+            0x00, 0x00, 0x30, 0x53, 0x00, 0x00, 0x30, 0x93, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！"
+        let mut buf = [0u8; 5];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "こ");
+    }
+
+    #[test]
+    fn decode_04() {
+        let data = [0x00, 0x01, 0xF6, 0x3A, 0x00, 0x01, 0xF6, 0x3C]; // "😺😼"
+        let mut buf = [0u8; 3];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 0);
+        assert_eq!(decoded, "");
+    }
+
+    #[test]
+    fn decode_05() {
+        let data = [0x00, 0x01, 0xF6, 0x3A, 0x00, 0x01, 0xF6, 0x3C]; // "😺😼"
+        let mut buf = [0u8; 4];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_06() {
+        let data = [0x00, 0x01, 0xF6, 0x3A, 0x00, 0x01, 0xF6, 0x3C]; // "😺😼"
+        let mut buf = [0u8; 7];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_07() {
+        let data = [0x00, 0x01, 0xF6, 0x3A, 0x00, 0x01, 0xF6]; // "😺😼" with last byte chopped off.
+        let mut buf = [0u8; 64];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_08() {
+        let data = [0x00, 0x01, 0xF6, 0x3A, 0x00, 0x01]; // "😺😼" with last 2 bytes chopped off.
+        let mut buf = [0u8; 64];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_09() {
+        let data = [0x00, 0x01, 0xF6, 0x3A, 0x00]; // "😺😼" with last 3 bytes chopped off.
+        let mut buf = [0u8; 64];
+        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        assert_eq!(consumed_count, 4);
+        assert_eq!(decoded, "😺");
+    }
+
+    #[test]
+    fn decode_error_01() {
+        let data = [
+            0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x30, 0x93, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！" with an error on the first char (value out of range)
+        let mut buf = [0u8; 2];
+        assert_eq!(
+            decode_to_utf8(&data, &mut buf),
+            Err(DecodeError {
+                error_range: (0, 4),
+                output_bytes_written: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn decode_error_02() {
+        let data = [
+            0x00, 0x00, 0xD8, 0x00, 0x00, 0x00, 0x30, 0x93, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！" with an error on the first char (value in surrogate range)
+        let mut buf = [0u8; 2];
+        assert_eq!(
+            decode_to_utf8(&data, &mut buf),
+            Err(DecodeError {
+                error_range: (0, 4),
+                output_bytes_written: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn decode_error_03() {
+        let data = [
+            0x00, 0x00, 0xDF, 0xFF, 0x00, 0x00, 0x30, 0x93, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！" with an error on the first char (value in surrogate range)
+        let mut buf = [0u8; 64];
+        assert_eq!(
+            decode_to_utf8(&data, &mut buf),
+            Err(DecodeError {
+                error_range: (0, 4),
+                output_bytes_written: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn decode_error_04() {
+        let data = [
+            0x00, 0x00, 0x30, 0x53, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！" with an error on the second char (value out of range)
+        let mut buf = [0u8; 64];
+        assert_eq!(
+            decode_to_utf8(&data, &mut buf),
+            Err(DecodeError {
+                error_range: (4, 8),
+                output_bytes_written: 3,
+            })
+        );
+        assert_eq!(&buf[..3], &[0xE3, 0x81, 0x93]);
+    }
+
+    #[test]
+    fn decode_error_05() {
+        let data = [
+            0x00, 0x00, 0x30, 0x53, 0x00, 0x00, 0xD8, 0x00, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！" with an error on the second char (value in surrogate range)
+        let mut buf = [0u8; 64];
+        assert_eq!(
+            decode_to_utf8(&data, &mut buf),
+            Err(DecodeError {
+                error_range: (4, 8),
+                output_bytes_written: 3,
+            })
+        );
+        assert_eq!(&buf[..3], &[0xE3, 0x81, 0x93]);
+    }
+
+    #[test]
+    fn decode_error_06() {
+        let data = [
+            0x00, 0x00, 0x30, 0x53, 0x00, 0x00, 0xDF, 0xFF, 0x00, 0x00, 0x30, 0x6B, 0x00, 0x00,
+            0x30, 0x61, 0x00, 0x00, 0x30, 0x6F, 0x00, 0x00, 0xFF, 0x01,
+        ]; // "こんにちは！" with an error on the second char (value in surrogate range)
+        let mut buf = [0u8; 64];
+        assert_eq!(
+            decode_to_utf8(&data, &mut buf),
+            Err(DecodeError {
+                error_range: (4, 8),
+                output_bytes_written: 3,
+            })
+        );
+        assert_eq!(&buf[..3], &[0xE3, 0x81, 0x93]);
+    }
 }
