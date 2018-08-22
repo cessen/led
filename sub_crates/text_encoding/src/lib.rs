@@ -85,7 +85,7 @@ pub type DecodeResult<'a> = Result<(usize, &'a str), DecodeError>;
 ///
 /// It is guaranteed that all input leading up to the problem character has
 /// already been encoded and written to the output buffer.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EncodeError {
     pub character: char,
     pub error_range: (usize, usize),
@@ -104,7 +104,7 @@ pub struct EncodeError {
 ///
 /// It is guaranteed that all input leading up to the invalid data has
 /// already been encoded and written to the output buffer.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct DecodeError {
     pub error_range: (usize, usize),
     pub output_bytes_written: usize,
