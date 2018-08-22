@@ -1,12 +1,12 @@
 //! These functions are essentially redundant, since they're supposedly
-//! encoding/decoding between utf8 and... utf8.  However, `decode_to_utf8()`
+//! encoding/decoding between utf8 and... utf8.  However, `decode_to_str()`
 //! is still useful for validating unknown input.  And they allow a uniform
 //! API for all encodings.
 
 use core;
 use {DecodeError, DecodeResult, EncodeResult};
 
-pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
+pub fn encode_from_str<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     let copy_len = {
         if output.len() >= input.len() {
             input.len()
@@ -24,7 +24,7 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
     Ok((copy_len, &output[..copy_len]))
 }
 
-pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
+pub fn decode_to_str<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
     let valid_up_to = match core::str::from_utf8(input) {
         Ok(text) => text.len(),
         Err(e) => {
@@ -39,7 +39,7 @@ pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a
         }
     };
 
-    let (in_consumed, out_slice) = encode_from_utf8(
+    let (in_consumed, out_slice) = encode_from_str(
         unsafe { core::str::from_utf8_unchecked(&input[..valid_up_to]) },
         output,
     ).unwrap();

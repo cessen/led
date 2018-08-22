@@ -4,7 +4,7 @@ extern crate text_encoding;
 
 use proptest::collection::vec;
 use proptest::test_runner::Config;
-use text_encoding::{decode_to_utf8, encode_from_utf8, Encoding};
+use text_encoding::{decode_to_str, encode_from_str, Encoding};
 
 proptest! {
     #![proptest_config(Config::with_cases(512))]
@@ -18,7 +18,7 @@ proptest! {
         // Encode to utf8
         let mut tmp = &text[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Utf8, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::Utf8, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8_encoded.extend_from_slice(encoded);
             } else {
@@ -29,7 +29,7 @@ proptest! {
         // Decode back from utf8
         let mut tmp = &utf8_encoded[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Utf8, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::Utf8, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -51,7 +51,7 @@ proptest! {
         // Encode to utf16 big endian
         let mut tmp = &text[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Utf16BE, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::Utf16BE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf16.extend_from_slice(encoded);
             } else {
@@ -62,7 +62,7 @@ proptest! {
         // Decode back from utf16 big endian
         let mut tmp = &utf16[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Utf16BE, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::Utf16BE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -82,7 +82,7 @@ proptest! {
         // Encode to utf16 little endian
         let mut tmp = &text[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Utf16LE, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::Utf16LE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf16.extend_from_slice(encoded);
             } else {
@@ -93,7 +93,7 @@ proptest! {
         // Decode back from utf16 big endian
         let mut tmp = &utf16[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Utf16LE, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::Utf16LE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -113,7 +113,7 @@ proptest! {
         // Encode to utf32 big endian
         let mut tmp = &text[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Utf32BE, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::Utf32BE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf32.extend_from_slice(encoded);
             } else {
@@ -124,7 +124,7 @@ proptest! {
         // Decode back from utf32 big endian
         let mut tmp = &utf32[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Utf32BE, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::Utf32BE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -144,7 +144,7 @@ proptest! {
         // Encode to utf32 little endian
         let mut tmp = &text[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Utf32LE, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::Utf32LE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf32.extend_from_slice(encoded);
             } else {
@@ -155,7 +155,7 @@ proptest! {
         // Decode back from utf32 little endian
         let mut tmp = &utf32[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Utf32LE, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::Utf32LE, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -175,7 +175,7 @@ proptest! {
         // Decode from latin1 to utf8
         let mut tmp = &data[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Latin1, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::Latin1, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -186,7 +186,7 @@ proptest! {
         // Encode to from utf8 back to latin1
         let mut tmp = &utf8[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Latin1, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::Latin1, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 latin1.extend_from_slice(encoded);
             } else {
@@ -213,7 +213,7 @@ proptest! {
         // Decode from windows-1252 to utf8
         let mut tmp = &data[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_utf8(Encoding::Windows1252, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::Windows1252, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -224,7 +224,7 @@ proptest! {
         // Encode to from utf8 back to w1252
         let mut tmp = &utf8[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_utf8(Encoding::Windows1252, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::Windows1252, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 w1252.extend_from_slice(encoded);
             } else {

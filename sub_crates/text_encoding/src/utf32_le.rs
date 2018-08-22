@@ -8,7 +8,7 @@ use core;
 use utils::{from_little_endian_u32, to_little_endian_u32};
 use {DecodeError, DecodeResult, EncodeResult};
 
-pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
+pub fn encode_from_str<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     // Do the encode.
     let mut input_i = 0;
     let mut output_i = 0;
@@ -38,7 +38,7 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
     Ok((input_i, &output[..output_i]))
 }
 
-pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
+pub fn decode_to_str<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
     let mut input_i = 0;
     let mut output_i = 0;
 
@@ -86,7 +86,7 @@ mod tests {
     fn encode_01() {
         let text = "こんにちは！";
         let mut buf = [0u8; 3];
-        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        let (consumed_count, encoded) = encode_from_str(text, &mut buf).unwrap();
         assert_eq!(consumed_count, 0);
         assert_eq!(encoded, &[]);
     }
@@ -95,7 +95,7 @@ mod tests {
     fn encode_02() {
         let text = "こんにちは！";
         let mut buf = [0u8; 4];
-        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        let (consumed_count, encoded) = encode_from_str(text, &mut buf).unwrap();
         assert_eq!(consumed_count, 3);
         assert_eq!(encoded, &[0x53, 0x30, 0x00, 0x00]);
     }
@@ -104,7 +104,7 @@ mod tests {
     fn encode_03() {
         let text = "こんにちは！";
         let mut buf = [0u8; 7];
-        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        let (consumed_count, encoded) = encode_from_str(text, &mut buf).unwrap();
         assert_eq!(consumed_count, 3);
         assert_eq!(encoded, &[0x53, 0x30, 0x00, 0x00]);
     }
@@ -113,7 +113,7 @@ mod tests {
     fn encode_04() {
         let text = "😺😼";
         let mut buf = [0u8; 3];
-        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        let (consumed_count, encoded) = encode_from_str(text, &mut buf).unwrap();
         assert_eq!(consumed_count, 0);
         assert_eq!(encoded, &[]);
     }
@@ -122,7 +122,7 @@ mod tests {
     fn encode_05() {
         let text = "😺😼";
         let mut buf = [0u8; 4];
-        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        let (consumed_count, encoded) = encode_from_str(text, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(encoded, &[0x3A, 0xF6, 0x01, 0x00]);
     }
@@ -131,7 +131,7 @@ mod tests {
     fn encode_06() {
         let text = "😺😼";
         let mut buf = [0u8; 7];
-        let (consumed_count, encoded) = encode_from_utf8(text, &mut buf).unwrap();
+        let (consumed_count, encoded) = encode_from_str(text, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(encoded, &[0x3A, 0xF6, 0x01, 0x00]);
     }
@@ -143,7 +143,7 @@ mod tests {
             0x00, 0x00, 0x6F, 0x30, 0x00, 0x00, 0x01, 0xFF, 0x00, 0x00,
         ]; // "こんにちは！"
         let mut buf = [0u8; 2];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 0);
         assert_eq!(decoded, "");
     }
@@ -155,7 +155,7 @@ mod tests {
             0x00, 0x00, 0x6F, 0x30, 0x00, 0x00, 0x01, 0xFF, 0x00, 0x00,
         ]; // "こんにちは！"
         let mut buf = [0u8; 3];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "こ");
     }
@@ -167,7 +167,7 @@ mod tests {
             0x00, 0x00, 0x6F, 0x30, 0x00, 0x00, 0x01, 0xFF, 0x00, 0x00,
         ]; // "こんにちは！"
         let mut buf = [0u8; 5];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "こ");
     }
@@ -176,7 +176,7 @@ mod tests {
     fn decode_04() {
         let data = [0x3A, 0xF6, 0x01, 0x00, 0x3C, 0xF6, 0x01, 0x00]; // "😺😼"
         let mut buf = [0u8; 3];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 0);
         assert_eq!(decoded, "");
     }
@@ -185,7 +185,7 @@ mod tests {
     fn decode_05() {
         let data = [0x3A, 0xF6, 0x01, 0x00, 0x3C, 0xF6, 0x01, 0x00]; // "😺😼"
         let mut buf = [0u8; 4];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "😺");
     }
@@ -194,7 +194,7 @@ mod tests {
     fn decode_06() {
         let data = [0x3A, 0xF6, 0x01, 0x00, 0x3C, 0xF6, 0x01, 0x00]; // "😺😼"
         let mut buf = [0u8; 7];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "😺");
     }
@@ -203,7 +203,7 @@ mod tests {
     fn decode_07() {
         let data = [0x3A, 0xF6, 0x01, 0x00, 0x3C, 0xF6, 0x01]; // "😺😼" with last byte chopped off.
         let mut buf = [0u8; 64];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "😺");
     }
@@ -212,7 +212,7 @@ mod tests {
     fn decode_08() {
         let data = [0x3A, 0xF6, 0x01, 0x00, 0x3C, 0xF6]; // "😺😼" with last 2 bytes chopped off.
         let mut buf = [0u8; 64];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "😺");
     }
@@ -221,7 +221,7 @@ mod tests {
     fn decode_09() {
         let data = [0x3A, 0xF6, 0x01, 0x00, 0x3C]; // "😺😼" with last 3 bytes chopped off.
         let mut buf = [0u8; 64];
-        let (consumed_count, decoded) = decode_to_utf8(&data, &mut buf).unwrap();
+        let (consumed_count, decoded) = decode_to_str(&data, &mut buf).unwrap();
         assert_eq!(consumed_count, 4);
         assert_eq!(decoded, "😺");
     }
@@ -234,7 +234,7 @@ mod tests {
         ]; // "こんにちは！" with an error on the first char (value out of range)
         let mut buf = [0u8; 2];
         assert_eq!(
-            decode_to_utf8(&data, &mut buf),
+            decode_to_str(&data, &mut buf),
             Err(DecodeError {
                 error_range: (0, 4),
                 output_bytes_written: 0,
@@ -250,7 +250,7 @@ mod tests {
         ]; // "こんにちは！" with an error on the first char (value in surrogate range)
         let mut buf = [0u8; 2];
         assert_eq!(
-            decode_to_utf8(&data, &mut buf),
+            decode_to_str(&data, &mut buf),
             Err(DecodeError {
                 error_range: (0, 4),
                 output_bytes_written: 0,
@@ -266,7 +266,7 @@ mod tests {
         ]; // "こんにちは！" with an error on the first char (value in surrogate range)
         let mut buf = [0u8; 64];
         assert_eq!(
-            decode_to_utf8(&data, &mut buf),
+            decode_to_str(&data, &mut buf),
             Err(DecodeError {
                 error_range: (0, 4),
                 output_bytes_written: 0,
@@ -282,7 +282,7 @@ mod tests {
         ]; // "こんにちは！" with an error on the second char (value out of range)
         let mut buf = [0u8; 64];
         assert_eq!(
-            decode_to_utf8(&data, &mut buf),
+            decode_to_str(&data, &mut buf),
             Err(DecodeError {
                 error_range: (4, 8),
                 output_bytes_written: 3,
@@ -299,7 +299,7 @@ mod tests {
         ]; // "こんにちは！" with an error on the second char (value in surrogate range)
         let mut buf = [0u8; 64];
         assert_eq!(
-            decode_to_utf8(&data, &mut buf),
+            decode_to_str(&data, &mut buf),
             Err(DecodeError {
                 error_range: (4, 8),
                 output_bytes_written: 3,
@@ -316,7 +316,7 @@ mod tests {
         ]; // "こんにちは！" with an error on the second char (value in surrogate range)
         let mut buf = [0u8; 64];
         assert_eq!(
-            decode_to_utf8(&data, &mut buf),
+            decode_to_str(&data, &mut buf),
             Err(DecodeError {
                 error_range: (4, 8),
                 output_bytes_written: 3,

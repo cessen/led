@@ -13,36 +13,36 @@ mod utils;
 mod windows1252;
 
 /// Encodes text from utf8 to a destination encoding.
-pub fn encode_from_utf8<'a>(
+pub fn encode_from_str<'a>(
     output_encoding: Encoding,
     input: &str,
     output: &'a mut [u8],
 ) -> EncodeResult<'a> {
     match output_encoding {
-        Encoding::Utf8 => utf8::encode_from_utf8(input, output),
-        Encoding::Utf16BE => utf16_be::encode_from_utf8(input, output),
-        Encoding::Utf16LE => utf16_le::encode_from_utf8(input, output),
-        Encoding::Utf32BE => utf32_be::encode_from_utf8(input, output),
-        Encoding::Utf32LE => utf32_le::encode_from_utf8(input, output),
-        Encoding::Latin1 => latin1::encode_from_utf8(input, output),
-        Encoding::Windows1252 => windows1252::encode_from_utf8(input, output),
+        Encoding::Utf8 => utf8::encode_from_str(input, output),
+        Encoding::Utf16BE => utf16_be::encode_from_str(input, output),
+        Encoding::Utf16LE => utf16_le::encode_from_str(input, output),
+        Encoding::Utf32BE => utf32_be::encode_from_str(input, output),
+        Encoding::Utf32LE => utf32_le::encode_from_str(input, output),
+        Encoding::Latin1 => latin1::encode_from_str(input, output),
+        Encoding::Windows1252 => windows1252::encode_from_str(input, output),
     }
 }
 
 /// Decodes text from a source encoding to utf8.
-pub fn decode_to_utf8<'a>(
+pub fn decode_to_str<'a>(
     input_encoding: Encoding,
     input: &[u8],
     output: &'a mut [u8],
 ) -> DecodeResult<'a> {
     match input_encoding {
-        Encoding::Utf8 => utf8::decode_to_utf8(input, output),
-        Encoding::Utf16BE => utf16_be::decode_to_utf8(input, output),
-        Encoding::Utf16LE => utf16_le::decode_to_utf8(input, output),
-        Encoding::Utf32BE => utf32_be::decode_to_utf8(input, output),
-        Encoding::Utf32LE => utf32_le::decode_to_utf8(input, output),
-        Encoding::Latin1 => latin1::decode_to_utf8(input, output),
-        Encoding::Windows1252 => windows1252::decode_to_utf8(input, output),
+        Encoding::Utf8 => utf8::decode_to_str(input, output),
+        Encoding::Utf16BE => utf16_be::decode_to_str(input, output),
+        Encoding::Utf16LE => utf16_le::decode_to_str(input, output),
+        Encoding::Utf32BE => utf32_be::decode_to_str(input, output),
+        Encoding::Utf32LE => utf32_le::decode_to_str(input, output),
+        Encoding::Latin1 => latin1::decode_to_str(input, output),
+        Encoding::Windows1252 => windows1252::decode_to_str(input, output),
     }
 }
 

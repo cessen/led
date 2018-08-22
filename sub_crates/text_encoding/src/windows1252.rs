@@ -3,7 +3,7 @@
 use core;
 use {DecodeError, DecodeResult, EncodeError, EncodeResult};
 
-pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
+pub fn encode_from_str<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'a> {
     // Do the encode.
     let mut input_i = 0;
     let mut output_i = 0;
@@ -37,7 +37,7 @@ pub fn encode_from_utf8<'a>(input: &str, output: &'a mut [u8]) -> EncodeResult<'
     Ok((input_i, &output[..output_i]))
 }
 
-pub fn decode_to_utf8<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
+pub fn decode_to_str<'a>(input: &[u8], output: &'a mut [u8]) -> DecodeResult<'a> {
     let mut input_i = 0;
     let mut output_i = 0;
     for &byte in input.iter() {
