@@ -197,23 +197,25 @@ proptest! {
         assert_eq!(&data[..], &latin1[..]);
     }
 
+    // The iso-8859-7 tests are representative of all single-byte encodings
+    // (except latin1) since they're all generated and share their code.
     #[test]
-    fn pt_windows1252_roundtrip(mut data in vec(0u8..=255, 0..1000)) {
+    fn pt_iso_8859_7_roundtrip(mut data in vec(0u8..=255, 0..1000)) {
         let mut buf = [0u8; 32];
         let mut utf8 = String::new();
-        let mut w1252: Vec<u8> = Vec::new();
+        let mut iso8859_7: Vec<u8> = Vec::new();
 
         // Eliminate undefined bytes in input.
         for b in data.iter_mut() {
-            if *b == 0x81 || *b == 0x8D || *b == 0x8F || *b == 0x90 || *b == 0x9D {
+            if *b == 0xAE || *b == 0xD2 || *b == 0xFF {
                 *b = 0;
             }
         }
 
-        // Decode from windows-1252 to utf8
+        // Decode from iso-8859-7 to utf8
         let mut tmp = &data[..];
         while !tmp.is_empty() {
-            if let Ok((n, decoded)) = decode_to_str(Encoding::Windows1252, tmp, &mut buf) {
+            if let Ok((n, decoded)) = decode_to_str(Encoding::ISO8859_7, tmp, &mut buf) {
                 tmp = &tmp[n..];
                 utf8.extend(decoded.chars());
             } else {
@@ -221,17 +223,17 @@ proptest! {
             }
         }
 
-        // Encode to from utf8 back to w1252
+        // Encode to from utf8 back to iso-8859-7
         let mut tmp = &utf8[..];
         while !tmp.is_empty() {
-            if let Ok((n, encoded)) = encode_from_str(Encoding::Windows1252, tmp, &mut buf) {
+            if let Ok((n, encoded)) = encode_from_str(Encoding::ISO8859_7, tmp, &mut buf) {
                 tmp = &tmp[n..];
-                w1252.extend_from_slice(encoded);
+                iso8859_7.extend_from_slice(encoded);
             } else {
                 panic!("Error when encoding.");
             }
         }
 
-        assert_eq!(&data[..], &w1252[..]);
+        assert_eq!(&data[..], &iso8859_7[..]);
     }
 }

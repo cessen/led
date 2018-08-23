@@ -11,9 +11,8 @@ mod utf32_be;
 mod utf32_le;
 mod utf8;
 mod utils;
-mod windows1252;
 
-use single_byte::{ibm866, iso_8859_2};
+use single_byte::{ibm866, iso_8859_2, iso_8859_7, windows1252};
 
 /// Encodes text from utf8 to a destination encoding.
 pub fn encode_from_str<'a>(
@@ -30,6 +29,7 @@ pub fn encode_from_str<'a>(
         Encoding::IBM866 => ibm866::encode_from_str(input, output),
         Encoding::Latin1 => latin1::encode_from_str(input, output),
         Encoding::ISO8859_2 => iso_8859_2::encode_from_str(input, output),
+        Encoding::ISO8859_7 => iso_8859_7::encode_from_str(input, output),
         Encoding::Windows1252 => windows1252::encode_from_str(input, output),
     }
 }
@@ -49,6 +49,7 @@ pub fn decode_to_str<'a>(
         Encoding::IBM866 => ibm866::decode_to_str(input, output),
         Encoding::Latin1 => latin1::decode_to_str(input, output),
         Encoding::ISO8859_2 => iso_8859_2::decode_to_str(input, output),
+        Encoding::ISO8859_7 => iso_8859_7::decode_to_str(input, output),
         Encoding::Windows1252 => windows1252::decode_to_str(input, output),
     }
 }
@@ -67,6 +68,7 @@ pub enum Encoding {
     IBM866,      // IBM 866
     Latin1,      // ISO/IEC 8859-1
     ISO8859_2,   // ISO/IEC 8859-2
+    ISO8859_7,   // ISO/IEC 8859-7
     Windows1252, // Windows code page 1252
 }
 

@@ -151,7 +151,7 @@ fn generate_single_byte_encoding_from_index<R: Read, W: Write>(
     let rev_table = {
         let mut rev_table = vec![];
         for (i, c) in table.iter().enumerate() {
-            rev_table.push((c, i));
+            rev_table.push((c, 128 + i));
         }
         rev_table.sort_by_key(|x| x.0);
         rev_table
