@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "sub_crates/backend",
-    "sub_crates/text_encoding",
 ]
 
 [package]
@@ -28,6 +27,3 @@ termion = "1.5"
 # Local crate dependencies
 [dependencies.backend]
 path = "sub_crates/backend"
-
-[dependencies.text_encoding]
-path = "sub_crates/text_encoding"
