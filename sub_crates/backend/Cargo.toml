@@ -9,6 +9,6 @@ name = "backend"
 path = "src/lib.rs"
 
 [dependencies]
-# ropey = "0.8"
-ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
+ropey = "1.0"
+# ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
 unicode-segmentation = "1.2.1"
