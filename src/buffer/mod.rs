@@ -44,7 +44,7 @@ impl Buffer {
 
     pub fn new_from_file(path: &Path) -> io::Result<Buffer> {
         let buf = Buffer {
-            text: Rope::from_reader(BufReader::new(try!(File::open(path))))?,
+            text: Rope::from_reader(BufReader::new(File::open(path)?))?,
             file_path: Some(path.to_path_buf()),
             undo_stack: UndoStack::new(),
         };
@@ -53,7 +53,7 @@ impl Buffer {
     }
 
     pub fn save_to_file(&self, path: &Path) -> io::Result<()> {
-        let mut f = BufWriter::new(try!(File::create(path)));
+        let mut f = BufWriter::new(File::create(path)?);
 
         for c in self.text.chunks() {
             let _ = f.write(c.as_bytes());
@@ -1482,5 +1482,4 @@ mod tests {
 
         assert!(None == iter.next());
     }
-
 }

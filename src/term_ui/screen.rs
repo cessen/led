@@ -151,7 +151,8 @@ impl Drop for Screen {
             color::Fg(color::Reset),
             color::Bg(color::Reset),
             termion::clear::All,
-        ).unwrap();
+        )
+        .unwrap();
         self.show_cursor();
     }
 }
