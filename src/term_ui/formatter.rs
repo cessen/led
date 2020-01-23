@@ -318,12 +318,14 @@ fn grapheme_vis_width_at_vis_pos(g: RopeSlice, pos: usize, tab_width: usize) -> 
 #[cfg(test)]
 mod tests {
     #![allow(unused_imports)]
-    use super::*;
-    use buffer::Buffer;
-    use formatter::RoundingBehavior::{Ceiling, Floor, Round};
-    use formatter::{LineFormatter, LINE_BLOCK_LENGTH};
     use ropey::Rope;
-    use utils::RopeGraphemes;
+
+    use crate::buffer::Buffer;
+    use crate::formatter::RoundingBehavior::{Ceiling, Floor, Round};
+    use crate::formatter::{LineFormatter, LINE_BLOCK_LENGTH};
+    use crate::utils::RopeGraphemes;
+
+    use super::*;
 
     #[test]
     fn dimensions_1() {
