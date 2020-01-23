@@ -12,4 +12,4 @@ path = "src/lib.rs"
 [dependencies]
 ropey = "1"
 # ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
-unicode-segmentation = "1.3"
+unicode-segmentation = "1"
