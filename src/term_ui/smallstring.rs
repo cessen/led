@@ -6,7 +6,6 @@ use std::ptr;
 use std::str;
 
 use ropey::RopeSlice;
-
 use smallvec::SmallVec;
 
 #[derive(Clone, Default)]

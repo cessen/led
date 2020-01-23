@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::io;
 use std::io::{BufWriter, Write};
 
-use super::smallstring::SmallString;
 use ropey::RopeSlice;
 use termion;
 use termion::color;
@@ -11,7 +10,10 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
-use utils::{grapheme_width, RopeGraphemes};
+
+use crate::utils::{grapheme_width, RopeGraphemes};
+
+use super::smallstring::SmallString;
 
 pub(crate) struct Screen {
     out: RefCell<AlternateScreen<RawTerminal<BufWriter<io::Stdout>>>>,

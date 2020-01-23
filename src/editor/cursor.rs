@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 
-use std::cmp::Ordering;
-use std::ops::{Index, IndexMut};
-use std::slice::{Iter, IterMut};
+use std::{
+    cmp::Ordering,
+    ops::{Index, IndexMut},
+    slice::{Iter, IterMut},
+};
 
-use buffer::Buffer;
-use formatter::LineFormatter;
+use crate::{buffer::Buffer, formatter::LineFormatter};
 
 /// A text cursor.  Also represents selections when range.0 != range.1.
 ///

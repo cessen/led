@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 //! Misc helpful utility functions for TextBuffer related stuff.
 
-use ropey::RopeSlice;
 use std::iter::repeat;
+
+use ropey::RopeSlice;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub fn is_line_ending(text: &str) -> bool {

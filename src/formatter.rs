@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
-use buffer::Buffer;
-use ropey::RopeSlice;
 use std::cmp::min;
-use utils::RopeGraphemes;
+
+use ropey::RopeSlice;
+
+use crate::{buffer::Buffer, utils::RopeGraphemes};
 
 // Maximum graphemes in a line before a soft line break is forced.
 // This is necessary to prevent pathological formatting cases which

@@ -1,18 +1,21 @@
 #![allow(dead_code)]
 
-use std::fs::File;
-use std::io;
-use std::io::{BufReader, BufWriter, Write};
-use std::path::{Path, PathBuf};
-
-use self::undo_stack::Operation::*;
-use self::undo_stack::UndoStack;
-use ropey;
-use ropey::{Rope, RopeSlice};
-use string_utils::char_count;
-use utils::{is_grapheme_boundary, next_grapheme_boundary, prev_grapheme_boundary, RopeGraphemes};
-
 mod undo_stack;
+
+use std::{
+    fs::File,
+    io::{self, BufReader, BufWriter, Write},
+    path::{Path, PathBuf},
+};
+
+use ropey::{self, Rope, RopeSlice};
+
+use crate::{
+    string_utils::char_count,
+    utils::{is_grapheme_boundary, next_grapheme_boundary, prev_grapheme_boundary, RopeGraphemes},
+};
+
+use self::undo_stack::{Operation::*, UndoStack};
 
 // =============================================================
 // Buffer

@@ -1,17 +1,22 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+mod cursor;
+
+use std::{
+    cmp::{max, min},
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
+
+use crate::{
+    buffer::Buffer,
+    formatter::LineFormatter,
+    formatter::RoundingBehavior::*,
+    string_utils::{char_count, rope_slice_to_line_ending, LineEnding},
+    utils::{digit_count, RopeGraphemes},
+};
 
 use self::cursor::CursorSet;
-use buffer::Buffer;
-use formatter::LineFormatter;
-use formatter::RoundingBehavior::*;
-use std::cmp::{max, min};
-use std::path::{Path, PathBuf};
-use string_utils::{char_count, rope_slice_to_line_ending, LineEnding};
-use utils::{digit_count, RopeGraphemes};
-
-mod cursor;
 
 pub struct Editor<T: LineFormatter> {
     pub buffer: Buffer,

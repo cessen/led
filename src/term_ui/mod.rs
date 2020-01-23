@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+pub mod formatter;
+mod screen;
+pub mod smallstring;
+
 use std;
 use std::cmp::min;
 
@@ -7,17 +11,17 @@ use termion;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
 
-use self::formatter::ConsoleLineFormatter;
-use editor::Editor;
-use formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH};
-use string_utils::{line_ending_to_str, rope_slice_is_line_ending, LineEnding};
-use utils::{digit_count, RopeGraphemes};
+use crate::{
+    editor::Editor,
+    formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH},
+    string_utils::{line_ending_to_str, rope_slice_is_line_ending, LineEnding},
+    utils::{digit_count, RopeGraphemes},
+};
 
-pub mod formatter;
-mod screen;
-pub mod smallstring;
-
-use self::screen::{Color, Screen, Style};
+use self::{
+    formatter::ConsoleLineFormatter,
+    screen::{Color, Screen, Style},
+};
 
 /// Generalized ui loop.
 macro_rules! ui_loop {

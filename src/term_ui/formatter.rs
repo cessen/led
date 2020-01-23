@@ -1,9 +1,12 @@
 use std::cmp::max;
 
-use formatter::{LineFormatter, RoundingBehavior};
 use ropey::RopeSlice;
-use string_utils::{rope_slice_is_line_ending, rope_slice_is_whitespace};
-use utils::grapheme_width;
+
+use crate::{
+    formatter::{LineFormatter, RoundingBehavior},
+    string_utils::{rope_slice_is_line_ending, rope_slice_is_whitespace},
+    utils::grapheme_width,
+};
 
 pub enum WrapType {
     NoWrap,
