@@ -82,7 +82,9 @@ macro_rules! ui_loop {
             // Draw the editor to screen
             if should_redraw {
                 // Make sure display dimensions are up-to-date.
-                $term_ui.editor.update_dim($term_ui.height, $term_ui.width);
+                $term_ui
+                    .editor
+                    .update_dim($term_ui.height - 1, $term_ui.width);
                 $term_ui
                     .editor
                     .formatter
@@ -159,7 +161,6 @@ impl TermUI {
                 match key {
                     KeyEvent {
                         code: KeyCode::Char('q'),
-                        // modifiers: EMPTY_MOD,
                         modifiers: KeyModifiers::CONTROL,
                     } => {
                         self.quit = true;
@@ -364,13 +365,8 @@ impl TermUI {
 
         // Jump to line!
         if !cancel {
-            if let Ok(n) = line.parse() {
-                let n2: usize = n; // Weird work-around: the type of n wasn't being inferred
-                if n2 > 0 {
-                    self.editor.jump_to_line(n2 - 1);
-                } else {
-                    self.editor.jump_to_line(0);
-                }
+            if let Ok(n) = line.parse::<usize>() {
+                self.editor.jump_to_line(n - 1.min(n));
             }
         }
     }
