@@ -4,12 +4,12 @@ pub mod formatter;
 mod screen;
 pub mod smallstring;
 
-use std;
-use std::cmp::min;
+use std::{cmp::min, time::Duration};
 
-use termion;
-use termion::event::{Event, Key};
-use termion::input::TermRead;
+use crossterm::{
+    event::{Event, KeyCode, KeyEvent, KeyModifiers},
+    style::Color,
+};
 
 use crate::{
     editor::Editor,
@@ -20,8 +20,10 @@ use crate::{
 
 use self::{
     formatter::ConsoleLineFormatter,
-    screen::{Color, Screen, Style},
+    screen::{Screen, Style},
 };
+
+const EMPTY_MOD: KeyModifiers = KeyModifiers::empty();
 
 /// Generalized ui loop.
 macro_rules! ui_loop {
@@ -40,19 +42,31 @@ macro_rules! ui_loop {
 
             // Handle input
             loop {
-                match $term_ui.inp.next() {
-                    Some(Ok(Event::Key($key))) => {
-                        let (status, state_changed) = || -> (LoopStatus, bool) { $key_press }();
-                        should_redraw |= state_changed;
-                        if status == LoopStatus::Done {
-                            stop = true;
+                if crossterm::event::poll(Duration::from_millis(5)).unwrap() {
+                    match crossterm::event::read().unwrap() {
+                        Event::Key($key) => {
+                            let (status, state_changed) = || -> (LoopStatus, bool) { $key_press }();
+                            should_redraw |= state_changed;
+                            if status == LoopStatus::Done {
+                                stop = true;
+                                break;
+                            }
+                        }
+
+                        Event::Mouse(_) => {
+                            break;
+                        }
+
+                        Event::Resize(w, h) => {
+                            $term_ui.width = w as usize;
+                            $term_ui.height = h as usize;
+                            $term_ui.screen.resize(w as usize, h as usize);
+                            should_redraw = true;
                             break;
                         }
                     }
-
-                    _ => {
-                        break;
-                    }
+                } else {
+                    break;
                 }
             }
 
@@ -61,36 +75,26 @@ macro_rules! ui_loop {
                 break;
             }
 
-            // Check for screen resize
-            let (w, h) = termion::terminal_size().unwrap();
-            let needs_update = $term_ui.editor.update_dim(h as usize - 1, w as usize);
-            if needs_update {
-                $term_ui.width = w as usize;
-                $term_ui.height = h as usize;
-                $term_ui.screen.resize(w as usize, h as usize);
+            // Draw the editor to screen
+            if should_redraw {
+                // Make sure display dimensions are up-to-date.
+                $term_ui.editor.update_dim($term_ui.height, $term_ui.width);
                 $term_ui
                     .editor
                     .formatter
                     .set_wrap_width($term_ui.editor.view_dim.1);
-                should_redraw = true;
-            }
 
-            // Draw the editor to screen
-            if should_redraw {
+                // Draw!
                 {
                     $draw
                 };
                 $term_ui.screen.present();
             }
-
-            // Sleep for a small bit so we don't just spin on the CPU
-            std::thread::sleep(std::time::Duration::from_millis(5));
         }
     };
 }
 
 pub struct TermUI {
-    inp: termion::input::Events<termion::AsyncReader>,
     screen: Screen,
     editor: Editor<ConsoleLineFormatter>,
     width: usize,
@@ -110,12 +114,11 @@ impl TermUI {
     }
 
     pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
-        let (w, h) = termion::terminal_size().unwrap();
+        let (w, h) = crossterm::terminal::size().unwrap();
         let mut editor = ed;
         editor.update_dim(h as usize - 1, w as usize);
 
         TermUI {
-            inp: termion::async_stdin().events(),
             screen: Screen::new(),
             editor: editor,
             width: w as usize,
@@ -129,7 +132,7 @@ impl TermUI {
         self.screen.hide_cursor();
 
         // Set terminal size info
-        let (w, h) = termion::terminal_size().unwrap();
+        let (w, h) = crossterm::terminal::size().unwrap();
         self.width = w as usize;
         self.height = h as usize;
         self.editor.update_dim(self.height - 1, self.width);
@@ -150,74 +153,119 @@ impl TermUI {
             key_press(key) {
                 let mut state_changed = true;
                 match key {
-                    Key::Ctrl('q') => {
+                    KeyEvent {
+                        code: KeyCode::Char('q'),
+                        // modifiers: EMPTY_MOD,
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
                         self.quit = true;
                         return (LoopStatus::Done, true);
                     }
 
-                    Key::Ctrl('s') => {
+                    KeyEvent {
+                        code: KeyCode::Char('s'),
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
                         self.editor.save_if_dirty();
                     }
 
-                    Key::Ctrl('z') => {
+                    KeyEvent {
+                        code: KeyCode::Char('z'),
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
                         self.editor.undo();
                     }
 
-                    Key::Ctrl('y') => {
+                    KeyEvent {
+                        code: KeyCode::Char('y'),
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
                         self.editor.redo();
                     }
 
-                    Key::Ctrl('l') => {
+                    KeyEvent {
+                        code: KeyCode::Char('l'),
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
                         self.go_to_line_ui_loop();
                     }
 
-                    Key::PageUp => {
+                    KeyEvent {
+                        code: KeyCode::PageUp,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.page_up();
                     }
 
-                    Key::PageDown => {
+                    KeyEvent {
+                        code: KeyCode::PageDown,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.page_down();
                     }
 
-                    Key::Up => {
+                    KeyEvent {
+                        code: KeyCode::Up,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.cursor_up(1);
                     }
 
-                    Key::Down => {
+                    KeyEvent {
+                        code: KeyCode::Down,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.cursor_down(1);
                     }
 
-                    Key::Left => {
+                    KeyEvent {
+                        code: KeyCode::Left,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.cursor_left(1);
                     }
 
-                    Key::Right => {
+                    KeyEvent {
+                        code: KeyCode::Right,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.cursor_right(1);
                     }
 
-                    Key::Char('\n') => {
+                    KeyEvent {
+                        code: KeyCode::Enter,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         let nl = line_ending_to_str(self.editor.line_ending_type);
                         self.editor.insert_text_at_cursor(nl);
                     }
 
-                    Key::Char(' ') => {
-                        self.editor.insert_text_at_cursor(" ");
-                    }
-
-                    Key::Char('\t') => {
+                    KeyEvent {
+                        code: KeyCode::Tab,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.insert_tab_at_cursor();
                     }
 
-                    Key::Backspace => {
+                    KeyEvent {
+                        code: KeyCode::Backspace,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.backspace_at_cursor();
                     }
 
-                    Key::Delete => {
+                    KeyEvent {
+                        code: KeyCode::Delete,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.remove_text_in_front_of_cursor(1);
                     }
 
                     // Character
-                    Key::Char(c) => {
+                    KeyEvent {
+                        code: KeyCode::Char(c),
+                        modifiers: EMPTY_MOD,
+                    } => {
                         self.editor.insert_text_at_cursor(&c.to_string()[..]);
                     }
 
@@ -261,21 +309,41 @@ impl TermUI {
             key_press(key) {
                 let mut state_changed = true;
                 match key {
-                    Key::Esc => {
+                    KeyEvent {
+                        code: KeyCode::Char('q'),
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
+                        self.quit = true;
+                        return (LoopStatus::Done, true);
+                    }
+
+                    KeyEvent {
+                        code: KeyCode::Esc,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         cancel = true;
                         return (LoopStatus::Done, true);
                     }
 
-                    Key::Char('\n') => {
+                    KeyEvent {
+                        code: KeyCode::Enter,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         return (LoopStatus::Done, true);
                     }
 
-                    Key::Backspace => {
+                    KeyEvent {
+                        code: KeyCode::Backspace,
+                        modifiers: EMPTY_MOD,
+                    } => {
                         line.pop();
                     }
 
                     // Character
-                    Key::Char(c) => {
+                    KeyEvent {
+                        code: KeyCode::Char(c),
+                        modifiers: EMPTY_MOD,
+                    } => {
                         if c.is_numeric() {
                             line.push(c);
                         }

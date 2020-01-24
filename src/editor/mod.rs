@@ -255,7 +255,7 @@ impl<T: LineFormatter> Editor<T> {
 
     /// Updates the view dimensions, and returns whether that
     /// actually changed anything.
-    pub fn update_dim(&mut self, h: usize, w: usize) -> bool {
+    pub fn update_dim(&mut self, h: usize, w: usize) {
         let line_count_digits = digit_count(self.buffer.line_count() as u32, 10) as usize;
         if self.editor_dim.0 != h || self.editor_dim.1 != w {
             self.editor_dim = (h, w);
@@ -266,12 +266,8 @@ impl<T: LineFormatter> Editor<T> {
                 self.editor_dim.0 - 1,
                 self.editor_dim.1 - line_count_digits - 1,
             );
-            return true;
         } else if self.view_dim.1 != (self.editor_dim.1 - line_count_digits - 1) {
             self.view_dim.1 = self.editor_dim.1 - line_count_digits - 1;
-            return true;
-        } else {
-            return false;
         }
     }
 

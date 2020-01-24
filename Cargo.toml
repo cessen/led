@@ -21,7 +21,7 @@ unicode-segmentation = "1"
 unicode-width = "0.1"
 clap = "2"
 smallvec = "1"
-termion = "1"
+crossterm = "0.14"
 
 # Local crate dependencies
 [dependencies.backend]
