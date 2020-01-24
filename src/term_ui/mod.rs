@@ -40,7 +40,11 @@ macro_rules! ui_loop {
         loop {
             let mut should_redraw = false;
 
-            // Handle input
+            // Handle input.
+            // Doing this as a polled loop isn't necessary in the current
+            // implementation, but it will be useful in the future when we may
+            // want to re-draw on e.g. async syntax highlighting updates, or
+            // update based on a file being modified outside our process.
             loop {
                 if crossterm::event::poll(Duration::from_millis(5)).unwrap() {
                     match crossterm::event::read().unwrap() {
