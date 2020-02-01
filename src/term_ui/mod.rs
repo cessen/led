@@ -58,9 +58,9 @@ const STYLE_GUTTER: Style = Style(
         b: 0x70,
     },
     Color::Rgb {
-        r: 0x28,
-        g: 0x28,
-        b: 0x28,
+        r: 0x22,
+        g: 0x22,
+        b: 0x22,
     },
 );
 const STYLE_INFO: Style = Style(
@@ -517,7 +517,7 @@ impl TermUI {
         for line in editor.buffer.line_iter_at_index(line_index) {
             // Print line number
             if line_block_index == 0 {
-                let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
+                let lnx = c1.1 + (gutter_width - 2 - digit_count(line_num as u32, 10) as usize);
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
                     self.screen

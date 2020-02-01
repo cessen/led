@@ -253,22 +253,17 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-    /// Updates the view dimensions, and returns whether that
-    /// actually changed anything.
+    /// Updates the view dimensions.
     pub fn update_dim(&mut self, h: usize, w: usize) {
         let line_count_digits = digit_count(self.buffer.line_count() as u32, 10) as usize;
-        if self.editor_dim.0 != h || self.editor_dim.1 != w {
-            self.editor_dim = (h, w);
+        self.editor_dim = (h, w);
 
-            // Minus 1 vertically for the header, minus one more than the digits in
-            // the line count for the gutter.
-            self.view_dim = (
-                self.editor_dim.0 - 1,
-                self.editor_dim.1 - line_count_digits - 1,
-            );
-        } else if self.view_dim.1 != (self.editor_dim.1 - line_count_digits - 1) {
-            self.view_dim.1 = self.editor_dim.1 - line_count_digits - 1;
-        }
+        // Minus 1 vertically for the header, minus two more than the digits in
+        // the line count for the gutter.
+        self.view_dim = (
+            self.editor_dim.0 - 1,
+            self.editor_dim.1 - line_count_digits - 2,
+        );
     }
 
     pub fn undo(&mut self) {
