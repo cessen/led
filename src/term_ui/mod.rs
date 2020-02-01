@@ -65,14 +65,14 @@ const STYLE_GUTTER: Style = Style(
 );
 const STYLE_INFO: Style = Style(
     Color::Rgb {
-        r: 0xD0,
-        g: 0xD0,
-        b: 0xD0,
+        r: 0xC0,
+        g: 0xC0,
+        b: 0xC0,
     },
     Color::Rgb {
-        r: 0x50,
-        g: 0x50,
-        b: 0x50,
+        r: 0x14,
+        g: 0x14,
+        b: 0x14,
     },
 );
 
