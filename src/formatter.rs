@@ -76,14 +76,15 @@ pub trait LineFormatter {
         // TODO: handle rounding modes
         // TODO: do this with bidirectional line iterator
 
-        // Get the line and block index of the given index
+        // Get the line and char index within that line.
         let (mut line_i, mut col_i) = buf.index_to_line_col(char_idx);
         let mut line = buf.get_line(line_i);
 
-        // Find the right block in the line, and the index within that block
+        // Get the block information for the char offset in the line.
         let (line_block, block_range) = block_index_and_range(&line, col_i);
         let col_i_adjusted = col_i - block_range.0;
 
+        // Get the 2d coordinates within the block.
         let (mut y, x) = self.index_to_v2d(
             RopeGraphemes::new(&line.slice(block_range.0..block_range.1)),
             col_i_adjusted,
@@ -143,10 +144,11 @@ pub trait LineFormatter {
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
         let (block_start, block_end) = char_range_from_block_index(&line, block_index);
+        let block_len = block_end - block_start;
         let block_slice = line.slice(block_start..block_end);
         let block_col_i = min(
             self.v2d_to_index(RopeGraphemes::new(&block_slice), (y, x), rounding),
-            LINE_BLOCK_LENGTH - 1,
+            block_len - 1.min(block_len),
         );
         col_i = block_start + block_col_i;
 
@@ -163,14 +165,15 @@ pub trait LineFormatter {
         horizontal: usize,
         rounding: RoundingBehavior,
     ) -> usize {
+        // Get the line info.
         let (line_i, col_i) = buf.index_to_line_col(char_idx);
         let line = buf.get_line(line_i);
 
-        // Find the right block in the line, and the index within that block
-        let (_, block_range) = block_index_and_range(&line, col_i);
+        // Get the right block within the line.
+        let (block_i, block_range) = block_index_and_range(&line, col_i);
         let col_i_adjusted = col_i - block_range.0;
 
-        // Calculate the horizontal position
+        // Calculate the horizontal position.
         let (v, _) = self.index_to_v2d(
             RopeGraphemes::new(&line.slice(block_range.0..block_range.1)),
             col_i_adjusted,
@@ -180,13 +183,14 @@ pub trait LineFormatter {
             (v, horizontal),
             (RoundingBehavior::Floor, rounding),
         );
-        let mut new_col_i = block_range.0 + min(block_col_i, LINE_BLOCK_LENGTH - 1);
-
-        // Make sure we're not pushing the index off the end of the line
-        if (line_i + 1) < buf.line_count() && new_col_i >= line.len_chars() && line.len_chars() > 0
-        {
-            new_col_i = line.len_chars() - 1;
-        }
+        let new_col_i = if (line_i + 1) < buf.line_count() || (block_i + 1) < block_count(&line) {
+            min(
+                block_range.0 + block_col_i,
+                block_range.1 - 1.min(block_range.1),
+            )
+        } else {
+            min(block_range.0 + block_col_i, block_range.1)
+        };
 
         return (char_idx + new_col_i) - col_i;
     }

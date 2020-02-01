@@ -4,7 +4,7 @@ pub mod formatter;
 mod screen;
 pub mod smallstring;
 
-use std::{cmp::min, time::Duration};
+use std::time::Duration;
 
 use crossterm::{
     event::{Event, KeyCode, KeyEvent, KeyModifiers},
