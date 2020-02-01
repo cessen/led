@@ -57,7 +57,7 @@ pub trait LineFormatter {
 
         // Find the right block in the line, and the index within that block
         let (_, block_range) = block_index_and_range(&line, col_i);
-        let col_i_adjusted = col_i - dbg!(block_range).0;
+        let col_i_adjusted = col_i - block_range.0;
 
         // Get an iter into the right block
         let g_iter = RopeGraphemes::new(&line.slice(block_range.0..block_range.1));

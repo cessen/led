@@ -601,6 +601,7 @@ impl TermUI {
                     g_iter = editor.formatter.iter(RopeGraphemes::new(
                         &line.slice(block_range.0..block_range.1),
                     ));
+                    lines_traversed += 1;
                 } else {
                     break;
                 }
