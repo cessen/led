@@ -66,10 +66,6 @@ impl ConsoleLineFormatter {
 }
 
 impl LineFormatter for ConsoleLineFormatter {
-    fn single_line_height(&self) -> usize {
-        return 1;
-    }
-
     fn dimensions<'a, T>(&'a self, g_iter: T) -> (usize, usize)
     where
         T: Iterator<Item = RopeSlice<'a>>,
@@ -80,7 +76,7 @@ impl LineFormatter for ConsoleLineFormatter {
             dim = (max(dim.0, pos.0), max(dim.1, pos.1 + width));
         }
 
-        dim.0 += self.single_line_height();
+        dim.0 += 1;
 
         return dim;
     }
@@ -180,24 +176,15 @@ where
             }
 
             if self.f.maintain_indent {
-                let pos = (
-                    self.pos.0 + self.f.single_line_height(),
-                    self.indent + self.f.wrap_additional_indent,
-                );
+                let pos = (self.pos.0 + 1, self.indent + self.f.wrap_additional_indent);
                 self.pos = (
-                    self.pos.0 + self.f.single_line_height(),
+                    self.pos.0 + 1,
                     self.indent + self.f.wrap_additional_indent + width,
                 );
                 return Some((g, pos, width));
             } else {
-                let pos = (
-                    self.pos.0 + self.f.single_line_height(),
-                    self.f.wrap_additional_indent,
-                );
-                self.pos = (
-                    self.pos.0 + self.f.single_line_height(),
-                    self.f.wrap_additional_indent + width,
-                );
+                let pos = (self.pos.0 + 1, self.f.wrap_additional_indent);
+                self.pos = (self.pos.0 + 1, self.f.wrap_additional_indent + width);
                 return Some((g, pos, width));
             }
         } else {
@@ -273,15 +260,10 @@ where
 
                         if self.pos.1 > 0 {
                             if self.f.maintain_indent {
-                                self.pos = (
-                                    self.pos.0 + self.f.single_line_height(),
-                                    self.indent + self.f.wrap_additional_indent,
-                                );
+                                self.pos =
+                                    (self.pos.0 + 1, self.indent + self.f.wrap_additional_indent);
                             } else {
-                                self.pos = (
-                                    self.pos.0 + self.f.single_line_height(),
-                                    self.f.wrap_additional_indent,
-                                );
+                                self.pos = (self.pos.0 + 1, self.f.wrap_additional_indent);
                             }
                         }
                     }
@@ -321,8 +303,8 @@ mod tests {
     use ropey::Rope;
 
     use crate::buffer::Buffer;
+    use crate::formatter::LineFormatter;
     use crate::formatter::RoundingBehavior::{Ceiling, Floor, Round};
-    use crate::formatter::{LineFormatter, LINE_BLOCK_LENGTH};
     use crate::utils::RopeGraphemes;
 
     use super::*;
@@ -355,6 +337,19 @@ mod tests {
 
     #[test]
     fn dimensions_3() {
+        let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
+
+        let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::WordWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
+        f.set_wrap_width(12);
+
+        assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (6, 12));
+    }
+
+    #[test]
+    fn dimensions_4() {
         // 55 graphemes long
         let text = Rope::from_str(
             "税マイミ文末\
@@ -379,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn dimensions_4() {
+    fn dimensions_5() {
         // 55 graphemes long
         let text = Rope::from_str(
             "税マイミ文末\
@@ -670,6 +665,36 @@ mod tests {
         assert_eq!(f.index_to_horizontal_v2d(&b, 47), 0);
         assert_eq!(f.index_to_horizontal_v2d(&b, 55), 8);
         assert_eq!(f.index_to_horizontal_v2d(&b, 56), 8);
+    }
+
+    #[test]
+    fn index_to_horizontal_v2d_3() {
+        let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
+
+        let mut f = ConsoleLineFormatter::new(4);
+        f.wrap_type = WrapType::WordWrap(0);
+        f.maintain_indent = false;
+        f.wrap_additional_indent = 0;
+        f.set_wrap_width(12);
+
+        assert_eq!(f.index_to_horizontal_v2d(&b, 0), 0);
+        assert_eq!(f.index_to_horizontal_v2d(&b, 5), 5);
+
+        assert_eq!(f.index_to_horizontal_v2d(&b, 6), 0);
+        assert_eq!(f.index_to_horizontal_v2d(&b, 12), 6);
+
+        assert_eq!(f.index_to_horizontal_v2d(&b, 13), 0);
+        assert_eq!(f.index_to_horizontal_v2d(&b, 22), 9);
+
+        assert_eq!(f.index_to_horizontal_v2d(&b, 23), 0);
+        assert_eq!(f.index_to_horizontal_v2d(&b, 34), 11);
+
+        assert_eq!(f.index_to_horizontal_v2d(&b, 35), 0);
+        assert_eq!(f.index_to_horizontal_v2d(&b, 45), 10);
+
+        assert_eq!(f.index_to_horizontal_v2d(&b, 46), 0);
+        assert_eq!(f.index_to_horizontal_v2d(&b, 55), 9);
+        assert_eq!(f.index_to_horizontal_v2d(&b, 56), 9);
     }
 
     #[test]

@@ -13,7 +13,7 @@ use crossterm::{
 
 use crate::{
     editor::Editor,
-    formatter::{block_index_and_offset, LineFormatter, LINE_BLOCK_LENGTH},
+    formatter::{block_count, block_index_and_range, char_range_from_block_index, LineFormatter},
     string_utils::{line_ending_to_str, rope_slice_is_line_ending, LineEnding},
     utils::{digit_count, RopeGraphemes},
 };
@@ -487,19 +487,11 @@ impl TermUI {
         // Calculate all the starting info
         let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
         let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
-        let (mut line_block_index, _) = block_index_and_offset(col_i);
-        let mut char_index = editor
-            .buffer
-            .line_col_to_index((line_index, line_block_index * LINE_BLOCK_LENGTH));
         let temp_line = editor.buffer.get_line(line_index);
+        let (mut line_block_index, block_range) = block_index_and_range(&temp_line, col_i);
+        let mut char_index = editor.buffer.line_col_to_index((line_index, block_range.0));
         let (vis_line_offset, _) = editor.formatter.index_to_v2d(
-            RopeGraphemes::new(&temp_line.slice(
-                (line_block_index * LINE_BLOCK_LENGTH)
-                    ..min(
-                        temp_line.len_chars(),
-                        (line_block_index + 1) * LINE_BLOCK_LENGTH,
-                    ),
-            )),
+            RopeGraphemes::new(&temp_line.slice(block_range.0..block_range.1)),
             editor.view_pos.0 - char_index,
         );
 
@@ -527,16 +519,16 @@ impl TermUI {
 
             // Loop through the graphemes of the line and print them to
             // the screen.
-            let mut line_g_index: usize = 0;
-            let mut last_pos_y = 0;
-            let mut lines_traversed: usize = 0;
-            let line_len = line.len_chars();
+            let max_block_index = block_count(&line) - 1;
+            let block_range = char_range_from_block_index(&line, line_block_index);
             let mut g_iter = editor.formatter.iter(RopeGraphemes::new(
-                &line.slice((line_block_index * LINE_BLOCK_LENGTH)..line_len),
+                &line.slice(block_range.0..block_range.1),
             ));
 
+            let mut last_pos_y = 0;
+            let mut lines_traversed: usize = 0;
             loop {
-                if let Some((g, (pos_y, pos_x), width)) = g_iter.next() {
+                for (g, (pos_y, pos_x), width) in g_iter {
                     if last_pos_y != pos_y {
                         if last_pos_y < pos_y {
                             lines_traversed += pos_y - last_pos_y;
@@ -600,19 +592,17 @@ impl TermUI {
                     }
 
                     char_index += g.chars().count();
-                    line_g_index += 1;
-                } else {
-                    break;
                 }
 
-                if line_g_index >= LINE_BLOCK_LENGTH {
-                    line_block_index += 1;
-                    line_g_index = 0;
-                    let line_len = line.len_chars();
+                // Move on to the next block.
+                line_block_index += 1;
+                if line_block_index <= max_block_index {
+                    let block_range = char_range_from_block_index(&line, line_block_index);
                     g_iter = editor.formatter.iter(RopeGraphemes::new(
-                        &line.slice((line_block_index * LINE_BLOCK_LENGTH)..line_len),
+                        &line.slice(block_range.0..block_range.1),
                     ));
-                    lines_traversed += 1;
+                } else {
+                    break;
                 }
             }
 

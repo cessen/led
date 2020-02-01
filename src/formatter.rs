@@ -1,17 +1,23 @@
-#![allow(dead_code)]
-
 use std::cmp::min;
 
 use ropey::RopeSlice;
 
-use crate::{buffer::Buffer, utils::RopeGraphemes};
+use crate::{
+    buffer::Buffer,
+    utils::{is_grapheme_boundary, RopeGraphemes},
+};
 
-// Maximum graphemes in a line before a soft line break is forced.
+// Maximum chars in a line before a soft line break is forced.
 // This is necessary to prevent pathological formatting cases which
 // could slow down the editor arbitrarily for arbitrarily long
 // lines.
-pub const LINE_BLOCK_LENGTH: usize = 1 << 12;
+const LINE_BLOCK_LENGTH: usize = 1 << 12;
 
+// A fudge-factor for the above block length, to allow looking for natural
+// breaks.
+const LINE_BLOCK_FUDGE: usize = 32;
+
+#[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq)]
 pub enum RoundingBehavior {
     Round,
@@ -20,8 +26,6 @@ pub enum RoundingBehavior {
 }
 
 pub trait LineFormatter {
-    fn single_line_height(&self) -> usize;
-
     /// Returns the 2d visual dimensions of the given text when formatted
     /// by the formatter.
     /// The text to be formatted is passed as a grapheme iterator.
@@ -46,17 +50,17 @@ pub trait LineFormatter {
     where
         T: Iterator<Item = RopeSlice<'a>>;
 
+    /// Converts from char index to the horizontal 2d char index.
     fn index_to_horizontal_v2d(&self, buf: &Buffer, char_idx: usize) -> usize {
         let (line_i, col_i) = buf.index_to_line_col(char_idx);
         let line = buf.get_line(line_i);
 
         // Find the right block in the line, and the index within that block
-        let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
+        let (_, block_range) = block_index_and_range(&line, col_i);
+        let col_i_adjusted = col_i - dbg!(block_range).0;
 
         // Get an iter into the right block
-        let a = line_block * LINE_BLOCK_LENGTH;
-        let b = min(line.len_chars(), (line_block + 1) * LINE_BLOCK_LENGTH);
-        let g_iter = RopeGraphemes::new(&line.slice(a..b));
+        let g_iter = RopeGraphemes::new(&line.slice(block_range.0..block_range.1));
         return self.index_to_v2d(g_iter, col_i_adjusted).1;
     }
 
@@ -74,16 +78,14 @@ pub trait LineFormatter {
 
         // Get the line and block index of the given index
         let (mut line_i, mut col_i) = buf.index_to_line_col(char_idx);
+        let mut line = buf.get_line(line_i);
 
         // Find the right block in the line, and the index within that block
-        let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
+        let (line_block, block_range) = block_index_and_range(&line, col_i);
+        let col_i_adjusted = col_i - block_range.0;
 
-        let mut line = buf.get_line(line_i);
         let (mut y, x) = self.index_to_v2d(
-            RopeGraphemes::new(&line.slice(
-                (line_block * LINE_BLOCK_LENGTH)
-                    ..min(line.len_chars(), (line_block + 1) * LINE_BLOCK_LENGTH),
-            )),
+            RopeGraphemes::new(&line.slice(block_range.0..block_range.1)),
             col_i_adjusted,
         );
 
@@ -93,17 +95,15 @@ pub trait LineFormatter {
         let mut block_index: usize = line_block;
         loop {
             line = buf.get_line(line_i);
-            let (h, _) = self.dimensions(RopeGraphemes::new(&line.slice(
-                (block_index * LINE_BLOCK_LENGTH)
-                    ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
-            )));
+            let (block_start, block_end) = char_range_from_block_index(&line, block_index);
+            let (h, _) = self.dimensions(RopeGraphemes::new(&line.slice(block_start..block_end)));
 
             if new_y >= 0 && new_y < h as isize {
                 y = new_y as usize;
                 break;
             } else {
                 if new_y > 0 {
-                    let is_last_block = block_index >= last_block_index(line.len_chars());
+                    let is_last_block = block_index >= (block_count(&line) - 1);
 
                     // Check for off-the-end
                     if is_last_block && (line_i + 1) >= buf.line_count() {
@@ -126,14 +126,13 @@ pub trait LineFormatter {
                     if block_index == 0 {
                         line_i -= 1;
                         line = buf.get_line(line_i);
-                        block_index = last_block_index(line.len_chars());
+                        block_index = block_count(&line) - 1;
                     } else {
                         block_index -= 1;
                     }
-                    let (h, _) = self.dimensions(RopeGraphemes::new(&line.slice(
-                        (block_index * LINE_BLOCK_LENGTH)
-                            ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
-                    )));
+                    let (block_start, block_end) = char_range_from_block_index(&line, block_index);
+                    let (h, _) =
+                        self.dimensions(RopeGraphemes::new(&line.slice(block_start..block_end)));
                     new_y += h as isize;
                 } else {
                     unreachable!();
@@ -143,15 +142,13 @@ pub trait LineFormatter {
 
         // Next, convert the resulting coordinates back into buffer-wide
         // coordinates.
-        let block_slice = line.slice(
-            (block_index * LINE_BLOCK_LENGTH)
-                ..min(line.len_chars(), (block_index + 1) * LINE_BLOCK_LENGTH),
-        );
+        let (block_start, block_end) = char_range_from_block_index(&line, block_index);
+        let block_slice = line.slice(block_start..block_end);
         let block_col_i = min(
             self.v2d_to_index(RopeGraphemes::new(&block_slice), (y, x), rounding),
             LINE_BLOCK_LENGTH - 1,
         );
-        col_i = (block_index * LINE_BLOCK_LENGTH) + block_col_i;
+        col_i = block_start + block_col_i;
 
         return buf.line_col_to_index((line_i, col_i));
     }
@@ -170,21 +167,20 @@ pub trait LineFormatter {
         let line = buf.get_line(line_i);
 
         // Find the right block in the line, and the index within that block
-        let (line_block, col_i_adjusted) = block_index_and_offset(col_i);
-        let start_index = line_block * LINE_BLOCK_LENGTH;
-        let end_index = min(line.len_chars(), start_index + LINE_BLOCK_LENGTH);
+        let (_, block_range) = block_index_and_range(&line, col_i);
+        let col_i_adjusted = col_i - block_range.0;
 
         // Calculate the horizontal position
         let (v, _) = self.index_to_v2d(
-            RopeGraphemes::new(&line.slice(start_index..end_index)),
+            RopeGraphemes::new(&line.slice(block_range.0..block_range.1)),
             col_i_adjusted,
         );
         let block_col_i = self.v2d_to_index(
-            RopeGraphemes::new(&line.slice(start_index..end_index)),
+            RopeGraphemes::new(&line.slice(block_range.0..block_range.1)),
             (v, horizontal),
             (RoundingBehavior::Floor, rounding),
         );
-        let mut new_col_i = start_index + min(block_col_i, LINE_BLOCK_LENGTH - 1);
+        let mut new_col_i = block_range.0 + min(block_col_i, LINE_BLOCK_LENGTH - 1);
 
         // Make sure we're not pushing the index off the end of the line
         if (line_i + 1) < buf.line_count() && new_col_i >= line.len_chars() && line.len_chars() > 0
@@ -196,19 +192,75 @@ pub trait LineFormatter {
     }
 }
 
-pub fn block_index_and_offset(index: usize) -> (usize, usize) {
-    (index / LINE_BLOCK_LENGTH, index % LINE_BLOCK_LENGTH)
+// Finds the best break at or before the given char index, bounded by
+// the given `lower_limit`.
+pub fn find_good_break(slice: &RopeSlice, lower_limit: usize, char_idx: usize) -> usize {
+    let char_idx = char_idx.min(slice.len_chars());
+    let lower_limit = lower_limit.min(slice.len_chars());
+
+    // Find a whitespace break, if any.
+    let mut i = char_idx;
+    while i > lower_limit {
+        match slice.char(i - 1) {
+            // Previous char is whitespace.
+            '\u{0009}' | '\u{0020}' | '\u{00A0}' | '\u{2000}' | '\u{2001}' | '\u{2002}'
+            | '\u{2003}' | '\u{2004}' | '\u{2005}' | '\u{2006}' | '\u{2007}' | '\u{2008}'
+            | '\u{2009}' | '\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}' => {
+                return i;
+            }
+
+            // Previous char is not whitespace.
+            _ => {
+                i -= 1;
+            }
+        }
+    }
+
+    // Otherwise, at least try to find a grapheme break.
+    let mut i = char_idx;
+    while i > lower_limit && !is_grapheme_boundary(slice, i) {
+        i -= 1;
+    }
+
+    if i > lower_limit {
+        i
+    } else {
+        char_idx
+    }
 }
 
-pub fn last_block_index(gc: usize) -> usize {
-    let mut block_count = gc / LINE_BLOCK_LENGTH;
-    if (gc % LINE_BLOCK_LENGTH) > 0 {
-        block_count += 1;
+pub fn char_range_from_block_index(slice: &RopeSlice, block_idx: usize) -> (usize, usize) {
+    let start = {
+        let initial = LINE_BLOCK_LENGTH * block_idx;
+        find_good_break(slice, initial - LINE_BLOCK_FUDGE.min(initial), initial)
+    };
+
+    let end = {
+        let initial = LINE_BLOCK_LENGTH * (block_idx + 1);
+        find_good_break(slice, initial - LINE_BLOCK_FUDGE.min(initial), initial)
+    };
+
+    (start, end)
+}
+
+pub fn block_index_and_range(slice: &RopeSlice, char_idx: usize) -> (usize, (usize, usize)) {
+    let mut block_index = char_idx / LINE_BLOCK_LENGTH;
+    let mut range = char_range_from_block_index(slice, block_index);
+    if char_idx >= range.1 && range.1 < slice.len_chars() {
+        block_index += 1;
+        range = char_range_from_block_index(slice, block_index);
+    }
+    (block_index, range)
+}
+
+pub fn block_count(slice: &RopeSlice) -> usize {
+    let char_count = slice.len_chars();
+    let mut last_idx = (char_count - 1.min(char_count)) / LINE_BLOCK_LENGTH;
+
+    let range = char_range_from_block_index(slice, last_idx + 1);
+    if range.0 < range.1 {
+        last_idx += 1;
     }
 
-    if block_count > 0 {
-        return block_count - 1;
-    } else {
-        return 0;
-    }
+    last_idx + 1
 }

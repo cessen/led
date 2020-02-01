@@ -553,7 +553,7 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn cursor_up(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
-            let vmove = -1 * (n * self.formatter.single_line_height()) as isize;
+            let vmove = -1 * n as isize;
 
             let mut temp_index = self.formatter.index_offset_vertical_v2d(
                 &self.buffer,
@@ -589,7 +589,7 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn cursor_down(&mut self, n: usize) {
         for c in self.cursors.iter_mut() {
-            let vmove = (n * self.formatter.single_line_height()) as isize;
+            let vmove = n as isize;
 
             let mut temp_index = self.formatter.index_offset_vertical_v2d(
                 &self.buffer,
@@ -624,8 +624,7 @@ impl<T: LineFormatter> Editor<T> {
     }
 
     pub fn page_up(&mut self) {
-        let move_amount =
-            self.view_dim.0 - max(self.view_dim.0 / 8, self.formatter.single_line_height());
+        let move_amount = self.view_dim.0 - max(self.view_dim.0 / 8, 1);
         self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
             &self.buffer,
             self.view_pos.0,
@@ -640,8 +639,7 @@ impl<T: LineFormatter> Editor<T> {
     }
 
     pub fn page_down(&mut self) {
-        let move_amount =
-            self.view_dim.0 - max(self.view_dim.0 / 8, self.formatter.single_line_height());
+        let move_amount = self.view_dim.0 - max(self.view_dim.0 / 8, 1);
         self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
             &self.buffer,
             self.view_pos.0,
