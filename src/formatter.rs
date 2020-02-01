@@ -195,25 +195,21 @@ pub trait LineFormatter {
 // Finds the best break at or before the given char index, bounded by
 // the given `lower_limit`.
 pub fn find_good_break(slice: &RopeSlice, lower_limit: usize, char_idx: usize) -> usize {
-    let char_idx = char_idx.min(slice.len_chars());
-    let lower_limit = lower_limit.min(slice.len_chars());
+    const WS_CHARS: &[char] = &[' ', '　', '\t'];
+
+    let slice_len = slice.len_chars();
+    let char_idx = char_idx.min(slice_len);
+    let lower_limit = lower_limit.min(slice_len);
 
     // Find a whitespace break, if any.
     let mut i = char_idx;
     while i > lower_limit {
-        match slice.char(i - 1) {
-            // Previous char is whitespace.
-            '\u{0009}' | '\u{0020}' | '\u{00A0}' | '\u{2000}' | '\u{2001}' | '\u{2002}'
-            | '\u{2003}' | '\u{2004}' | '\u{2005}' | '\u{2006}' | '\u{2007}' | '\u{2008}'
-            | '\u{2009}' | '\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}' => {
-                return i;
-            }
-
-            // Previous char is not whitespace.
-            _ => {
-                i -= 1;
-            }
+        if (i == slice_len || !WS_CHARS.contains(&slice.char(i)))
+            && WS_CHARS.contains(&slice.char(i - 1))
+        {
+            return i;
         }
+        i -= 1;
     }
 
     // Otherwise, at least try to find a grapheme break.
