@@ -25,6 +25,57 @@ use self::{
 
 const EMPTY_MOD: KeyModifiers = KeyModifiers::empty();
 
+// Color theme.
+// Styles are (FG, BG).
+const STYLE_MAIN: Style = Style(
+    Color::Rgb {
+        r: 0xD0,
+        g: 0xD0,
+        b: 0xD0,
+    },
+    Color::Rgb {
+        r: 0x28,
+        g: 0x28,
+        b: 0x28,
+    },
+);
+const STYLE_CURSOR: Style = Style(
+    Color::Rgb {
+        r: 0x00,
+        g: 0x00,
+        b: 0x00,
+    },
+    Color::Rgb {
+        r: 0xD0,
+        g: 0xD0,
+        b: 0xD0,
+    },
+);
+const STYLE_GUTTER: Style = Style(
+    Color::Rgb {
+        r: 0x70,
+        g: 0x70,
+        b: 0x70,
+    },
+    Color::Rgb {
+        r: 0x28,
+        g: 0x28,
+        b: 0x28,
+    },
+);
+const STYLE_INFO: Style = Style(
+    Color::Rgb {
+        r: 0xD0,
+        g: 0xD0,
+        b: 0xD0,
+    },
+    Color::Rgb {
+        r: 0x50,
+        g: 0x50,
+        b: 0x50,
+    },
+);
+
 /// Generalized ui loop.
 macro_rules! ui_loop {
     ($term_ui:ident,draw $draw:block,key_press($key:ident) $key_press:block) => {
@@ -151,7 +202,7 @@ impl TermUI {
 
             // Draw
             draw {
-                self.screen.clear(Color::Black);
+                self.screen.clear(STYLE_MAIN.1);
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
             },
 
@@ -285,8 +336,6 @@ impl TermUI {
     }
 
     fn go_to_line_ui_loop(&mut self) {
-        let style = Style(Color::Black, Color::Cyan);
-
         let mut cancel = false;
         let prefix = "Jump to line: ";
         let mut line = String::new();
@@ -296,17 +345,17 @@ impl TermUI {
 
             // Draw
             draw {
-                self.screen.clear(Color::Black);
+                self.screen.clear(STYLE_MAIN.1);
                 self.draw_editor(&self.editor, (0, 0), (self.height - 1, self.width - 1));
                 for i in 0..self.width {
-                    self.screen.draw(i, 0, " ", style);
+                    self.screen.draw(i, 0, " ", STYLE_INFO);
                 }
-                self.screen.draw(1, 0, prefix, style);
+                self.screen.draw(1, 0, prefix, STYLE_INFO);
                 self.screen.draw(
                     prefix.len() + 1,
                     0,
                     &line[..],
-                    style,
+                    STYLE_INFO,
                 );
             },
 
@@ -377,18 +426,16 @@ impl TermUI {
         c1: (usize, usize),
         c2: (usize, usize),
     ) {
-        let style = Style(Color::Black, Color::Cyan);
-
         // Fill in top row with info line color
         for i in c1.1..(c2.1 + 1) {
-            self.screen.draw(i, c1.0, " ", style);
+            self.screen.draw(i, c1.0, " ", STYLE_INFO);
         }
 
         // Filename and dirty marker
         let filename = editor.file_path.display();
         let dirty_char = if editor.dirty { "*" } else { "" };
         let name = format!("{}{}", filename, dirty_char);
-        self.screen.draw(c1.1 + 1, c1.0, &name[..], style);
+        self.screen.draw(c1.1 + 1, c1.0, &name[..], STYLE_INFO);
 
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
@@ -400,8 +447,12 @@ impl TermUI {
             100
         };
         let pstring = format!("{}%", percentage);
-        self.screen
-            .draw(c2.1 - pstring.len().min(c2.1), c1.0, &pstring[..], style);
+        self.screen.draw(
+            c2.1 - pstring.len().min(c2.1),
+            c1.0,
+            &pstring[..],
+            STYLE_INFO,
+        );
 
         // Text encoding info and tab style
         let nl = match editor.line_ending_type {
@@ -421,7 +472,7 @@ impl TermUI {
             nl, soft_tabs_str, editor.soft_tab_width as usize
         );
         self.screen
-            .draw(c2.1 - 30.min(c2.1), c1.0, &info_line[..], style);
+            .draw(c2.1 - 30.min(c2.1), c1.0, &info_line[..], STYLE_INFO);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
@@ -458,8 +509,7 @@ impl TermUI {
         // Fill in the gutter with the appropriate background
         for y in c1.0..(c2.0 + 1) {
             for x in c1.1..(c1.1 + gutter_width - 1) {
-                self.screen
-                    .draw(x, y, " ", Style(Color::White, Color::Blue));
+                self.screen.draw(x, y, " ", STYLE_GUTTER);
             }
         }
 
@@ -470,12 +520,8 @@ impl TermUI {
                 let lnx = c1.1 + (gutter_width - 1 - digit_count(line_num as u32, 10) as usize);
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
-                    self.screen.draw(
-                        lnx,
-                        lny,
-                        &format!("{}", line_num)[..],
-                        Style(Color::White, Color::Blue),
-                    );
+                    self.screen
+                        .draw(lnx, lny, &format!("{}", line_num)[..], STYLE_GUTTER);
                 }
             }
 
@@ -519,33 +565,20 @@ impl TermUI {
                         // Actually print the character
                         if rope_slice_is_line_ending(&g) {
                             if at_cursor {
-                                self.screen.draw(
-                                    px as usize,
-                                    py as usize,
-                                    " ",
-                                    Style(Color::Black, Color::White),
-                                );
+                                self.screen
+                                    .draw(px as usize, py as usize, " ", STYLE_CURSOR);
                             }
                         } else if g == "\t" {
                             for i in 0..width {
                                 let tpx = px as usize + i;
                                 if tpx <= c2.1 {
-                                    self.screen.draw(
-                                        tpx as usize,
-                                        py as usize,
-                                        " ",
-                                        Style(Color::White, Color::Black),
-                                    );
+                                    self.screen.draw(tpx as usize, py as usize, " ", STYLE_MAIN);
                                 }
                             }
 
                             if at_cursor {
-                                self.screen.draw(
-                                    px as usize,
-                                    py as usize,
-                                    " ",
-                                    Style(Color::Black, Color::White),
-                                );
+                                self.screen
+                                    .draw(px as usize, py as usize, " ", STYLE_CURSOR);
                             }
                         } else {
                             if at_cursor {
@@ -553,14 +586,14 @@ impl TermUI {
                                     px as usize,
                                     py as usize,
                                     &g,
-                                    Style(Color::Black, Color::White),
+                                    STYLE_CURSOR,
                                 );
                             } else {
                                 self.screen.draw_rope_slice(
                                     px as usize,
                                     py as usize,
                                     &g,
-                                    Style(Color::White, Color::Black),
+                                    STYLE_MAIN,
                                 );
                             }
                         }
@@ -613,12 +646,8 @@ impl TermUI {
                 && (px <= c2.1 as isize)
                 && (py <= c2.0 as isize)
             {
-                self.screen.draw(
-                    px as usize,
-                    py as usize,
-                    " ",
-                    Style(Color::Black, Color::White),
-                );
+                self.screen
+                    .draw(px as usize, py as usize, " ", STYLE_CURSOR);
             }
         }
     }
