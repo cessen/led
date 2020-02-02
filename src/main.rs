@@ -1,7 +1,4 @@
-use std::{
-    io::{Read, Write},
-    path::Path,
-};
+use std::{io::Write, path::Path};
 
 use clap::{App, Arg};
 use editor::Editor;
@@ -37,38 +34,27 @@ fn main() {
         Editor::new(ConsoleLineFormatter::new(4))
     };
 
-    // Redirect stderr to an internal buffer, so we can print it after exiting.
-    let stderr_buf = gag::BufferRedirect::stderr().unwrap();
+    // Holds stderr output in an internal buffer, and prints it when dropped.
+    // This keeps stderr from being swallowed by the TUI.
+    let stderr_hold = gag::Hold::stderr().unwrap();
 
-    // Initialize and start UI
+    // Initialize and start UI.
     let exec_result = std::panic::catch_unwind(|| {
         let mut ui = TermUI::new_from_editor(editor);
         ui.main_ui_loop();
     });
 
-    // Check for panics.  If we did panic, exit from raw mode and the alternate
-    // screen before propagating the panic, so that the panic printout actually
-    // goes to a visible and scrollable screen.
-    match exec_result {
-        Ok(_) => {
-            // Print captured stderr.
-            let mut msg = String::new();
-            stderr_buf.into_inner().read_to_string(&mut msg).unwrap();
-            eprint!("{}", msg);
-        }
-        Err(e) => {
-            // Exit raw alt screen.
-            crossterm::terminal::disable_raw_mode().unwrap();
-            crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen)
-                .unwrap();
+    // If we panicked, ensure that we've exited from raw mode and the alternate
+    // screen before printing the error and resuming the panic.
+    if let Err(e) = exec_result {
+        // Exit raw alt screen.
+        crossterm::terminal::disable_raw_mode().unwrap();
+        crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen).unwrap();
 
-            // Print captured stderr.
-            let mut msg = String::new();
-            stderr_buf.into_inner().read_to_string(&mut msg).unwrap();
-            eprint!("{}", msg);
+        // Print captured stderr.
+        drop(stderr_hold);
 
-            // Resume panic unwind.
-            std::panic::resume_unwind(e);
-        }
+        // Resume panic unwind.
+        std::panic::resume_unwind(e);
     }
 }
