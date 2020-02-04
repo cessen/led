@@ -1,5 +1,5 @@
 use std;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::io;
 use std::io::{BufWriter, Write};
 
@@ -15,6 +15,7 @@ use super::smallstring::SmallString;
 pub(crate) struct Screen {
     out: RefCell<BufWriter<io::Stdout>>,
     buf: RefCell<Vec<Option<(Style, SmallString)>>>,
+    main_cursor: Cell<(u16, u16)>,
     w: usize,
     h: usize,
 }
@@ -40,6 +41,7 @@ impl Screen {
         Screen {
             out: RefCell::new(out),
             buf: RefCell::new(buf),
+            main_cursor: Cell::new((0, 0)),
             w: w as usize,
             h: h as usize,
         }
@@ -113,8 +115,19 @@ impl Screen {
             }
         }
 
+        let cursor_pos = self.main_cursor.get();
+        queue!(out, crossterm::cursor::MoveTo(cursor_pos.0, cursor_pos.1)).unwrap();
+        self.main_cursor.set((0, 0));
+
         // Make sure everything is written out from the buffer.
         out.flush().unwrap();
+    }
+
+    pub(crate) fn set_cursor(&self, x: usize, y: usize) {
+        self.main_cursor.set((
+            x.min(self.w.saturating_sub(1)) as u16,
+            y.min(self.h.saturating_sub(1)) as u16,
+        ));
     }
 
     pub(crate) fn draw(&self, x: usize, y: usize, text: &str, style: Style) {

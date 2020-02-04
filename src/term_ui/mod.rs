@@ -357,6 +357,7 @@ impl TermUI {
                     &line[..],
                     STYLE_INFO,
                 );
+                self.screen.set_cursor(prefix.len() + 1, 0);
             },
 
             // Handle input
@@ -551,6 +552,7 @@ impl TermUI {
                         for c in editor.cursors.iter() {
                             if char_index >= c.range.0 && char_index <= c.range.1 {
                                 at_cursor = true;
+                                self.screen.set_cursor(px as usize, py as usize);
                             }
                         }
 
@@ -639,6 +641,7 @@ impl TermUI {
             {
                 self.screen
                     .draw(px as usize, py as usize, " ", STYLE_CURSOR);
+                self.screen.set_cursor(px as usize, py as usize);
             }
         }
     }
