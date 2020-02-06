@@ -4,7 +4,7 @@ use ropey::RopeSlice;
 
 use crate::{
     buffer::Buffer,
-    utils::{is_grapheme_boundary, RopeGraphemes},
+    utils::{is_grapheme_boundary, prev_grapheme_boundary, RopeGraphemes},
 };
 
 // Maximum chars in a line before a soft line break is forced.
@@ -202,27 +202,39 @@ pub fn find_good_break(slice: &RopeSlice, lower_limit: usize, char_idx: usize) -
     let char_idx = char_idx.min(slice_len);
     let lower_limit = lower_limit.min(slice_len);
 
+    // Early out in trivial cases.
+    if char_idx < (LINE_BLOCK_LENGTH - LINE_BLOCK_FUDGE) {
+        return char_idx;
+    }
+
     // Find a whitespace break, if any.
     let mut i = char_idx;
+    let mut prev = if i == slice_len {
+        None
+    } else {
+        Some(slice.char(char_idx))
+    };
+    let mut char_itr = slice.chars_at(char_idx);
     while i > lower_limit {
-        if (i == slice_len || !WS_CHARS.contains(&slice.char(i)))
-            && WS_CHARS.contains(&slice.char(i - 1))
+        let c = char_itr.prev();
+        if WS_CHARS.contains(&c.unwrap()) && prev.map(|pc| !WS_CHARS.contains(&pc)).unwrap_or(true)
         {
             return i;
         }
+        prev = c;
         i -= 1;
     }
 
     // Otherwise, at least try to find a grapheme break.
-    let mut i = char_idx;
-    while i > lower_limit && !is_grapheme_boundary(slice, i) {
-        i -= 1;
-    }
-
-    if i > lower_limit {
-        i
-    } else {
+    if is_grapheme_boundary(slice, char_idx) {
         char_idx
+    } else {
+        let i = prev_grapheme_boundary(slice, char_idx);
+        if i > lower_limit {
+            i
+        } else {
+            char_idx
+        }
     }
 }
 
