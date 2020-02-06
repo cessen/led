@@ -416,7 +416,7 @@ impl TermUI {
         // Jump to line!
         if !cancel {
             if let Ok(n) = line.parse::<usize>() {
-                self.editor.jump_to_line(n - 1.min(n));
+                self.editor.jump_to_line(n.saturating_sub(1));
             }
         }
     }
@@ -449,7 +449,7 @@ impl TermUI {
         };
         let pstring = format!("{}%", percentage);
         self.screen.draw(
-            c2.1 - pstring.len().min(c2.1),
+            c2.1.saturating_sub(pstring.len()),
             c1.0,
             &pstring[..],
             STYLE_INFO,
@@ -473,7 +473,7 @@ impl TermUI {
             nl, soft_tabs_str, editor.soft_tab_width as usize
         );
         self.screen
-            .draw(c2.1 - 30.min(c2.1), c1.0, &info_line[..], STYLE_INFO);
+            .draw(c2.1.saturating_sub(30), c1.0, &info_line[..], STYLE_INFO);
 
         // Draw main text editing area
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);

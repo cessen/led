@@ -148,7 +148,7 @@ pub trait LineFormatter {
         let block_slice = line.slice(block_start..block_end);
         let block_col_i = min(
             self.v2d_to_index(RopeGraphemes::new(&block_slice), (y, x), rounding),
-            block_len - 1.min(block_len),
+            block_len.saturating_sub(1),
         );
         col_i = block_start + block_col_i;
 
@@ -184,10 +184,7 @@ pub trait LineFormatter {
             (RoundingBehavior::Floor, rounding),
         );
         let new_col_i = if (line_i + 1) < buf.line_count() || (block_i + 1) < block_count(&line) {
-            min(
-                block_range.0 + block_col_i,
-                block_range.1 - 1.min(block_range.1),
-            )
+            min(block_range.0 + block_col_i, block_range.1.saturating_sub(1))
         } else {
             min(block_range.0 + block_col_i, block_range.1)
         };
@@ -232,12 +229,12 @@ pub fn find_good_break(slice: &RopeSlice, lower_limit: usize, char_idx: usize) -
 pub fn char_range_from_block_index(slice: &RopeSlice, block_idx: usize) -> (usize, usize) {
     let start = {
         let initial = LINE_BLOCK_LENGTH * block_idx;
-        find_good_break(slice, initial - LINE_BLOCK_FUDGE.min(initial), initial)
+        find_good_break(slice, initial.saturating_sub(LINE_BLOCK_FUDGE), initial)
     };
 
     let end = {
         let initial = LINE_BLOCK_LENGTH * (block_idx + 1);
-        find_good_break(slice, initial - LINE_BLOCK_FUDGE.min(initial), initial)
+        find_good_break(slice, initial.saturating_sub(LINE_BLOCK_FUDGE), initial)
     };
 
     (start, end)
@@ -255,7 +252,7 @@ pub fn block_index_and_range(slice: &RopeSlice, char_idx: usize) -> (usize, (usi
 
 pub fn block_count(slice: &RopeSlice) -> usize {
     let char_count = slice.len_chars();
-    let mut last_idx = (char_count - 1.min(char_count)) / LINE_BLOCK_LENGTH;
+    let mut last_idx = char_count.saturating_sub(1) / LINE_BLOCK_LENGTH;
 
     let range = char_range_from_block_index(slice, last_idx + 1);
     if range.0 < range.1 {
