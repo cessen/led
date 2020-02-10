@@ -15,7 +15,7 @@ use crate::{
     editor::Editor,
     formatter::{block_count, block_index_and_range, char_range_from_block_index, LineFormatter},
     string_utils::{line_ending_to_str, rope_slice_is_line_ending, LineEnding},
-    utils::{digit_count, RopeGraphemes},
+    utils::{digit_count, RopeGraphemes, Timer},
 };
 
 use self::{
@@ -24,6 +24,7 @@ use self::{
 };
 
 const EMPTY_MOD: KeyModifiers = KeyModifiers::empty();
+const UPDATE_TICK_MS: u64 = 10;
 
 // Color theme.
 // Styles are (FG, BG).
@@ -80,6 +81,7 @@ const STYLE_INFO: Style = Style(
 macro_rules! ui_loop {
     ($term_ui:ident,draw $draw:block,key_press($key:ident) $key_press:block) => {
         let mut stop = false;
+        let mut timer = Timer::new();
 
         // Draw the editor to screen for the first time
         {
@@ -97,7 +99,7 @@ macro_rules! ui_loop {
             // want to re-draw on e.g. async syntax highlighting updates, or
             // update based on a file being modified outside our process.
             loop {
-                if crossterm::event::poll(Duration::from_millis(5)).unwrap() {
+                if crossterm::event::poll(Duration::from_millis(UPDATE_TICK_MS)).unwrap() {
                     match crossterm::event::read().unwrap() {
                         Event::Key($key) => {
                             let (status, state_changed) = || -> (LoopStatus, bool) { $key_press }();
@@ -119,6 +121,15 @@ macro_rules! ui_loop {
                             should_redraw = true;
                             break;
                         }
+                    }
+
+                    // If too much time has passed since the last redraw,
+                    // break so we can draw if needed.  This keeps an onslaught
+                    // of input (e.g. when pasting a large piece of text) from
+                    // visually freezing the UI.
+                    if timer.elapsed() >= UPDATE_TICK_MS {
+                        timer.tick();
+                        break;
                     }
                 } else {
                     break;

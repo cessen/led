@@ -1,4 +1,5 @@
 use ropey::{iter::Chunks, str_utils::byte_to_char_idx, RopeSlice};
+use time::Instant;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 use unicode_width::UnicodeWidthStr;
 
@@ -185,6 +186,34 @@ impl<'a> Iterator for RopeGraphemes<'a> {
             let b2 = b - self.cur_chunk_start;
             Some((&self.cur_chunk[a2..b2]).into())
         }
+    }
+}
+
+//=============================================================
+
+#[derive(Copy, Clone)]
+pub struct Timer {
+    last_instant: Instant,
+}
+
+impl Timer {
+    pub fn new() -> Timer {
+        Timer {
+            last_instant: Instant::now(),
+        }
+    }
+
+    /// Marks a new tick time and returns the time elapsed in milliseconds since
+    /// the last call to tick().
+    pub fn tick(&mut self) -> u64 {
+        let n = self.elapsed();
+        self.last_instant = Instant::now();
+        n
+    }
+
+    /// Returns the time elapsed in milliseconds since the last call to tick().
+    pub fn elapsed(self) -> u64 {
+        self.last_instant.elapsed().whole_milliseconds() as u64
     }
 }
 

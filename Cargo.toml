@@ -23,6 +23,7 @@ clap = "2"
 smallvec = "1"
 crossterm = "0.14"
 gag = "0.1.10"
+time = "0.2"
 
 # Local crate dependencies
 [dependencies.backend]
