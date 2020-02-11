@@ -14,7 +14,7 @@ use crossterm::{
 use crate::{
     editor::Editor,
     formatter::{block_count, block_index_and_range, char_range_from_block_index, LineFormatter},
-    string_utils::{line_ending_to_str, rope_slice_is_line_ending, LineEnding},
+    string_utils::{is_line_ending, line_ending_to_str, LineEnding},
     utils::{digit_count, RopeGraphemes, Timer},
 };
 
@@ -568,7 +568,7 @@ impl TermUI {
                         }
 
                         // Actually print the character
-                        if rope_slice_is_line_ending(&g) {
+                        if is_line_ending(&g) {
                             if at_cursor {
                                 self.screen
                                     .draw(px as usize, py as usize, " ", STYLE_CURSOR);
@@ -587,19 +587,9 @@ impl TermUI {
                             }
                         } else {
                             if at_cursor {
-                                self.screen.draw_rope_slice(
-                                    px as usize,
-                                    py as usize,
-                                    &g,
-                                    STYLE_CURSOR,
-                                );
+                                self.screen.draw(px as usize, py as usize, &g, STYLE_CURSOR);
                             } else {
-                                self.screen.draw_rope_slice(
-                                    px as usize,
-                                    py as usize,
-                                    &g,
-                                    STYLE_MAIN,
-                                );
+                                self.screen.draw(px as usize, py as usize, &g, STYLE_MAIN);
                             }
                         }
                     }

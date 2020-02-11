@@ -1,11 +1,9 @@
-use std::cmp::max;
-
-use ropey::RopeSlice;
+use std::{borrow::Cow, cmp::max};
 
 use crate::{
     formatter::{LineFormatter, RoundingBehavior},
-    string_utils::{rope_slice_is_line_ending, rope_slice_is_whitespace},
-    utils::grapheme_width,
+    string_utils::{is_line_ending, is_whitespace},
+    utils::{grapheme_width, RopeGraphemes},
 };
 
 pub enum WrapType {
@@ -49,27 +47,24 @@ impl ConsoleLineFormatter {
         }
     }
 
-    pub fn iter<'a, T>(&'a self, g_iter: T) -> ConsoleLineFormatterVisIter<'a, T>
-    where
-        T: Iterator<Item = RopeSlice<'a>>,
-    {
-        ConsoleLineFormatterVisIter::<'a, T> {
-            grapheme_iter: g_iter,
-            f: self,
-            pos: (0, 0),
-            indent: 0,
-            indent_found: false,
+    pub fn iter<'a>(&self, g_iter: RopeGraphemes<'a>) -> FormattingIter<'a> {
+        FormattingIter {
+            grapheme_itr: g_iter,
+            wrap_width: match self.wrap_type {
+                WrapType::WordWrap(w) => w,
+                WrapType::CharWrap(w) => w,
+                WrapType::NoWrap => unreachable!(),
+            },
+            tab_width: self.tab_width as usize,
             word_buf: Vec::new(),
             word_i: 0,
+            pos: (0, 0),
         }
     }
 }
 
 impl LineFormatter for ConsoleLineFormatter {
-    fn dimensions<'a, T>(&'a self, g_iter: T) -> (usize, usize)
-    where
-        T: Iterator<Item = RopeSlice<'a>>,
-    {
+    fn dimensions(&self, g_iter: RopeGraphemes) -> (usize, usize) {
         let mut dim: (usize, usize) = (0, 0);
 
         for (_, pos, width) in self.iter(g_iter) {
@@ -81,10 +76,7 @@ impl LineFormatter for ConsoleLineFormatter {
         return dim;
     }
 
-    fn index_to_v2d<'a, T>(&'a self, g_iter: T, char_idx: usize) -> (usize, usize)
-    where
-        T: Iterator<Item = RopeSlice<'a>>,
-    {
+    fn index_to_v2d(&self, g_iter: RopeGraphemes, char_idx: usize) -> (usize, usize) {
         let mut pos = (0, 0);
         let mut i = 0;
         let mut last_width = 0;
@@ -102,15 +94,12 @@ impl LineFormatter for ConsoleLineFormatter {
         return (pos.0, pos.1 + last_width);
     }
 
-    fn v2d_to_index<'a, T>(
-        &'a self,
-        g_iter: T,
+    fn v2d_to_index(
+        &self,
+        g_iter: RopeGraphemes,
         v2d: (usize, usize),
         _: (RoundingBehavior, RoundingBehavior),
-    ) -> usize
-    where
-        T: Iterator<Item = RopeSlice<'a>>,
-    {
+    ) -> usize {
         // TODO: handle rounding modes
         let mut prev_i = 0;
         let mut i = 0;
@@ -131,171 +120,96 @@ impl LineFormatter for ConsoleLineFormatter {
     }
 }
 
-// ===================================================================
-// An iterator that iterates over the graphemes in a line in a
-// manner consistent with the ConsoleFormatter.
-// ===================================================================
-pub struct ConsoleLineFormatterVisIter<'a, T>
-where
-    T: Iterator<Item = RopeSlice<'a>>,
-{
-    grapheme_iter: T,
-    f: &'a ConsoleLineFormatter,
-    pos: (usize, usize),
+//--------------------------------------------------------------------------
 
-    indent: usize,
-    indent_found: bool,
+/// An iterator over the visual printable characters of a piece of text,
+/// yielding the text of the character, its position in 2d space, and its
+/// visial width.
+///
+/// TODO: handle maintaining indent, etc.
+pub struct FormattingIter<'a> {
+    grapheme_itr: RopeGraphemes<'a>,
+    wrap_width: usize,
+    tab_width: usize,
 
-    word_buf: Vec<RopeSlice<'a>>,
+    word_buf: Vec<(Cow<'a, str>, usize)>, // Printable character and its width.
     word_i: usize,
+
+    pos: (usize, usize),
 }
 
-impl<'a, T> ConsoleLineFormatterVisIter<'a, T>
-where
-    T: Iterator<Item = RopeSlice<'a>>,
-{
-    fn next_nowrap(&mut self, g: RopeSlice<'a>) -> Option<(RopeSlice<'a>, (usize, usize), usize)> {
-        let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
+impl<'a> Iterator for FormattingIter<'a> {
+    type Item = (Cow<'a, str>, (usize, usize), usize);
 
+    fn next(&mut self) -> Option<Self::Item> {
+        // Get next word if necessary
+        if self.word_i >= self.word_buf.len() {
+            let mut word_width = 0;
+            self.word_buf.truncate(0);
+
+            while let Some(g) = self.grapheme_itr.next().map(|g| Cow::<str>::from(g)) {
+                let width =
+                    grapheme_vis_width_at_vis_pos(&g, self.pos.1 + word_width, self.tab_width);
+                self.word_buf.push((g.clone(), width));
+                word_width += width;
+
+                if is_whitespace(&g) {
+                    break;
+                }
+            }
+
+            if self.word_buf.len() == 0 {
+                return None;
+            }
+
+            // Move to next line if necessary
+            if (self.pos.1 + word_width) > self.wrap_width {
+                if self.pos.1 > 0 {
+                    self.pos = (self.pos.0 + 1, 0);
+                }
+            }
+
+            self.word_i = 0;
+        }
+
+        // Get next grapheme and width from the current word.
+        let (g, g_width) = {
+            let (ref g, mut width) = self.word_buf[self.word_i];
+            if g == "\t" {
+                width = grapheme_vis_width_at_vis_pos(&g, self.pos.1, self.tab_width);
+            }
+            (g, width)
+        };
+
+        // Get our character's position and update the position for the next
+        // grapheme.
+        if (self.pos.1 + g_width) > self.wrap_width && self.pos.1 > 0 {
+            self.pos.0 += 1;
+            self.pos.1 = 0;
+        }
         let pos = self.pos;
-        self.pos = (self.pos.0, self.pos.1 + width);
-        return Some((g, pos, width));
-    }
+        self.pos.1 += g_width;
 
-    fn next_charwrap(
-        &mut self,
-        g: RopeSlice<'a>,
-        wrap_width: usize,
-    ) -> Option<(RopeSlice<'a>, (usize, usize), usize)> {
-        let width = grapheme_vis_width_at_vis_pos(g, self.pos.1, self.f.tab_width as usize);
-
-        if (self.pos.1 + width) > wrap_width {
-            if !self.indent_found {
-                self.indent = 0;
-                self.indent_found = true;
-            }
-
-            if self.f.maintain_indent {
-                let pos = (self.pos.0 + 1, self.indent + self.f.wrap_additional_indent);
-                self.pos = (
-                    self.pos.0 + 1,
-                    self.indent + self.f.wrap_additional_indent + width,
-                );
-                return Some((g, pos, width));
-            } else {
-                let pos = (self.pos.0 + 1, self.f.wrap_additional_indent);
-                self.pos = (self.pos.0 + 1, self.f.wrap_additional_indent + width);
-                return Some((g, pos, width));
-            }
-        } else {
-            if !self.indent_found {
-                if rope_slice_is_whitespace(&g) {
-                    self.indent += width;
-                } else {
-                    self.indent_found = true;
-                }
-            }
-
-            let pos = self.pos;
-            self.pos = (self.pos.0, self.pos.1 + width);
-            return Some((g, pos, width));
-        }
+        // Increment index and return.
+        self.word_i += 1;
+        return Some((g.clone(), pos, g_width));
     }
 }
-
-impl<'a, T> Iterator for ConsoleLineFormatterVisIter<'a, T>
-where
-    T: Iterator<Item = RopeSlice<'a>>,
-{
-    type Item = (RopeSlice<'a>, (usize, usize), usize);
-
-    fn next(&mut self) -> Option<(RopeSlice<'a>, (usize, usize), usize)> {
-        match self.f.wrap_type {
-            WrapType::NoWrap => {
-                if let Some(g) = self.grapheme_iter.next() {
-                    return self.next_nowrap(g);
-                } else {
-                    return None;
-                }
-            }
-
-            WrapType::CharWrap(wrap_width) => {
-                if let Some(g) = self.grapheme_iter.next() {
-                    return self.next_charwrap(g, wrap_width);
-                } else {
-                    return None;
-                }
-            }
-
-            WrapType::WordWrap(wrap_width) => {
-                // Get next word if necessary
-                if self.word_i >= self.word_buf.len() {
-                    let mut word_width = 0;
-                    self.word_buf.truncate(0);
-                    while let Some(g) = self.grapheme_iter.next() {
-                        self.word_buf.push(g);
-                        let width = grapheme_vis_width_at_vis_pos(
-                            g,
-                            self.pos.1 + word_width,
-                            self.f.tab_width as usize,
-                        );
-                        word_width += width;
-                        if rope_slice_is_whitespace(&g) {
-                            break;
-                        }
-                    }
-
-                    if self.word_buf.len() == 0 {
-                        return None;
-                    } else if !self.indent_found && !rope_slice_is_whitespace(&self.word_buf[0]) {
-                        self.indent_found = true;
-                    }
-
-                    // Move to next line if necessary
-                    if (self.pos.1 + word_width) > wrap_width {
-                        if !self.indent_found {
-                            self.indent = 0;
-                            self.indent_found = true;
-                        }
-
-                        if self.pos.1 > 0 {
-                            if self.f.maintain_indent {
-                                self.pos =
-                                    (self.pos.0 + 1, self.indent + self.f.wrap_additional_indent);
-                            } else {
-                                self.pos = (self.pos.0 + 1, self.f.wrap_additional_indent);
-                            }
-                        }
-                    }
-
-                    self.word_i = 0;
-                }
-
-                // Iterate over the word
-                let g = self.word_buf[self.word_i];
-                self.word_i += 1;
-                return self.next_charwrap(g, wrap_width);
-            }
-        }
-    }
-}
-
-// ===================================================================
-// Helper functions
-// ===================================================================
 
 /// Returns the visual width of a grapheme given a starting
 /// position on a line.
-fn grapheme_vis_width_at_vis_pos(g: RopeSlice, pos: usize, tab_width: usize) -> usize {
+fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize {
     if g == "\t" {
         let ending_pos = ((pos / tab_width) + 1) * tab_width;
         return ending_pos - pos;
-    } else if rope_slice_is_line_ending(&g) {
+    } else if is_line_ending(g) {
         return 1;
     } else {
         return grapheme_width(&g);
     }
 }
+
+//--------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

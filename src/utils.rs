@@ -16,14 +16,8 @@ pub fn digit_count(mut n: u32, b: u32) -> u32 {
 
 //=============================================================
 
-pub fn grapheme_width(slice: &RopeSlice) -> usize {
-    use crate::term_ui::smallstring::SmallString;
-    if let Some(text) = slice.as_str() {
-        return UnicodeWidthStr::width(text);
-    } else {
-        let text = SmallString::from_rope_slice(slice);
-        return UnicodeWidthStr::width(&text[..]);
-    }
+pub fn grapheme_width(g: &str) -> usize {
+    UnicodeWidthStr::width(g)
 }
 
 /// Finds the previous grapheme boundary before the given char position.

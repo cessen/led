@@ -29,26 +29,20 @@ pub trait LineFormatter {
     /// Returns the 2d visual dimensions of the given text when formatted
     /// by the formatter.
     /// The text to be formatted is passed as a grapheme iterator.
-    fn dimensions<'a, T>(&'a self, g_iter: T) -> (usize, usize)
-    where
-        T: Iterator<Item = RopeSlice<'a>>;
+    fn dimensions(&self, g_iter: RopeGraphemes) -> (usize, usize);
 
     /// Converts a char index within a text into a visual 2d position.
     /// The text to be formatted is passed as a grapheme iterator.
-    fn index_to_v2d<'a, T>(&'a self, g_iter: T, char_idx: usize) -> (usize, usize)
-    where
-        T: Iterator<Item = RopeSlice<'a>>;
+    fn index_to_v2d(&self, g_iter: RopeGraphemes, char_idx: usize) -> (usize, usize);
 
     /// Converts a visual 2d position into a char index within a text.
     /// The text to be formatted is passed as a grapheme iterator.
-    fn v2d_to_index<'a, T>(
-        &'a self,
-        g_iter: T,
+    fn v2d_to_index(
+        &self,
+        g_iter: RopeGraphemes,
         v2d: (usize, usize),
         rounding: (RoundingBehavior, RoundingBehavior),
-    ) -> usize
-    where
-        T: Iterator<Item = RopeSlice<'a>>;
+    ) -> usize;
 
     /// Converts from char index to the horizontal 2d char index.
     fn index_to_horizontal_v2d(&self, buf: &Buffer, char_idx: usize) -> usize {

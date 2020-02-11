@@ -16,7 +16,11 @@ pub fn is_line_ending(text: &str) -> bool {
 }
 
 pub fn rope_slice_is_line_ending(text: &RopeSlice) -> bool {
-    rope_slice_to_line_ending(text) != LineEnding::None
+    match text.char(0) {
+        c if (c >= '\u{000A}' && c <= '\u{000D}') => true,
+        '\u{0085}' | '\u{2028}' | '\u{2029}' => true,
+        _ => false,
+    }
 }
 
 pub fn is_whitespace(text: &str) -> bool {
