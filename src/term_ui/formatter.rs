@@ -237,19 +237,6 @@ mod tests {
     }
 
     #[test]
-    fn dimensions_2() {
-        let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
-
-        let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
-        f.maintain_indent = false;
-        f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
-
-        assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (5, 12));
-    }
-
-    #[test]
     fn dimensions_3() {
         let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
 
