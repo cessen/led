@@ -1,21 +1,13 @@
 use ropey::Rope;
 
+use crate::marks::MarkSet;
+
 /// An open text buffer, currently being edited.
 #[derive(Debug, Clone)]
 pub struct Buffer {
-    pub is_dirty: bool, // Is this buffer currently out of sync with disk.
-    pub text: Rope,     // The actual text content.
-
-    // Sets of marked ranges to be used for various purposes.
-    //
-    // Each individual mark consists of a head and a tail.  The ordering of the
-    // head and tail is unspecified: either the head or the tail may come first
-    // in the text.  Both head and tail are specified in absolute indices.
-    //
-    // Within sets, marks cannot overlap or abutt, and they must be ordered.
-    // Overlapping or abutting marks will be merged, and out-of-order marks
-    // will be removed.
-    pub mark_sets: Vec<Vec<(usize, usize)>>,
+    pub is_dirty: bool,          // Is this buffer currently out of sync with disk.
+    pub text: Rope,              // The actual text content.
+    pub mark_sets: Vec<MarkSet>, // MarkSets for cursors, view positions, etc.
 }
 
 impl Buffer {
@@ -51,15 +43,7 @@ impl Buffer {
 
     /// Creates a new empty mark set, and returns the set index.
     pub fn add_mark_set(&mut self) -> usize {
-        self.mark_sets.push(vec![(0, 0)]);
+        self.mark_sets.push(MarkSet::new());
         return self.mark_sets.len() - 1;
-    }
-
-    pub fn insert_new_mark(&mut self, _set_idx: usize, _mark: (usize, usize)) {
-        todo!()
-    }
-
-    pub fn clear_mark_set(&mut self, set_idx: usize) {
-        self.mark_sets[set_idx].clear();
     }
 }
