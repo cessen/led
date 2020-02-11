@@ -6,19 +6,13 @@ use crate::{
     utils::{grapheme_width, RopeGraphemes},
 };
 
-pub enum WrapType {
-    NoWrap,
-    CharWrap(usize),
-    WordWrap(usize),
-}
-
 // ===================================================================
 // LineFormatter implementation for terminals/consoles.
 // ===================================================================
 
 pub struct ConsoleLineFormatter {
     pub tab_width: u8,
-    pub wrap_type: WrapType,
+    pub wrap_width: usize,
     pub maintain_indent: bool,
     pub wrap_additional_indent: usize,
 }
@@ -27,34 +21,20 @@ impl ConsoleLineFormatter {
     pub fn new(tab_width: u8) -> ConsoleLineFormatter {
         ConsoleLineFormatter {
             tab_width: tab_width,
-            wrap_type: WrapType::WordWrap(40),
+            wrap_width: 40,
             maintain_indent: true,
             wrap_additional_indent: 0,
         }
     }
 
     pub fn set_wrap_width(&mut self, width: usize) {
-        match self.wrap_type {
-            WrapType::NoWrap => {}
-
-            WrapType::CharWrap(ref mut w) => {
-                *w = width;
-            }
-
-            WrapType::WordWrap(ref mut w) => {
-                *w = width;
-            }
-        }
+        self.wrap_width = width;
     }
 
     pub fn iter<'a>(&self, g_iter: RopeGraphemes<'a>) -> FormattingIter<'a> {
         FormattingIter {
             grapheme_itr: g_iter,
-            wrap_width: match self.wrap_type {
-                WrapType::WordWrap(w) => w,
-                WrapType::CharWrap(w) => w,
-                WrapType::NoWrap => unreachable!(),
-            },
+            wrap_width: self.wrap_width,
             tab_width: self.tab_width as usize,
             word_buf: Vec::new(),
             word_i: 0,
@@ -228,10 +208,9 @@ mod tests {
         let text = Rope::from_str("Hello there, stranger!"); // 22 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 80;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(80);
 
         assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (1, 22));
     }
@@ -241,10 +220,9 @@ mod tests {
         let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::WordWrap(0);
+        f.wrap_width = 12;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (6, 12));
     }
@@ -266,10 +244,9 @@ mod tests {
         );
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 12;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (10, 12));
     }
@@ -291,10 +268,9 @@ mod tests {
         );
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::WordWrap(0);
+        f.wrap_width = 12;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(f.dimensions(RopeGraphemes::new(&text.slice(..))), (10, 12));
     }
@@ -304,10 +280,9 @@ mod tests {
         let text = Rope::from_str("Hello there, stranger!"); // 22 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 80;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(80);
 
         assert_eq!(
             f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 0),
@@ -332,10 +307,9 @@ mod tests {
         let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 12; // Was char wrap.
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(
             f.index_to_v2d(RopeGraphemes::new(&text.slice(..)), 0),
@@ -413,10 +387,9 @@ mod tests {
         let text = Rope::from_str("Hello there, stranger!"); // 22 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 80;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(80);
 
         assert_eq!(
             f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 0), (Floor, Floor)),
@@ -449,10 +422,9 @@ mod tests {
         let text = Rope::from_str("Hello there, stranger!  How are you doing this fine day?"); // 56 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 12; // Was char wrap.
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(
             f.v2d_to_index(RopeGraphemes::new(&text.slice(..)), (0, 0), (Floor, Floor)),
@@ -529,10 +501,9 @@ mod tests {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 80;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(80);
 
         assert_eq!(f.index_to_horizontal_v2d(&b, 0), 0);
         assert_eq!(f.index_to_horizontal_v2d(&b, 5), 5);
@@ -546,10 +517,9 @@ mod tests {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 12; // Was char wrap.
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(f.index_to_horizontal_v2d(&b, 0), 0);
         assert_eq!(f.index_to_horizontal_v2d(&b, 11), 11);
@@ -573,10 +543,9 @@ mod tests {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::WordWrap(0);
+        f.wrap_width = 12;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(f.index_to_horizontal_v2d(&b, 0), 0);
         assert_eq!(f.index_to_horizontal_v2d(&b, 5), 5);
@@ -603,10 +572,9 @@ mod tests {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 80;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(80);
 
         assert_eq!(f.index_set_horizontal_v2d(&b, 0, 0, Floor), 0);
         assert_eq!(f.index_set_horizontal_v2d(&b, 0, 22, Floor), 22);
@@ -638,10 +606,9 @@ mod tests {
         let b = Buffer::new_from_str("Hello there, stranger! How are you doing this fine day?"); // 55 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 12; // Was char wrap.
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(f.index_set_horizontal_v2d(&b, 0, 0, Floor), 0);
         assert_eq!(f.index_set_horizontal_v2d(&b, 0, 11, Floor), 11);
@@ -673,10 +640,9 @@ mod tests {
         let b = Buffer::new_from_str("Hello there, stranger!\nHow are you doing this fine day?"); // 55 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 80; // Was char wrap.
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(80);
 
         assert_eq!(f.index_offset_vertical_v2d(&b, 0, 0, (Floor, Floor)), 0);
         assert_eq!(f.index_offset_vertical_v2d(&b, 0, 1, (Floor, Floor)), 23);
@@ -700,10 +666,9 @@ mod tests {
         let b = Buffer::new_from_str("Hello there, stranger! How are you doing this fine day?"); // 55 graphemes long
 
         let mut f = ConsoleLineFormatter::new(4);
-        f.wrap_type = WrapType::CharWrap(0);
+        f.wrap_width = 12;
         f.maintain_indent = false;
         f.wrap_additional_indent = 0;
-        f.set_wrap_width(12);
 
         assert_eq!(f.index_offset_vertical_v2d(&b, 0, 0, (Floor, Floor)), 0);
         assert_eq!(f.index_offset_vertical_v2d(&b, 0, 1, (Floor, Floor)), 12);
