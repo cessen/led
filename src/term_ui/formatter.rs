@@ -38,6 +38,9 @@ impl ConsoleLineFormatter {
             tab_width: self.tab_width as usize,
             word_buf: Vec::new(),
             word_i: 0,
+            indent: 0,
+            extra_indent: 2,
+            finding_indent: true,
             pos: (0, 0),
         }
     }
@@ -115,6 +118,10 @@ pub struct FormattingIter<'a> {
     word_buf: Vec<(Cow<'a, str>, usize)>, // Printable character and its width.
     word_i: usize,
 
+    indent: usize,       // Size of soft indent to use.
+    extra_indent: usize, // Additional amount to indent soft-wrapped lines.
+    finding_indent: bool,
+
     pos: (usize, usize),
 }
 
@@ -122,6 +129,10 @@ impl<'a> Iterator for FormattingIter<'a> {
     type Item = (Cow<'a, str>, (usize, usize), usize);
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.pos == (0, 0) {
+            self.pos = (0, self.indent);
+        }
+
         // Get next word if necessary
         if self.word_i >= self.word_buf.len() {
             let mut word_width = 0;
@@ -134,7 +145,19 @@ impl<'a> Iterator for FormattingIter<'a> {
                 word_width += width;
 
                 if is_whitespace(&g) {
+                    if self.finding_indent {
+                        if (self.indent + self.extra_indent + width + 2) > self.wrap_width {
+                            // Cancel indentation if it's too long for the screen.
+                            self.indent = 0;
+                            self.extra_indent = 0;
+                            self.finding_indent = false;
+                        } else {
+                            self.indent += width;
+                        }
+                    }
                     break;
+                } else {
+                    self.finding_indent = false;
                 }
             }
 
@@ -143,9 +166,9 @@ impl<'a> Iterator for FormattingIter<'a> {
             }
 
             // Move to next line if necessary
-            if (self.pos.1 + word_width) > self.wrap_width {
+            if (self.pos.1 + word_width) > self.wrap_width && (self.pos.1 > self.indent) {
                 if self.pos.1 > 0 {
-                    self.pos = (self.pos.0 + 1, 0);
+                    self.pos = (self.pos.0 + 1, self.indent + self.extra_indent);
                 }
             }
 
@@ -165,7 +188,7 @@ impl<'a> Iterator for FormattingIter<'a> {
         // grapheme.
         if (self.pos.1 + g_width) > self.wrap_width && self.pos.1 > 0 {
             self.pos.0 += 1;
-            self.pos.1 = 0;
+            self.pos.1 = self.indent + self.extra_indent;
         }
         let pos = self.pos;
         self.pos.1 += g_width;

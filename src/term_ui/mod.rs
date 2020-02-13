@@ -632,8 +632,12 @@ impl TermUI {
             let pos_x = editor
                 .formatter
                 .index_to_horizontal_v2d(&self.editor.buffer, self.editor.buffer.char_count());
-            let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
-            let py = screen_line - 1;
+            let mut px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
+            let mut py = screen_line - 1;
+            if px > c2.1 as isize {
+                px = c1.1 as isize + screen_col;
+                py += 1;
+            }
 
             if (px >= c1.1 as isize)
                 && (py >= c1.0 as isize)
