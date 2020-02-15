@@ -52,16 +52,28 @@ const STYLE_CURSOR: Style = Style(
         b: 0xD0,
     },
 );
-const STYLE_GUTTER: Style = Style(
+const STYLE_GUTTER_ODD: Style = Style(
     Color::Rgb {
         r: 0x70,
         g: 0x70,
         b: 0x70,
     },
     Color::Rgb {
-        r: 0x22,
-        g: 0x22,
-        b: 0x22,
+        r: 0x08,
+        g: 0x08,
+        b: 0x08,
+    },
+);
+const STYLE_GUTTER_EVEN: Style = Style(
+    Color::Rgb {
+        r: 0x78,
+        g: 0x78,
+        b: 0x78,
+    },
+    Color::Rgb {
+        r: 0x1B,
+        g: 0x1B,
+        b: 0x1B,
     },
 );
 const STYLE_INFO: Style = Style(
@@ -498,6 +510,7 @@ impl TermUI {
     ) {
         // Calculate all the starting info
         let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
+        let blank_gutter = &"                "[..gutter_width - 1];
         let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
         let temp_line = editor.buffer.get_line(line_index);
         let (mut line_block_index, block_range) = block_index_and_range(&temp_line, col_i);
@@ -512,20 +525,33 @@ impl TermUI {
 
         // Fill in the gutter with the appropriate background
         for y in c1.0..(c2.0 + 1) {
-            for x in c1.1..(c1.1 + gutter_width - 1) {
-                self.screen.draw(x, y, " ", STYLE_GUTTER);
-            }
+            self.screen.draw(c1.1, y, blank_gutter, STYLE_GUTTER_ODD);
         }
 
         let mut line_num = line_index + 1;
         for line in editor.buffer.line_iter_at_index(line_index) {
+            let gutter_style = if (line_num % 2) == 0 {
+                STYLE_GUTTER_EVEN
+            } else {
+                STYLE_GUTTER_ODD
+            };
+
             // Print line number
             if line_block_index == 0 {
-                let lnx = c1.1 + (gutter_width - 2 - digit_count(line_num as u32, 10) as usize);
+                let lnx = c1.1;
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
-                    self.screen
-                        .draw(lnx, lny, &format!("{}", line_num)[..], STYLE_GUTTER);
+                    self.screen.draw(
+                        lnx,
+                        lny,
+                        &format!(
+                            "{}{} ",
+                            &blank_gutter
+                                [..(gutter_width - 2 - digit_count(line_num as u32, 10) as usize)],
+                            line_num,
+                        )[..],
+                        gutter_style,
+                    );
                 }
             }
 
@@ -541,6 +567,8 @@ impl TermUI {
             let mut lines_traversed: usize = 0;
             loop {
                 for (g, (pos_y, pos_x), width) in g_iter {
+                    let do_gutter =
+                        last_pos_y != pos_y || (lines_traversed == 0 && line_block_index != 0);
                     if last_pos_y != pos_y {
                         if last_pos_y < pos_y {
                             lines_traversed += pos_y - last_pos_y;
@@ -554,6 +582,11 @@ impl TermUI {
                     // If we're off the bottom, we're done
                     if py > c2.0 as isize {
                         return;
+                    }
+
+                    if do_gutter {
+                        self.screen
+                            .draw(c1.1, py as usize, blank_gutter, gutter_style);
                     }
 
                     // Draw the grapheme to the screen if it's in bounds
