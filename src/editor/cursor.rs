@@ -28,8 +28,8 @@ impl Cursor {
         }
     }
 
-    pub fn update_vis_start<T: LineFormatter>(&mut self, buf: &Buffer, f: &T) {
-        self.vis_start = f.index_to_horizontal_v2d(buf, self.range.0);
+    pub fn update_vis_start(&mut self, buf: &Buffer, f: &LineFormatter) {
+        self.vis_start = f.get_horizontal(buf, self.range.0);
     }
 }
 

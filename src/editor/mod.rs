@@ -11,16 +11,15 @@ use std::{
 use crate::{
     buffer::Buffer,
     formatter::LineFormatter,
-    formatter::RoundingBehavior::*,
     string_utils::{char_count, rope_slice_to_line_ending, LineEnding},
     utils::{digit_count, RopeGraphemes},
 };
 
 use self::cursor::CursorSet;
 
-pub struct Editor<T: LineFormatter> {
+pub struct Editor {
     pub buffer: Buffer,
-    pub formatter: T,
+    pub formatter: LineFormatter,
     pub file_path: PathBuf,
     pub line_ending_type: LineEnding,
     pub soft_tabs: bool,
@@ -39,9 +38,9 @@ pub struct Editor<T: LineFormatter> {
     pub cursors: CursorSet,
 }
 
-impl<T: LineFormatter> Editor<T> {
+impl Editor {
     /// Create a new blank editor
-    pub fn new(formatter: T) -> Editor<T> {
+    pub fn new(formatter: LineFormatter) -> Editor {
         Editor {
             buffer: Buffer::new(),
             formatter: formatter,
@@ -57,7 +56,7 @@ impl<T: LineFormatter> Editor<T> {
         }
     }
 
-    pub fn new_from_file(formatter: T, path: &Path) -> Editor<T> {
+    pub fn new_from_file(formatter: LineFormatter, path: &Path) -> Editor {
         let buf = match Buffer::new_from_file(path) {
             Ok(b) => b,
             // TODO: handle un-openable file better
@@ -307,28 +306,24 @@ impl<T: LineFormatter> Editor<T> {
         // the closest cursor.
 
         // Find the first and last char index visible within the editor.
-        let c_first =
+        let c_first = self
+            .formatter
+            .set_horizontal(&self.buffer, self.view_pos.0, 0);
+        let mut c_last =
             self.formatter
-                .index_set_horizontal_v2d(&self.buffer, self.view_pos.0, 0, Floor);
-        let mut c_last = self.formatter.index_offset_vertical_v2d(
-            &self.buffer,
-            c_first,
-            self.view_dim.0 as isize,
-            (Floor, Floor),
-        );
-        c_last =
-            self.formatter
-                .index_set_horizontal_v2d(&self.buffer, c_last, self.view_dim.1, Floor);
+                .offset_vertical(&self.buffer, c_first, self.view_dim.0 as isize);
+        c_last = self
+            .formatter
+            .set_horizontal(&self.buffer, c_last, self.view_dim.1);
 
         // Adjust the view depending on where the cursor is
         if self.cursors[0].range.0 < c_first {
             self.view_pos.0 = self.cursors[0].range.0;
         } else if self.cursors[0].range.0 > c_last {
-            self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
+            self.view_pos.0 = self.formatter.offset_vertical(
                 &self.buffer,
                 self.cursors[0].range.0,
                 -(self.view_dim.0 as isize),
-                (Floor, Floor),
             );
         }
     }
@@ -369,9 +364,7 @@ impl<T: LineFormatter> Editor<T> {
                 c.range.1 += offset;
 
                 // Figure out how many spaces to insert
-                let vis_pos = self
-                    .formatter
-                    .index_to_horizontal_v2d(&self.buffer, c.range.0);
+                let vis_pos = self.formatter.get_horizontal(&self.buffer, c.range.0);
                 // TODO: handle tab settings
                 let next_tab_stop =
                     ((vis_pos / self.soft_tab_width as usize) + 1) * self.soft_tab_width as usize;
@@ -555,18 +548,12 @@ impl<T: LineFormatter> Editor<T> {
         for c in self.cursors.iter_mut() {
             let vmove = -1 * n as isize;
 
-            let mut temp_index = self.formatter.index_offset_vertical_v2d(
-                &self.buffer,
-                c.range.0,
-                vmove,
-                (Round, Round),
-            );
-            temp_index = self.formatter.index_set_horizontal_v2d(
-                &self.buffer,
-                temp_index,
-                c.vis_start,
-                Round,
-            );
+            let mut temp_index = self
+                .formatter
+                .offset_vertical(&self.buffer, c.range.0, vmove);
+            temp_index = self
+                .formatter
+                .set_horizontal(&self.buffer, temp_index, c.vis_start);
 
             if !self.buffer.is_grapheme(temp_index) {
                 temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
@@ -591,18 +578,12 @@ impl<T: LineFormatter> Editor<T> {
         for c in self.cursors.iter_mut() {
             let vmove = n as isize;
 
-            let mut temp_index = self.formatter.index_offset_vertical_v2d(
-                &self.buffer,
-                c.range.0,
-                vmove,
-                (Round, Round),
-            );
-            temp_index = self.formatter.index_set_horizontal_v2d(
-                &self.buffer,
-                temp_index,
-                c.vis_start,
-                Round,
-            );
+            let mut temp_index = self
+                .formatter
+                .offset_vertical(&self.buffer, c.range.0, vmove);
+            temp_index = self
+                .formatter
+                .set_horizontal(&self.buffer, temp_index, c.vis_start);
 
             if !self.buffer.is_grapheme(temp_index) {
                 temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
@@ -625,11 +606,10 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn page_up(&mut self) {
         let move_amount = self.view_dim.0 - max(self.view_dim.0 / 8, 1);
-        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
+        self.view_pos.0 = self.formatter.offset_vertical(
             &self.buffer,
             self.view_pos.0,
             -1 * move_amount as isize,
-            (Round, Round),
         );
 
         self.cursor_up(move_amount);
@@ -640,12 +620,9 @@ impl<T: LineFormatter> Editor<T> {
 
     pub fn page_down(&mut self) {
         let move_amount = self.view_dim.0 - max(self.view_dim.0 / 8, 1);
-        self.view_pos.0 = self.formatter.index_offset_vertical_v2d(
-            &self.buffer,
-            self.view_pos.0,
-            move_amount as isize,
-            (Round, Round),
-        );
+        self.view_pos.0 =
+            self.formatter
+                .offset_vertical(&self.buffer, self.view_pos.0, move_amount as isize);
 
         self.cursor_down(move_amount);
 
@@ -656,12 +633,9 @@ impl<T: LineFormatter> Editor<T> {
     pub fn jump_to_line(&mut self, n: usize) {
         let pos = self.buffer.line_col_to_index((n, 0));
         self.cursors.truncate(1);
-        self.cursors[0].range.0 = self.formatter.index_set_horizontal_v2d(
-            &self.buffer,
-            pos,
-            self.cursors[0].vis_start,
-            Round,
-        );
+        self.cursors[0].range.0 =
+            self.formatter
+                .set_horizontal(&self.buffer, pos, self.cursors[0].vis_start);
         self.cursors[0].range.1 = self.cursors[0].range.0;
 
         // Adjust view

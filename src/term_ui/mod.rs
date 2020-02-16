@@ -13,15 +13,12 @@ use crossterm::{
 
 use crate::{
     editor::Editor,
-    formatter::{block_count, block_index_and_range, char_range_from_block_index, LineFormatter},
-    string_utils::{is_line_ending, line_ending_to_str, LineEnding},
-    utils::{digit_count, RopeGraphemes, Timer},
+    formatter::LineFormatter,
+    string_utils::{char_count, is_line_ending, line_ending_to_str, LineEnding},
+    utils::{digit_count, Timer},
 };
 
-use self::{
-    formatter::ConsoleLineFormatter,
-    screen::{Screen, Style},
-};
+use self::screen::{Screen, Style};
 
 const EMPTY_MOD: KeyModifiers = KeyModifiers::empty();
 const UPDATE_TICK_MS: u64 = 10;
@@ -159,10 +156,7 @@ macro_rules! ui_loop {
                 $term_ui
                     .editor
                     .update_dim($term_ui.height - 1, $term_ui.width);
-                $term_ui
-                    .editor
-                    .formatter
-                    .set_wrap_width($term_ui.editor.view_dim.1);
+                $term_ui.editor.formatter.wrap_width = $term_ui.editor.view_dim.1;
 
                 // Draw!
                 {
@@ -176,7 +170,7 @@ macro_rules! ui_loop {
 
 pub struct TermUI {
     screen: Screen,
-    editor: Editor<ConsoleLineFormatter>,
+    editor: Editor,
     width: usize,
     height: usize,
     quit: bool,
@@ -190,10 +184,10 @@ enum LoopStatus {
 
 impl TermUI {
     pub fn new() -> TermUI {
-        TermUI::new_from_editor(Editor::new(ConsoleLineFormatter::new(4)))
+        TermUI::new_from_editor(Editor::new(LineFormatter::new(4)))
     }
 
-    pub fn new_from_editor(ed: Editor<ConsoleLineFormatter>) -> TermUI {
+    pub fn new_from_editor(ed: Editor) -> TermUI {
         let (w, h) = crossterm::terminal::size().unwrap();
         let mut editor = ed;
         editor.update_dim(h as usize - 1, w as usize);
@@ -216,7 +210,7 @@ impl TermUI {
         self.width = w as usize;
         self.height = h as usize;
         self.editor.update_dim(self.height - 1, self.width);
-        self.editor.formatter.set_wrap_width(self.editor.view_dim.1);
+        self.editor.formatter.wrap_width = self.editor.view_dim.1;
         self.screen.resize(w as usize, h as usize);
 
         // Start the UI
@@ -444,12 +438,7 @@ impl TermUI {
         }
     }
 
-    fn draw_editor(
-        &self,
-        editor: &Editor<ConsoleLineFormatter>,
-        c1: (usize, usize),
-        c2: (usize, usize),
-    ) {
+    fn draw_editor(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
         // Fill in top row with info line color
         for i in c1.1..(c2.1 + 1) {
             self.screen.draw(i, c1.0, " ", STYLE_INFO);
@@ -502,23 +491,20 @@ impl TermUI {
         self.draw_editor_text(editor, (c1.0 + 1, c1.1), c2);
     }
 
-    fn draw_editor_text(
-        &self,
-        editor: &Editor<ConsoleLineFormatter>,
-        c1: (usize, usize),
-        c2: (usize, usize),
-    ) {
+    fn draw_editor_text(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
         // Calculate all the starting info
         let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
         let blank_gutter = &"                "[..gutter_width - 1];
-        let (line_index, col_i) = editor.buffer.index_to_line_col(editor.view_pos.0);
-        let temp_line = editor.buffer.get_line(line_index);
-        let (mut line_block_index, block_range) = block_index_and_range(&temp_line, col_i);
-        let mut char_index = editor.buffer.line_col_to_index((line_index, block_range.0));
-        let (vis_line_offset, _) = editor.formatter.index_to_v2d(
-            RopeGraphemes::new(&temp_line.slice(block_range.0..block_range.1)),
-            editor.view_pos.0 - char_index,
-        );
+        let line_index = editor.buffer.text.char_to_line(editor.view_pos.0);
+
+        let (blocks_iter, char_offset) = editor.formatter.iter(&editor.buffer, editor.view_pos.0);
+
+        let vis_line_offset = blocks_iter
+            .clone()
+            .next()
+            .unwrap()
+            .0
+            .vpos(editor.view_pos.0);
 
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
         let screen_col = c1.1 as isize + gutter_width as isize;
@@ -528,8 +514,16 @@ impl TermUI {
             self.screen.draw(c1.1, y, blank_gutter, STYLE_GUTTER_ODD);
         }
 
+        // Loop through the blocks, printing them to the screen.
+        let mut is_first_loop = true;
         let mut line_num = line_index + 1;
-        for line in editor.buffer.line_iter_at_index(line_index) {
+        let mut char_index = editor.view_pos.0 - char_offset;
+        for (block_vis_iter, is_line_start) in blocks_iter {
+            if is_line_start && !is_first_loop {
+                line_num += 1;
+            }
+            is_first_loop = false;
+
             let gutter_style = if (line_num % 2) == 0 {
                 STYLE_GUTTER_EVEN
             } else {
@@ -537,7 +531,7 @@ impl TermUI {
             };
 
             // Print line number
-            if line_block_index == 0 {
+            if is_line_start {
                 let lnx = c1.1;
                 let lny = screen_line as usize;
                 if lny >= c1.0 && lny <= c2.0 {
@@ -555,97 +549,63 @@ impl TermUI {
                 }
             }
 
-            // Loop through the graphemes of the line and print them to
+            // Loop through the graphemes of the block and print them to
             // the screen.
-            let max_block_index = block_count(&line) - 1;
-            let block_range = char_range_from_block_index(&line, line_block_index);
-            let mut g_iter = editor.formatter.iter(RopeGraphemes::new(
-                &line.slice(block_range.0..block_range.1),
-            ));
-
             let mut last_pos_y = 0;
-            let mut lines_traversed: usize = 0;
-            loop {
-                for (g, (pos_y, pos_x), width) in g_iter {
-                    let do_gutter =
-                        last_pos_y != pos_y || (lines_traversed == 0 && line_block_index != 0);
-                    if last_pos_y != pos_y {
-                        if last_pos_y < pos_y {
-                            lines_traversed += pos_y - last_pos_y;
+            for (g, (pos_y, pos_x), width) in block_vis_iter {
+                // Calculate the cell coordinates at which to draw the grapheme
+                if pos_y > last_pos_y {
+                    screen_line += 1;
+                    last_pos_y = pos_y;
+                }
+                let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
+                let py = screen_line;
+
+                // If we're off the bottom, we're done
+                if py > c2.0 as isize {
+                    return;
+                }
+
+                // Draw the grapheme to the screen if it's in bounds
+                if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) {
+                    // Check if the character is within a cursor
+                    let mut at_cursor = false;
+                    for c in editor.cursors.iter() {
+                        if char_index >= c.range.0 && char_index <= c.range.1 {
+                            at_cursor = true;
+                            self.screen.set_cursor(px as usize, py as usize);
                         }
-                        last_pos_y = pos_y;
-                    }
-                    // Calculate the cell coordinates at which to draw the grapheme
-                    let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
-                    let py = lines_traversed as isize + screen_line;
-
-                    // If we're off the bottom, we're done
-                    if py > c2.0 as isize {
-                        return;
                     }
 
-                    if do_gutter {
-                        self.screen
-                            .draw(c1.1, py as usize, blank_gutter, gutter_style);
-                    }
-
-                    // Draw the grapheme to the screen if it's in bounds
-                    if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) {
-                        // Check if the character is within a cursor
-                        let mut at_cursor = false;
-                        for c in editor.cursors.iter() {
-                            if char_index >= c.range.0 && char_index <= c.range.1 {
-                                at_cursor = true;
-                                self.screen.set_cursor(px as usize, py as usize);
+                    // Actually print the character
+                    if is_line_ending(&g) {
+                        if at_cursor {
+                            self.screen
+                                .draw(px as usize, py as usize, " ", STYLE_CURSOR);
+                        }
+                    } else if g == "\t" {
+                        for i in 0..width {
+                            let tpx = px as usize + i;
+                            if tpx <= c2.1 {
+                                self.screen.draw(tpx as usize, py as usize, " ", STYLE_MAIN);
                             }
                         }
 
-                        // Actually print the character
-                        if is_line_ending(&g) {
-                            if at_cursor {
-                                self.screen
-                                    .draw(px as usize, py as usize, " ", STYLE_CURSOR);
-                            }
-                        } else if g == "\t" {
-                            for i in 0..width {
-                                let tpx = px as usize + i;
-                                if tpx <= c2.1 {
-                                    self.screen.draw(tpx as usize, py as usize, " ", STYLE_MAIN);
-                                }
-                            }
-
-                            if at_cursor {
-                                self.screen
-                                    .draw(px as usize, py as usize, " ", STYLE_CURSOR);
-                            }
+                        if at_cursor {
+                            self.screen
+                                .draw(px as usize, py as usize, " ", STYLE_CURSOR);
+                        }
+                    } else {
+                        if at_cursor {
+                            self.screen.draw(px as usize, py as usize, &g, STYLE_CURSOR);
                         } else {
-                            if at_cursor {
-                                self.screen.draw(px as usize, py as usize, &g, STYLE_CURSOR);
-                            } else {
-                                self.screen.draw(px as usize, py as usize, &g, STYLE_MAIN);
-                            }
+                            self.screen.draw(px as usize, py as usize, &g, STYLE_MAIN);
                         }
                     }
-
-                    char_index += g.chars().count();
                 }
 
-                // Move on to the next block.
-                line_block_index += 1;
-                if line_block_index <= max_block_index {
-                    let block_range = char_range_from_block_index(&line, line_block_index);
-                    g_iter = editor.formatter.iter(RopeGraphemes::new(
-                        &line.slice(block_range.0..block_range.1),
-                    ));
-                    lines_traversed += 1;
-                } else {
-                    break;
-                }
+                char_index += char_count(&g);
             }
-
-            line_block_index = 0;
-            screen_line += lines_traversed as isize + 1;
-            line_num += 1;
         }
 
         // If we get here, it means we reached the end of the text buffer
@@ -664,7 +624,7 @@ impl TermUI {
             // Calculate the cell coordinates at which to draw the cursor
             let pos_x = editor
                 .formatter
-                .index_to_horizontal_v2d(&self.editor.buffer, self.editor.buffer.char_count());
+                .get_horizontal(&self.editor.buffer, self.editor.buffer.char_count());
             let mut px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
             let mut py = screen_line - 1;
             if px > c2.1 as isize {

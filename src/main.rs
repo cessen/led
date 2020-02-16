@@ -2,7 +2,7 @@ use std::{io::Write, path::Path};
 
 use clap::{App, Arg};
 use editor::Editor;
-use term_ui::formatter::ConsoleLineFormatter;
+use formatter::LineFormatter;
 use term_ui::TermUI;
 
 mod buffer;
@@ -29,9 +29,9 @@ fn main() {
 
     // Load file, if specified
     let editor = if let Some(filepath) = args.value_of("file") {
-        Editor::new_from_file(ConsoleLineFormatter::new(4), &Path::new(&filepath[..]))
+        Editor::new_from_file(LineFormatter::new(4), &Path::new(&filepath[..]))
     } else {
-        Editor::new(ConsoleLineFormatter::new(4))
+        Editor::new(LineFormatter::new(4))
     };
 
     // Holds stderr output in an internal buffer, and prints it when dropped.

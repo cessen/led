@@ -10,28 +10,36 @@ pub fn is_line_ending(text: &str) -> bool {
     }
 }
 
-pub fn is_whitespace(text: &str) -> bool {
+pub fn str_is_whitespace(text: &str) -> bool {
+    if let Some(c) = text.chars().nth(0) {
+        is_whitespace(c)
+    } else {
+        false
+    }
+}
+
+pub fn is_whitespace(c: char) -> bool {
     // TODO: this is a naive categorization of whitespace characters.
     // For better categorization these should be split up into groups
     // based on e.g. breaking vs non-breaking spaces, among other things.
-    match text.chars().nth(0) {
-        //Some('\u{1680}') | // OGHAM SPACE MARK (here for completeness, but usually displayed as a dash, not as whitespace)
-        Some('\u{0009}') | // CHARACTER TABULATION
-        Some('\u{0020}') | // SPACE
-        Some('\u{00A0}') | // NO-BREAK SPACE
-        Some('\u{180E}') | // MONGOLIAN VOWEL SEPARATOR
-        Some('\u{202F}') | // NARROW NO-BREAK SPACE
-        Some('\u{205F}') | // MEDIUM MATHEMATICAL SPACE
-        Some('\u{3000}') | // IDEOGRAPHIC SPACE
-        Some('\u{FEFF}') // ZERO WIDTH NO-BREAK SPACE
+    match c {
+        //'\u{1680}' | // OGHAM SPACE MARK (here for completeness, but usually displayed as a dash, not as whitespace)
+        '\u{0009}' | // CHARACTER TABULATION
+        '\u{0020}' | // SPACE
+        '\u{00A0}' | // NO-BREAK SPACE
+        '\u{180E}' | // MONGOLIAN VOWEL SEPARATOR
+        '\u{202F}' | // NARROW NO-BREAK SPACE
+        '\u{205F}' | // MEDIUM MATHEMATICAL SPACE
+        '\u{3000}' | // IDEOGRAPHIC SPACE
+        '\u{FEFF}' // ZERO WIDTH NO-BREAK SPACE
         => true,
 
         // EN QUAD, EM QUAD, EN SPACE, EM SPACE, THREE-PER-EM SPACE,
         // FOUR-PER-EM SPACE, SIX-PER-EM SPACE, FIGURE SPACE,
         // PUNCTUATION SPACE, THIN SPACE, HAIR SPACE, ZERO WIDTH SPACE.
-        Some(c) if c >= '\u{2000}' && c <= '\u{200B}' => true,
+        c if c >= '\u{2000}' && c <= '\u{200B}' => true,
 
-        // None, or not a matching whitespace character.
+        // Not a matching whitespace character.
         _ => false,
     }
 }
@@ -108,9 +116,11 @@ mod tests {
 
     #[test]
     fn char_count_1() {
+        let text_0 = "";
         let text_1 = "Hello world!";
         let text_2 = "今日はみんなさん！";
 
+        assert_eq!(0, char_count(text_0));
         assert_eq!(12, char_count(text_1));
         assert_eq!(9, char_count(text_2));
     }

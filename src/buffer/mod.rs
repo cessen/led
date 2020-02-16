@@ -23,7 +23,7 @@ use self::undo_stack::{Operation::*, UndoStack};
 
 /// A text buffer
 pub struct Buffer {
-    text: Rope,
+    pub text: Rope,
     file_path: Option<PathBuf>,
     undo_stack: UndoStack,
 }

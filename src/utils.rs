@@ -122,6 +122,7 @@ pub fn is_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> bool {
 }
 
 /// An iterator over the graphemes of a RopeSlice.
+#[derive(Clone)]
 pub struct RopeGraphemes<'a> {
     text: RopeSlice<'a>,
     chunks: Chunks<'a>,
