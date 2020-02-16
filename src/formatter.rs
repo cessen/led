@@ -107,7 +107,7 @@ impl LineFormatter {
                 // wasn't long enough, so return the index of the last grapheme
                 // of the previous line.
                 if i > char_offset {
-                    return last_i;
+                    return char_idx - char_offset + last_i;
                 }
 
                 // Otherwise reset and keep going.
@@ -123,7 +123,7 @@ impl LineFormatter {
             // Check if we've found the horizontal position _and_ the passed
             // char_idx on the same line, and return if so.
             if i >= char_offset && hpos_char_idx != None {
-                return hpos_char_idx.unwrap();
+                return char_idx - char_offset + hpos_char_idx.unwrap();
             }
 
             last_pos = pos;
@@ -132,7 +132,13 @@ impl LineFormatter {
         }
 
         // If we reached the end of the text, return the last char index.
-        return i;
+        let end_i = char_idx - char_offset + i;
+        let end_last_i = char_idx - char_offset + last_i;
+        if buf.text.len_chars() == end_i {
+            return end_i;
+        } else {
+            return end_last_i;
+        }
     }
 
     /// Takes a char index and a visual vertical offset, and returns the char
