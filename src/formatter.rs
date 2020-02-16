@@ -122,7 +122,7 @@ impl LineFormatter {
 
             // Check if we've found the horizontal position _and_ the passed
             // char_idx on the same line, and return if so.
-            if i >= char_offset && hpos_char_idx != None {
+            if (i + char_count(&g)) > char_offset && hpos_char_idx != None {
                 return char_idx - char_offset + hpos_char_idx.unwrap();
             }
 
