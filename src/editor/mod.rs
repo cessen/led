@@ -299,33 +299,27 @@ impl Editor {
 
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
-        // TODO: account for the horizontal offset of the editor view.
+        // // Find the first and last char index visible within the editor.
+        // let c_first = self
+        //     .formatter
+        //     .set_horizontal(&self.buffer, self.view_pos.0, 0);
+        // let mut c_last =
+        //     self.formatter
+        //         .offset_vertical(&self.buffer, c_first, self.view_dim.0 as isize);
+        // c_last = self
+        //     .formatter
+        //     .set_horizontal(&self.buffer, c_last, self.view_dim.1);
 
-        // TODO: handle multiple cursors properly.  Should only move if
-        // there are no cursors currently in view, and should jump to
-        // the closest cursor.
-
-        // Find the first and last char index visible within the editor.
-        let c_first = self
-            .formatter
-            .set_horizontal(&self.buffer, self.view_pos.0, 0);
-        let mut c_last =
-            self.formatter
-                .offset_vertical(&self.buffer, c_first, self.view_dim.0 as isize);
-        c_last = self
-            .formatter
-            .set_horizontal(&self.buffer, c_last, self.view_dim.1);
-
-        // Adjust the view depending on where the cursor is
-        if self.cursors[0].range.0 < c_first {
-            self.view_pos.0 = self.cursors[0].range.0;
-        } else if self.cursors[0].range.0 > c_last {
-            self.view_pos.0 = self.formatter.offset_vertical(
-                &self.buffer,
-                self.cursors[0].range.0,
-                -(self.view_dim.0 as isize),
-            );
-        }
+        // // Adjust the view depending on where the cursor is
+        // if self.cursors[0].range.0 < c_first {
+        //     self.view_pos.0 = self.cursors[0].range.0;
+        // } else if self.cursors[0].range.0 > c_last {
+        //     self.view_pos.0 = self.formatter.offset_vertical(
+        //         &self.buffer,
+        //         self.cursors[0].range.0,
+        //         -(self.view_dim.0 as isize),
+        //     );
+        // }
     }
 
     pub fn insert_text_at_cursor(&mut self, text: &str) {
@@ -551,9 +545,9 @@ impl Editor {
             let mut temp_index = self
                 .formatter
                 .offset_vertical(&self.buffer, c.range.0, vmove);
-            temp_index = self
-                .formatter
-                .set_horizontal(&self.buffer, temp_index, c.vis_start);
+            // temp_index = self
+            //     .formatter
+            //     .set_horizontal(&self.buffer, temp_index, c.vis_start);
 
             if !self.buffer.is_grapheme(temp_index) {
                 temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
@@ -581,9 +575,9 @@ impl Editor {
             let mut temp_index = self
                 .formatter
                 .offset_vertical(&self.buffer, c.range.0, vmove);
-            temp_index = self
-                .formatter
-                .set_horizontal(&self.buffer, temp_index, c.vis_start);
+            // temp_index = self
+            //     .formatter
+            //     .set_horizontal(&self.buffer, temp_index, c.vis_start);
 
             if !self.buffer.is_grapheme(temp_index) {
                 temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);

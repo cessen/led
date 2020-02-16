@@ -158,24 +158,17 @@ impl LineFormatter {
             // and handle appropriately.
             if offset_char_v_pos < 0 {
                 // If we're off the start of the block.
+                char_idx = char_idx.saturating_sub(char_offset + 1);
+                v_offset += char_v_pos as isize + 1;
                 if char_idx == 0 {
-                    // We reached the start of the whole buffer.
                     break;
-                } else {
-                    // Set our variables appropriately for the next iteration.
-                    char_idx -= char_offset + 1;
-                    v_offset += char_v_pos as isize + 1;
                 }
             } else if offset_char_v_pos >= block_v_dim as isize {
                 // If we're off the end of the block.
-                if char_idx >= buf.text.len_chars() {
-                    // We reached the end of the whole buffer.
-                    char_idx = buf.text.len_chars();
+                char_idx = (char_idx + block.len_chars() - char_offset).min(buf.text.len_chars());
+                v_offset -= block_v_dim as isize - char_v_pos as isize;
+                if char_idx == buf.text.len_chars() {
                     break;
-                } else {
-                    // Set our variables appropriately for the next iteration.
-                    char_idx += block.len_chars() - char_offset;
-                    v_offset -= block_v_dim as isize - char_v_pos as isize;
                 }
             } else {
                 // If the vertical offset is within this block, calculate an
@@ -187,7 +180,8 @@ impl LineFormatter {
                     }
                     i += char_count(&g);
                 }
-                char_idx += block.len_chars() - char_offset + i;
+                char_idx -= char_offset;
+                char_idx += i;
                 v_offset = 0;
             }
         }
@@ -233,12 +227,13 @@ impl LineFormatter {
         buf: &'b Buffer,
         char_idx: usize,
     ) -> (RopeSlice<'b>, BlockVisIter<'b>, usize) {
-        let (line_i, col_i) = buf.index_to_line_col(char_idx);
-        let line = buf.get_line(line_i);
+        let line_i = buf.text.char_to_line(char_idx);
+        let line_start = buf.text.line_to_char(line_i);
+        let line_end = buf.text.line_to_char(line_i + 1);
+        let line = buf.text.slice(line_start..line_end);
 
         // Find the right block in the line, and the index within that block
-        let (block_index, block_range) = block_index_and_range(&line, col_i);
-        let col_i_adjusted = col_i - block_range.0;
+        let (block_index, block_range) = block_index_and_range(&line, char_idx - line_start);
 
         // Get the right block and an iter into it.
         let block = line.slice(block_range.0..block_range.1);
@@ -258,7 +253,7 @@ impl LineFormatter {
             self.wrap_extra_indent,
         );
 
-        (block, vis_iter, col_i_adjusted)
+        (block, vis_iter, char_idx - (line_start + block_range.0))
     }
 }
 
