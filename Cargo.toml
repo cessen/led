@@ -20,7 +20,8 @@ debug = true
 [dependencies]
 ropey = "1"
 # ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
-unicode-segmentation = "1"
+# unicode-segmentation = "1"
+unicode-segmentation = { git = "https://github.com/unicode-rs/unicode-segmentation.git", branch = "master" }
 unicode-width = "0.1"
 clap = "2"
 smallvec = "1"

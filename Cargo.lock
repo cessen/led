@@ -11,7 +11,7 @@ dependencies = [
  "ropey",
  "smallvec 1.2.0",
  "time",
- "unicode-segmentation",
+ "unicode-segmentation 1.6.0 (git+https://github.com/unicode-rs/unicode-segmentation.git)",
  "unicode-width",
 ]
 
@@ -46,7 +46,7 @@ name = "backend"
 version = "0.1.0"
 dependencies = [
  "ropey",
- "unicode-segmentation",
+ "unicode-segmentation 1.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -516,6 +516,11 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.6.0"
+source = "git+https://github.com/unicode-rs/unicode-segmentation.git#fbba2a660b38dad86eebcd7fe73138c5cbfb9469"
 
 [[package]]
 name = "unicode-segmentation"
