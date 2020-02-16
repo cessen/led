@@ -17,7 +17,26 @@ pub fn digit_count(mut n: u32, b: u32) -> u32 {
 //=============================================================
 
 pub fn grapheme_width(g: &str) -> usize {
-    UnicodeWidthStr::width(g)
+    if g.as_bytes()[0] <= 127 {
+        // Fast-path ascii.
+        // Point 1: theoretically, ascii control characters should have zero
+        // width, but in our case we actually want them to have width: if they
+        // show up in text, we want to treat them as textual elements that can
+        // be editied.  So we can get away with making all ascii single width
+        // here.
+        // Point 2: we're only examining the first codepoint here, which means
+        // we're ignoring graphemes formed with combining characters.  However,
+        // if it starts with ascii, it's going to be a single-width grapeheme
+        // regardless, so, again, we can get away with that here.
+        // Point 3: we're only examining the first _byte_.  But for utf8, when
+        // checking for ascii range values only, that works.
+        1
+    } else {
+        // We use max(1) here because all grapeheme clusters--even illformed
+        // ones--should have at least some width so they can be edited
+        // properly.
+        UnicodeWidthStr::width(g).max(1)
+    }
 }
 
 /// Finds the previous grapheme boundary before the given char position.

@@ -5,7 +5,7 @@ use ropey::{Rope, RopeSlice};
 use crate::{
     buffer::Buffer,
     string_utils::char_count,
-    string_utils::{is_line_ending, str_is_whitespace},
+    string_utils::str_is_whitespace,
     utils::{grapheme_width, is_grapheme_boundary, prev_grapheme_boundary, RopeGraphemes},
 };
 
@@ -476,9 +476,8 @@ impl<'a> Iterator for BlockVisIter<'a> {
 /// position on a line.
 fn grapheme_vis_width_at_vis_pos(g: &str, pos: usize, tab_width: usize) -> usize {
     if g == "\t" {
-        return tab_stop_from_vis_pos(pos, tab_width) - pos;
-    } else if is_line_ending(g) {
-        return 1;
+        // Tabs are special.
+        tab_stop_from_vis_pos(pos, tab_width) - pos
     } else {
         return grapheme_width(&g);
     }
