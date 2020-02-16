@@ -116,7 +116,7 @@ impl LineFormatter {
 
             // Check if we found the horizontal position on this line,
             // and set it if so.
-            if hpos_char_idx == None && horizontal < (pos.1 + width) {
+            if hpos_char_idx == None && (pos.1 + width) > horizontal {
                 hpos_char_idx = Some(i);
             }
 
