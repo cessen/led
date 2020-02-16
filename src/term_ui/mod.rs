@@ -606,6 +606,8 @@ impl TermUI {
 
                 char_index += char_count(&g);
             }
+
+            screen_line += 1;
         }
 
         // If we get here, it means we reached the end of the text buffer

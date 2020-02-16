@@ -147,7 +147,7 @@ impl LineFormatter {
 
             // Get the vertical size of the block and the vertical
             // position of the char_idx within it.
-            let block_v_dim = (block_vis_iter.clone().last().unwrap().1).0 + 1;
+            let block_v_dim = block_vis_iter.clone().last().map(|n| (n.1).0).unwrap_or(0) + 1;
             let char_v_pos = block_vis_iter.clone().vpos(char_offset);
 
             // Get the char's vertical position within the block after offset
