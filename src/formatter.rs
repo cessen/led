@@ -246,20 +246,39 @@ impl LineFormatter {
         let g_iter = RopeGraphemes::new(&block);
 
         // Get an appropriate visual block iter.
-        let vis_iter = BlockVisIter::new(
+        let vis_iter = self.make_block_vis_iter(g_iter, &line, block_index == 0);
+
+        (block, vis_iter, char_idx - (line_start + block_range.0))
+    }
+
+    /// Takes a graphemes iterator for the block, the line its from, and
+    /// whether or not the block is the first block of the line, and creates
+    /// an appropriate visual iterator for it.
+    ///
+    /// This is a helper function, just to keep this logic in one place so it's
+    /// easy to tinker with.  It was duplicated in a couple places before.
+    fn make_block_vis_iter<'a>(
+        &self,
+        g_iter: RopeGraphemes<'a>,
+        line: &RopeSlice,
+        is_line_start: bool,
+    ) -> BlockVisIter<'a> {
+        BlockVisIter::new(
             g_iter,
             self.wrap_width,
             self.tab_width,
-            block_index == 0,
-            if block_index == 0 {
+            is_line_start,
+            if is_line_start {
                 0
             } else {
-                self.get_line_indent(&line)
+                self.get_line_indent(&line) + self.wrap_extra_indent
             },
-            self.wrap_extra_indent,
-        );
-
-        (block, vis_iter, char_idx - (line_start + block_range.0))
+            if is_line_start {
+                self.wrap_extra_indent
+            } else {
+                0
+            },
+        )
     }
 }
 
@@ -288,17 +307,10 @@ impl<'a> Iterator for Blocks<'a> {
             let line = self.buf.line(self.line_idx);
             let (start, end) = char_range_from_block_index(&line, self.block_idx);
             let block = line.slice(start..end);
-            let iter = BlockVisIter::new(
+            let iter = self.formatter.make_block_vis_iter(
                 RopeGraphemes::new(&block),
-                self.formatter.wrap_width,
-                self.formatter.tab_width,
+                &line,
                 self.block_idx == 0,
-                if self.block_idx == 0 {
-                    0
-                } else {
-                    self.formatter.get_line_indent(&line)
-                },
-                self.formatter.wrap_extra_indent,
             );
 
             (iter, self.block_idx == 0)
@@ -344,10 +356,17 @@ impl<'a> BlockVisIter<'a> {
         grapheme_itr: RopeGraphemes<'a>,
         wrap_width: usize,
         tab_width: usize,
-        find_indent: bool,
-        starting_indent: usize,
-        wrap_extra_indent: usize,
+        mut find_indent: bool,
+        mut starting_indent: usize,
+        mut wrap_extra_indent: usize,
     ) -> BlockVisIter<'a> {
+        if (starting_indent + wrap_extra_indent + 2) > wrap_width {
+            // No indentation of wrap wdith is too small.
+            find_indent = false;
+            starting_indent = 0;
+            wrap_extra_indent = 0;
+        }
+
         BlockVisIter {
             grapheme_itr: grapheme_itr,
             wrap_width: wrap_width,
