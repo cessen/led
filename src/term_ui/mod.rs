@@ -49,19 +49,7 @@ const STYLE_CURSOR: Style = Style(
         b: 0xD0,
     },
 );
-const STYLE_GUTTER_ODD: Style = Style(
-    Color::Rgb {
-        r: 0x70,
-        g: 0x70,
-        b: 0x70,
-    },
-    Color::Rgb {
-        r: 0x08,
-        g: 0x08,
-        b: 0x08,
-    },
-);
-const STYLE_GUTTER_EVEN: Style = Style(
+const STYLE_GUTTER_LINE_START: Style = Style(
     Color::Rgb {
         r: 0x78,
         g: 0x78,
@@ -71,6 +59,18 @@ const STYLE_GUTTER_EVEN: Style = Style(
         r: 0x1B,
         g: 0x1B,
         b: 0x1B,
+    },
+);
+const STYLE_GUTTER_LINE_WRAP: Style = Style(
+    Color::Rgb {
+        r: 0x78,
+        g: 0x78,
+        b: 0x78,
+    },
+    Color::Rgb {
+        r: 0x22,
+        g: 0x22,
+        b: 0x22,
     },
 );
 const STYLE_INFO: Style = Style(
@@ -506,7 +506,8 @@ impl TermUI {
 
         // Fill in the gutter with the appropriate background
         for y in c1.0..(c2.0 + 1) {
-            self.screen.draw(c1.1, y, blank_gutter, STYLE_GUTTER_ODD);
+            self.screen
+                .draw(c1.1, y, blank_gutter, STYLE_GUTTER_LINE_WRAP);
         }
 
         // Loop through the blocks, printing them to the screen.
@@ -518,12 +519,6 @@ impl TermUI {
                 line_num += 1;
             }
             is_first_loop = false;
-
-            let gutter_style = if (line_num % 2) == 0 {
-                STYLE_GUTTER_EVEN
-            } else {
-                STYLE_GUTTER_ODD
-            };
 
             // Print line number
             if is_line_start {
@@ -539,7 +534,7 @@ impl TermUI {
                                 [..(gutter_width - 2 - digit_count(line_num as u32, 10) as usize)],
                             line_num,
                         )[..],
-                        gutter_style,
+                        STYLE_GUTTER_LINE_START,
                     );
                 }
             }
