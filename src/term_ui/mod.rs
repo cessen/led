@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-pub mod formatter;
 mod screen;
 pub mod smallstring;
 
