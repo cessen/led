@@ -499,12 +499,7 @@ impl TermUI {
 
         let (blocks_iter, char_offset) = editor.formatter.iter(&editor.buffer, editor.view_pos.0);
 
-        let vis_line_offset = blocks_iter
-            .clone()
-            .next()
-            .unwrap()
-            .0
-            .vpos(editor.view_pos.0);
+        let vis_line_offset = blocks_iter.clone().next().unwrap().0.vpos(char_offset);
 
         let mut screen_line = c1.0 as isize - vis_line_offset as isize;
         let screen_col = c1.1 as isize + gutter_width as isize;
