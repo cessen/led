@@ -305,7 +305,7 @@ impl Editor {
             .set_horizontal(&self.buffer, self.view_pos.0, 0);
         let mut c_last =
             self.formatter
-                .offset_vertical(&self.buffer, c_first, self.view_dim.0 as isize);
+                .offset_vertical(&self.buffer, c_first, self.view_dim.0 as isize - 1);
         c_last = self
             .formatter
             .set_horizontal(&self.buffer, c_last, self.view_dim.1);
