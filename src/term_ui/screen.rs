@@ -5,8 +5,7 @@ use std::io::{BufWriter, Write};
 
 use crossterm::{self, execute, queue};
 use unicode_segmentation::UnicodeSegmentation;
-
-use crate::utils::grapheme_width;
+use unicode_width::UnicodeWidthStr;
 
 use super::smallstring::SmallString;
 
@@ -93,9 +92,9 @@ impl Screen {
         // Write everything to the buffered output.
         for y in 0..self.h {
             let mut x = 0;
-            queue!(out, crossterm::cursor::MoveTo(0, y as u16)).unwrap();
             while x < self.w {
                 if let Some((style, ref text)) = buf[y * self.w + x] {
+                    queue!(out, crossterm::cursor::MoveTo(x as u16, y as u16)).unwrap();
                     if style != last_style {
                         queue!(
                             out,
@@ -106,10 +105,8 @@ impl Screen {
                         last_style = style;
                     }
                     write!(out, "{}", text).unwrap();
-                    x += 1;
-                } else {
-                    x += 1;
                 }
+                x += 1;
             }
         }
 
@@ -133,16 +130,26 @@ impl Screen {
             let mut buf = self.buf.borrow_mut();
             let mut x = x;
             for g in UnicodeSegmentation::graphemes(text, true) {
-                let width = grapheme_width(g);
-                if width > 0 {
-                    if x < self.w {
+                if x < self.w {
+                    let width = UnicodeWidthStr::width(g);
+                    if width > 0 {
                         buf[y * self.w + x] = Some((style, g.into()));
-                    }
-                    x += 1;
-                    for _ in 0..(width - 1) {
-                        if x < self.w {
-                            buf[y * self.w + x] = None;
+                        x += 1;
+                        for _ in 1..width {
+                            if x < self.w {
+                                buf[y * self.w + x] = None;
+                            }
+                            x += 1;
                         }
+                    } else {
+                        // If it's a zero-width character, prepend a space
+                        // to give it width.  While this isn't strictly
+                        // unicode compliant, it serves the purpose of this
+                        // type of editor well by making all graphemes visible,
+                        // even if they're otherwise illformed.
+                        let mut graph = SmallString::from_str(" ");
+                        graph.push_str(g);
+                        buf[y * self.w + x] = Some((style, graph));
                         x += 1;
                     }
                 }
