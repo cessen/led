@@ -31,9 +31,9 @@ const STYLE_MAIN: Style = Style(
         b: 0xD0,
     },
     Color::Rgb {
-        r: 0x28,
-        g: 0x28,
-        b: 0x28,
+        r: 0x30,
+        g: 0x30,
+        b: 0x30,
     },
 );
 const STYLE_CURSOR: Style = Style(
@@ -55,9 +55,9 @@ const STYLE_GUTTER_LINE_START: Style = Style(
         b: 0x78,
     },
     Color::Rgb {
-        r: 0x1B,
-        g: 0x1B,
-        b: 0x1B,
+        r: 0x1D,
+        g: 0x1D,
+        b: 0x1D,
     },
 );
 const STYLE_GUTTER_LINE_WRAP: Style = Style(
@@ -67,11 +67,16 @@ const STYLE_GUTTER_LINE_WRAP: Style = Style(
         b: 0x78,
     },
     Color::Rgb {
-        r: 0x22,
-        g: 0x22,
-        b: 0x22,
+        r: 0x27,
+        g: 0x27,
+        b: 0x27,
     },
 );
+const COLOR_GUTTER_BAR: Color = Color::Rgb {
+    r: 0x18,
+    g: 0x18,
+    b: 0x18,
+};
 const STYLE_INFO: Style = Style(
     Color::Rgb {
         r: 0xC0,
@@ -507,6 +512,12 @@ impl TermUI {
         for y in c1.0..(c2.0 + 1) {
             self.screen
                 .draw(c1.1, y, blank_gutter, STYLE_GUTTER_LINE_WRAP);
+            self.screen.draw(
+                c1.1 + blank_gutter.len() - 1,
+                y,
+                "▕",
+                Style(COLOR_GUTTER_BAR, STYLE_GUTTER_LINE_WRAP.1),
+            );
         }
 
         // Loop through the blocks, printing them to the screen.
@@ -528,12 +539,18 @@ impl TermUI {
                         lnx,
                         lny,
                         &format!(
-                            "{}{} ",
+                            "{}{}",
                             &blank_gutter
                                 [..(gutter_width - 2 - digit_count(line_num as u32, 10) as usize)],
                             line_num,
                         )[..],
                         STYLE_GUTTER_LINE_START,
+                    );
+                    self.screen.draw(
+                        lnx + blank_gutter.len() - 1,
+                        lny,
+                        "▕",
+                        Style(COLOR_GUTTER_BAR, STYLE_GUTTER_LINE_START.1),
                     );
                 }
             }
