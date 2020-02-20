@@ -289,10 +289,24 @@ impl TermUI {
                     }
 
                     KeyEvent {
+                        code: KeyCode::Up,
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
+                        self.editor.cursor_up(8);
+                    }
+
+                    KeyEvent {
                         code: KeyCode::Down,
                         modifiers: EMPTY_MOD,
                     } => {
                         self.editor.cursor_down(1);
+                    }
+
+                    KeyEvent {
+                        code: KeyCode::Down,
+                        modifiers: KeyModifiers::CONTROL,
+                    } => {
+                        self.editor.cursor_down(8);
                     }
 
                     KeyEvent {
