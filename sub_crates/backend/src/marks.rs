@@ -43,6 +43,7 @@ impl Mark {
         }
     }
 
+    #[must_use]
     pub fn merge(&self, other: Mark) -> Mark {
         let r1 = self.range();
         let r2 = other.range();
@@ -63,9 +64,44 @@ impl Mark {
             }
         }
     }
+
+    /// Modify the mark based on an edit that occured to the text.
+    ///
+    /// `range` is the char range affected by the edit, and `new_len` is the
+    /// new length of that range after the edit.
+    ///
+    /// `range` must be correctly ordered.
+    #[must_use]
+    pub fn edit(&self, range: (usize, usize), new_len: usize) -> Mark {
+        assert!(range.0 <= range.1);
+
+        // Head.
+        let head = if self.head > range.1 {
+            self.head + new_len - (range.1 - range.0)
+        } else if self.head >= range.0 {
+            range.0 + new_len
+        } else {
+            self.head
+        };
+
+        // Tail.
+        let tail = if self.tail > range.1 {
+            self.tail + new_len - (range.1 - range.0)
+        } else if self.tail >= range.0 {
+            range.0 + new_len
+        } else {
+            self.tail
+        };
+
+        Mark {
+            head: head,
+            tail: tail,
+            hh_pos: None,
+        }
+    }
 }
 
-//--------------------------------------------------------------------------
+//----------------------------------------------------------------------
 
 /// A set of disjoint Marks, sorted by position in the text.
 ///
