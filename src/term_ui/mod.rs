@@ -10,9 +10,10 @@ use crossterm::{
     style::Color,
 };
 
+use backend::buffer::BufferPath;
+
 use crate::{
     editor::Editor,
-    formatter::LineFormatter,
     string_utils::{char_count, is_line_ending, line_ending_to_str, LineEnding},
     utils::{digit_count, Timer},
 };
@@ -187,10 +188,6 @@ enum LoopStatus {
 }
 
 impl TermUI {
-    pub fn new() -> TermUI {
-        TermUI::new_from_editor(Editor::new(LineFormatter::new(4)))
-    }
-
     pub fn new_from_editor(ed: Editor) -> TermUI {
         let (w, h) = crossterm::terminal::size().unwrap();
         let mut editor = ed;
@@ -463,7 +460,10 @@ impl TermUI {
         }
 
         // Filename and dirty marker
-        let filename = editor.file_path.display();
+        let filename = match editor.buffer.path {
+            BufferPath::File(ref p) => format!("{}", p.display()),
+            BufferPath::Temp(i) => format!("Scratch #{}", i + 1),
+        };
         let dirty_char = if editor.buffer.is_dirty { "*" } else { "" };
         let name = format!("{}{}", filename, dirty_char);
         self.screen.draw(c1.1 + 1, c1.0, &name[..], STYLE_INFO);

@@ -4,13 +4,13 @@ use std::{
     cmp::{max, min},
     collections::HashMap,
     fs::File,
-    io::{self, BufReader, BufWriter, Write},
-    path::{Path, PathBuf},
+    io::{self, BufWriter, Write},
 };
 
-use ropey::Rope;
-
-use backend::{buffer::Buffer, marks::Mark};
+use backend::{
+    buffer::{Buffer, BufferPath},
+    marks::Mark,
+};
 
 use crate::{
     formatter::LineFormatter,
@@ -24,7 +24,6 @@ use crate::{
 pub struct Editor {
     pub buffer: Buffer,
     pub formatter: LineFormatter,
-    pub file_path: PathBuf,
     pub line_ending_type: LineEnding,
     pub soft_tabs: bool,
     pub soft_tab_width: u8,
@@ -43,48 +42,18 @@ pub struct Editor {
 
 impl Editor {
     /// Create a new blank editor
-    pub fn new(formatter: LineFormatter) -> Editor {
-        let (buffer, v_msi, c_msi) = {
-            let mut buffer = Buffer::new("".into());
-            let view_idx = buffer.add_mark_set();
-            let cursors_idx = buffer.add_mark_set();
+    pub fn new(buffer: Buffer, formatter: LineFormatter) -> Editor {
+        let mut buffer = buffer;
 
-            buffer.mark_sets[view_idx].add_mark(Mark::new(0, 0));
-            buffer.mark_sets[cursors_idx].add_mark(Mark::new(0, 0));
-
-            (buffer, view_idx, cursors_idx)
-        };
-
-        Editor {
-            buffer: buffer,
-            formatter: formatter,
-            file_path: PathBuf::new(),
-            line_ending_type: LineEnding::LF,
-            soft_tabs: false,
-            soft_tab_width: 4,
-            editor_dim: (0, 0),
-            view_dim: (0, 0),
-            v_msi: v_msi,
-            c_msi: c_msi,
-        }
-    }
-
-    pub fn new_from_file(formatter: LineFormatter, path: &Path) -> io::Result<Editor> {
-        let (buffer, v_msi, c_msi) = {
-            let mut buffer = Buffer::new(Rope::from_reader(BufReader::new(File::open(path)?))?);
-            let view_idx = buffer.add_mark_set();
-            let cursors_idx = buffer.add_mark_set();
-
-            buffer.mark_sets[view_idx].add_mark(Mark::new(0, 0));
-            buffer.mark_sets[cursors_idx].add_mark(Mark::new(0, 0));
-
-            (buffer, view_idx, cursors_idx)
-        };
+        // Create appropriate mark sets for view positions and cursors.
+        let v_msi = buffer.add_mark_set();
+        let c_msi = buffer.add_mark_set();
+        buffer.mark_sets[v_msi].add_mark(Mark::new(0, 0));
+        buffer.mark_sets[c_msi].add_mark(Mark::new(0, 0));
 
         let mut ed = Editor {
             buffer: buffer,
             formatter: formatter,
-            file_path: path.to_path_buf(),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
@@ -97,18 +66,20 @@ impl Editor {
         ed.auto_detect_line_ending();
         ed.auto_detect_indentation_style();
 
-        Ok(ed)
+        ed
     }
 
     pub fn save_if_dirty(&mut self) -> io::Result<()> {
-        if self.buffer.is_dirty && self.file_path != PathBuf::new() {
-            let mut f = BufWriter::new(File::create(&self.file_path)?);
+        if let BufferPath::File(ref file_path) = self.buffer.path {
+            if self.buffer.is_dirty {
+                let mut f = BufWriter::new(File::create(file_path)?);
 
-            for c in self.buffer.text.chunks() {
-                f.write(c.as_bytes())?;
+                for c in self.buffer.text.chunks() {
+                    f.write(c.as_bytes())?;
+                }
+
+                self.buffer.is_dirty = false;
             }
-
-            self.buffer.is_dirty = false;
         }
 
         Ok(())

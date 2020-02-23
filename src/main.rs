@@ -1,8 +1,13 @@
-use std::{io::Write, path::Path};
+use std::{
+    fs::File,
+    io::{BufReader, Write},
+};
 
+use backend::buffer::{Buffer, BufferPath};
 use clap::{App, Arg};
 use editor::Editor;
 use formatter::LineFormatter;
+use ropey::Rope;
 use term_ui::TermUI;
 
 mod editor;
@@ -14,7 +19,7 @@ mod utils;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn main() {
+fn main() -> std::io::Result<()> {
     // Parse command line arguments.
     let args = App::new("Led")
         .version(VERSION)
@@ -28,12 +33,16 @@ fn main() {
         .get_matches();
 
     // Load file, if specified
-    let editor = if let Some(filepath) = args.value_of("file") {
-        Editor::new_from_file(LineFormatter::new(4), &Path::new(&filepath[..]))
-            .expect(&format!("Couldn't open file '{}'.", filepath))
+    let buffer = if let Some(filepath) = args.value_of("file") {
+        Buffer::new(
+            Rope::from_reader(BufReader::new(File::open(filepath)?))?,
+            BufferPath::File(filepath.into()),
+        )
     } else {
-        Editor::new(LineFormatter::new(4))
+        Buffer::new("".into(), BufferPath::Temp(0))
     };
+
+    let editor = Editor::new(buffer, LineFormatter::new(4));
 
     // Holds stderr output in an internal buffer, and prints it when dropped.
     // This keeps stderr from being swallowed by the TUI.
@@ -58,4 +67,6 @@ fn main() {
         // Resume panic unwind.
         std::panic::resume_unwind(e);
     }
+
+    Ok(())
 }

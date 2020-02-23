@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use ropey::Rope;
 
 use crate::{
@@ -5,9 +7,20 @@ use crate::{
     marks::MarkSet,
 };
 
+/// A path for an open text buffer.
+///
+/// This indicates where the text data of the buffer came from, and
+/// where it should be saved to.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum BufferPath {
+    File(PathBuf), // A buffer for a normal file on disk.
+    Temp(usize),   // A temporary buffer, with a number ID.
+}
+
 /// An open text buffer, currently being edited.
 #[derive(Debug, Clone)]
 pub struct Buffer {
+    pub path: BufferPath,
     pub is_dirty: bool,          // Is this buffer currently out of sync with disk.
     pub text: Rope,              // The actual text content.
     pub mark_sets: Vec<MarkSet>, // MarkSets for cursors, view positions, etc.
@@ -15,8 +28,9 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new(text: Rope) -> Buffer {
+    pub fn new(text: Rope, path: BufferPath) -> Buffer {
         Buffer {
+            path: path,
             is_dirty: false,
             text: text,
             mark_sets: Vec::new(),
