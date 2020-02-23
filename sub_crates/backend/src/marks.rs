@@ -78,7 +78,7 @@ impl Mark {
         // Head.
         let head = if self.head > range.1 {
             self.head + new_len - (range.1 - range.0)
-        } else if self.head >= range.0 {
+        } else if self.head > range.0 {
             range.0 + new_len
         } else {
             self.head
@@ -87,7 +87,7 @@ impl Mark {
         // Tail.
         let tail = if self.tail > range.1 {
             self.tail + new_len - (range.1 - range.0)
-        } else if self.tail >= range.0 {
+        } else if self.tail > range.0 {
             range.0 + new_len
         } else {
             self.tail

@@ -338,10 +338,16 @@ impl Editor {
 
     pub fn insert_text_at_cursor(&mut self, text: &str) {
         // TODO: handle multiple cursors.
-        let mark = self.buffer.mark_sets[self.c_msi].main().unwrap();
-        let range = mark.range();
+        let range = self.buffer.mark_sets[self.c_msi][0].range();
 
+        // Do the edit.
         self.buffer.edit((range.start, range.end), text);
+
+        // Adjust cursor position.
+        let len = text.chars().count();
+        self.buffer.mark_sets[self.c_msi][0].head = range.start + len;
+        self.buffer.mark_sets[self.c_msi][0].tail = range.start + len;
+        self.buffer.mark_sets[self.c_msi][0].hh_pos = None;
 
         // Adjust view
         self.move_view_to_cursor();
@@ -349,8 +355,7 @@ impl Editor {
 
     pub fn insert_tab_at_cursor(&mut self) {
         // TODO: handle multiple cursors.
-        let mark = self.buffer.mark_sets[self.c_msi].main().unwrap();
-        let range = mark.range();
+        let range = self.buffer.mark_sets[self.c_msi][0].range();
 
         if self.soft_tabs {
             // Figure out how many spaces to insert
@@ -368,8 +373,18 @@ impl Editor {
             ];
             self.buffer
                 .edit((range.start, range.end), space_strs[space_count]);
+
+            // Adjust cursor position.
+            self.buffer.mark_sets[self.c_msi][0].head = range.start + space_count;
+            self.buffer.mark_sets[self.c_msi][0].tail = range.start + space_count;
+            self.buffer.mark_sets[self.c_msi][0].hh_pos = None;
         } else {
             self.buffer.edit((range.start, range.end), "\t");
+
+            // Adjust cursor position.
+            self.buffer.mark_sets[self.c_msi][0].head = range.start + 1;
+            self.buffer.mark_sets[self.c_msi][0].tail = range.start + 1;
+            self.buffer.mark_sets[self.c_msi][0].hh_pos = None;
         }
 
         // Adjust view
