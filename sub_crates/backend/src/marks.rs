@@ -208,4 +208,26 @@ impl MarkSet {
 
         self.marks.truncate(i1 + 1);
     }
+
+    pub fn iter(&self) -> std::slice::Iter<Mark> {
+        self.marks.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Mark> {
+        self.marks.iter_mut()
+    }
+}
+
+impl std::ops::Index<usize> for MarkSet {
+    type Output = Mark;
+
+    fn index(&self, index: usize) -> &Mark {
+        &self.marks[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for MarkSet {
+    fn index_mut(&mut self, index: usize) -> &mut Mark {
+        &mut self.marks[index]
+    }
 }

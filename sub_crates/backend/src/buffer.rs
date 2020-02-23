@@ -57,7 +57,7 @@ impl Buffer {
         // Update mark sets.
         let post_len = text.chars().count();
         for mark_set in self.mark_sets.iter_mut() {
-            for mark in mark_set.marks.iter_mut() {
+            for mark in mark_set.iter_mut() {
                 *mark = mark.edit((start, end), post_len);
             }
 
@@ -88,7 +88,7 @@ impl Buffer {
 
             // Update mark sets.
             for mark_set in self.mark_sets.iter_mut() {
-                for mark in mark_set.marks.iter_mut() {
+                for mark in mark_set.iter_mut() {
                     *mark = mark.edit((start, end), post_len);
                 }
 
@@ -124,7 +124,7 @@ impl Buffer {
 
             // Update mark sets.
             for mark_set in self.mark_sets.iter_mut() {
-                for mark in mark_set.marks.iter_mut() {
+                for mark in mark_set.iter_mut() {
                     *mark = mark.edit((start, end), post_len);
                 }
 
