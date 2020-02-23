@@ -55,9 +55,10 @@ impl Buffer {
         }
 
         // Update mark sets.
+        let post_len = text.chars().count();
         for mark_set in self.mark_sets.iter_mut() {
             for mark in mark_set.marks.iter_mut() {
-                *mark = mark.edit((start, end), text.chars().count());
+                *mark = mark.edit((start, end), post_len);
             }
 
             mark_set.merge_touching();
@@ -74,12 +75,76 @@ impl Buffer {
         }
     }
 
-    pub fn undo(&mut self) {
-        todo!()
+    /// Un-does the last edit if there is one, and returns the range of the
+    /// edited characters which can be used for e.g. placing a cursor or moving
+    /// the view.
+    ///
+    /// Returns None if there is no edit to undo.
+    pub fn undo(&mut self) -> Option<(usize, usize)> {
+        if let Some(ed) = self.history.undo() {
+            let pre_len = ed.to.chars().count();
+            let post_len = ed.from.chars().count();
+            let (start, end) = (ed.char_idx, ed.char_idx + pre_len);
+
+            // Update mark sets.
+            for mark_set in self.mark_sets.iter_mut() {
+                for mark in mark_set.marks.iter_mut() {
+                    *mark = mark.edit((start, end), post_len);
+                }
+
+                mark_set.merge_touching();
+            }
+
+            // Do removal if needed.
+            if start != end {
+                self.text.remove(start..end);
+            }
+
+            // Do insertion if needed.
+            if !ed.from.is_empty() {
+                self.text.insert(start, &ed.from);
+            }
+
+            return Some((start, start + post_len));
+        } else {
+            return None;
+        }
     }
 
-    pub fn redo(&mut self) {
-        todo!()
+    /// Re-does the last edit if there is one, and returns the range of the
+    /// edited characters which can be used for e.g. placing a cursor or moving
+    /// the view.
+    ///
+    /// Returns None if there is no edit to redo.
+    pub fn redo(&mut self) -> Option<(usize, usize)> {
+        if let Some(ed) = self.history.redo() {
+            let pre_len = ed.from.chars().count();
+            let post_len = ed.to.chars().count();
+            let (start, end) = (ed.char_idx, ed.char_idx + pre_len);
+
+            // Update mark sets.
+            for mark_set in self.mark_sets.iter_mut() {
+                for mark in mark_set.marks.iter_mut() {
+                    *mark = mark.edit((start, end), post_len);
+                }
+
+                mark_set.merge_touching();
+            }
+
+            // Do removal if needed.
+            if start != end {
+                self.text.remove(start..end);
+            }
+
+            // Do insertion if needed.
+            if !ed.to.is_empty() {
+                self.text.insert(start, &ed.to);
+            }
+
+            return Some((start, start + post_len));
+        } else {
+            return None;
+        }
     }
 
     /// Creates a new empty mark set, and returns the set index.
