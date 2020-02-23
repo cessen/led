@@ -111,7 +111,7 @@ impl Mark {
 /// and code that modifies a MarkSet should ensure that the invariants remain
 /// true.
 ///
-/// The `merge_touching` method will ensure that all expected invariants hold,
+/// The `make_consistent` method will ensure that all expected invariants hold,
 /// modifying the set to meet the invariants if needed.
 #[derive(Debug, Clone)]
 pub struct MarkSet {
@@ -133,6 +133,23 @@ impl MarkSet {
         self.marks.clear();
     }
 
+    pub fn truncate(&mut self, len: usize) {
+        self.marks.truncate(len);
+        self.main_mark_idx = self.main_mark_idx.min(self.marks.len().saturating_sub(1));
+    }
+
+    /// Returns the main mark, if it exists.
+    pub fn main(&self) -> Option<Mark> {
+        self.marks.get(self.main_mark_idx).map(|m| *m)
+    }
+
+    /// Removes all marks except the main one.
+    pub fn reduce_to_main(&mut self) {
+        self.marks.swap(0, self.main_mark_idx);
+        self.main_mark_idx = 0;
+        self.marks.truncate(1);
+    }
+
     /// Adds a new mark to the set, inserting it into its sorted position, and
     /// returns the index where it was inserted.
     ///
@@ -140,7 +157,7 @@ impl MarkSet {
     /// range.
     ///
     /// This does *not* preserve disjointedness.  You should call
-    /// `merge_touching` after you have added all the marks you want.
+    /// `make_consistent` after you have added all the marks you want.
     ///
     /// Runs in O(N + log N) time worst-case, but when the new mark is
     /// inserted at the end of the set it is amortized O(1).
@@ -185,7 +202,7 @@ impl MarkSet {
     /// into one.
     ///
     /// Runs in O(N) time.
-    pub fn merge_touching(&mut self) {
+    pub fn make_consistent(&mut self) {
         let mut i1 = 0;
         let mut i2 = 1;
 

@@ -3,10 +3,9 @@ use std::borrow::Cow;
 use ropey::{Rope, RopeSlice};
 
 use crate::{
-    buffer::Buffer,
+    graphemes::{grapheme_width, is_grapheme_boundary, prev_grapheme_boundary, RopeGraphemes},
     string_utils::char_count,
     string_utils::str_is_whitespace,
-    utils::{grapheme_width, is_grapheme_boundary, prev_grapheme_boundary, RopeGraphemes},
 };
 
 // Maximum chars in a line before a soft line break is forced.
@@ -42,10 +41,14 @@ impl LineFormatter {
     /// Returns an iterator over the blocks of the buffer, starting at the
     /// block containing the given char.  Also returns the offset of that char
     /// relative to the start of the first block.
-    pub fn iter<'b>(&'b self, buf: &'b Buffer, char_idx: usize) -> (Blocks<'b>, usize) {
+    pub fn iter<'b>(&'b self, buf: &'b Rope, char_idx: usize) -> (Blocks<'b>, usize) {
         // Get the line.
-        let (line_i, col_i) = buf.index_to_line_col(char_idx);
-        let line = buf.get_line(line_i);
+        let (line_i, col_i) = {
+            let line_idx = buf.char_to_line(char_idx);
+            let col_idx = char_idx - buf.line_to_char(line_idx);
+            (line_idx, col_idx)
+        };
+        let line = buf.line(line_i);
 
         // Find the right block in the line, and the index within that block
         let (block_index, block_range) = block_index_and_range(&line, col_i);
@@ -54,7 +57,7 @@ impl LineFormatter {
         (
             Blocks {
                 formatter: self,
-                buf: &buf.text,
+                buf: buf,
                 line_idx: line_i,
                 line_block_count: block_count(&line),
                 block_idx: block_index,
@@ -63,8 +66,8 @@ impl LineFormatter {
         )
     }
 
-    /// Converts from char index to the horizontal 2d char index.
-    pub fn get_horizontal(&self, buf: &Buffer, char_idx: usize) -> usize {
+    /// Converts from char index to its formatted horizontal 2d position.
+    pub fn get_horizontal(&self, buf: &Rope, char_idx: usize) -> usize {
         let (_, vis_iter, char_offset) = self.block_vis_iter_and_char_offset(buf, char_idx);
 
         // Traverse the iterator and find the horizontal position of the char
@@ -92,7 +95,7 @@ impl LineFormatter {
     /// returns a char index on the same visual line as the given index,
     /// but offset to have the desired horizontal position (or as close as is
     /// possible.
-    pub fn set_horizontal(&self, buf: &Buffer, char_idx: usize, horizontal: usize) -> usize {
+    pub fn set_horizontal(&self, buf: &Rope, char_idx: usize, horizontal: usize) -> usize {
         let (_, vis_iter, char_offset) = self.block_vis_iter_and_char_offset(buf, char_idx);
 
         let mut hpos_char_idx = None;
@@ -134,7 +137,7 @@ impl LineFormatter {
         // If we reached the end of the text, return the last char index.
         let end_i = char_idx - char_offset + i;
         let end_last_i = char_idx - char_offset + last_i;
-        if buf.text.len_chars() == end_i {
+        if buf.len_chars() == end_i {
             return end_i;
         } else {
             return end_last_i;
@@ -143,7 +146,7 @@ impl LineFormatter {
 
     /// Takes a char index and a visual vertical offset, and returns the char
     /// index after that visual offset is applied.
-    pub fn offset_vertical(&self, buf: &Buffer, char_idx: usize, v_offset: isize) -> usize {
+    pub fn offset_vertical(&self, buf: &Rope, char_idx: usize, v_offset: isize) -> usize {
         let mut char_idx = char_idx;
         let mut v_offset = v_offset;
         while v_offset != 0 {
@@ -171,9 +174,9 @@ impl LineFormatter {
                 }
             } else if offset_char_v_pos >= block_v_dim as isize {
                 // If we're off the end of the block.
-                char_idx = (char_idx + block.len_chars() - char_offset).min(buf.text.len_chars());
+                char_idx = (char_idx + block.len_chars() - char_offset).min(buf.len_chars());
                 v_offset -= block_v_dim as isize - char_v_pos as isize;
-                if char_idx == buf.text.len_chars() {
+                if char_idx == buf.len_chars() {
                     break;
                 }
             } else {
@@ -230,13 +233,13 @@ impl LineFormatter {
     /// char's offset within that iter.
     fn block_vis_iter_and_char_offset<'b>(
         &self,
-        buf: &'b Buffer,
+        buf: &'b Rope,
         char_idx: usize,
     ) -> (RopeSlice<'b>, BlockVisIter<'b>, usize) {
-        let line_i = buf.text.char_to_line(char_idx);
-        let line_start = buf.text.line_to_char(line_i);
-        let line_end = buf.text.line_to_char(line_i + 1);
-        let line = buf.text.slice(line_start..line_end);
+        let line_i = buf.char_to_line(char_idx);
+        let line_start = buf.line_to_char(line_i);
+        let line_end = buf.line_to_char(line_i + 1);
+        let line = buf.slice(line_start..line_end);
 
         // Find the right block in the line, and the index within that block
         let (block_index, block_range) = block_index_and_range(&line, char_idx - line_start);

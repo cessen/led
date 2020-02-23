@@ -5,9 +5,9 @@ use editor::Editor;
 use formatter::LineFormatter;
 use term_ui::TermUI;
 
-mod buffer;
 mod editor;
 mod formatter;
+mod graphemes;
 mod string_utils;
 mod term_ui;
 mod utils;
@@ -30,6 +30,7 @@ fn main() {
     // Load file, if specified
     let editor = if let Some(filepath) = args.value_of("file") {
         Editor::new_from_file(LineFormatter::new(4), &Path::new(&filepath[..]))
+            .expect(&format!("Couldn't open file '{}'.", filepath))
     } else {
         Editor::new(LineFormatter::new(4))
     };

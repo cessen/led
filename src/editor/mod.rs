@@ -1,21 +1,25 @@
 #![allow(dead_code)]
 
-mod cursor;
-
 use std::{
     cmp::{max, min},
     collections::HashMap,
+    fs::File,
+    io::{self, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
-use crate::{
-    buffer::Buffer,
-    formatter::LineFormatter,
-    string_utils::{char_count, rope_slice_to_line_ending, LineEnding},
-    utils::{digit_count, RopeGraphemes},
-};
+use ropey::Rope;
 
-use self::cursor::CursorSet;
+use backend::{buffer::Buffer, marks::Mark};
+
+use crate::{
+    formatter::LineFormatter,
+    graphemes::{
+        is_grapheme_boundary, nth_next_grapheme_boundary, nth_prev_grapheme_boundary, RopeGraphemes,
+    },
+    string_utils::{rope_slice_to_line_ending, LineEnding},
+    utils::digit_count,
+};
 
 pub struct Editor {
     pub buffer: Buffer,
@@ -24,7 +28,6 @@ pub struct Editor {
     pub line_ending_type: LineEnding,
     pub soft_tabs: bool,
     pub soft_tab_width: u8,
-    pub dirty: bool,
 
     // The dimensions of the total editor in screen space, including the
     // header, gutter, etc.
@@ -32,76 +35,90 @@ pub struct Editor {
 
     // The dimensions and position of just the text view portion of the editor
     pub view_dim: (usize, usize), // (height, width)
-    pub view_pos: (usize, usize), // (char index, visual horizontal offset)
 
-    // The editing cursor position
-    pub cursors: CursorSet,
+    // Indices into the mark sets of the buffer.
+    pub v_msi: usize, // View position MarkSet index.
+    pub c_msi: usize, // Cursors MarkSet index.
 }
 
 impl Editor {
     /// Create a new blank editor
     pub fn new(formatter: LineFormatter) -> Editor {
+        let (buffer, v_msi, c_msi) = {
+            let mut buffer = Buffer::new("".into());
+            let view_idx = buffer.add_mark_set();
+            let cursors_idx = buffer.add_mark_set();
+
+            buffer.mark_sets[view_idx].add_mark(Mark::new(0, 0));
+            buffer.mark_sets[cursors_idx].add_mark(Mark::new(0, 0));
+
+            (buffer, view_idx, cursors_idx)
+        };
+
         Editor {
-            buffer: Buffer::new(),
+            buffer: buffer,
             formatter: formatter,
             file_path: PathBuf::new(),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
-            dirty: false,
             editor_dim: (0, 0),
             view_dim: (0, 0),
-            view_pos: (0, 0),
-            cursors: CursorSet::new(),
+            v_msi: v_msi,
+            c_msi: c_msi,
         }
     }
 
-    pub fn new_from_file(formatter: LineFormatter, path: &Path) -> Editor {
-        let buf = match Buffer::new_from_file(path) {
-            Ok(b) => b,
-            // TODO: handle un-openable file better
-            _ => panic!("Could not open file!"),
+    pub fn new_from_file(formatter: LineFormatter, path: &Path) -> io::Result<Editor> {
+        let (buffer, v_msi, c_msi) = {
+            let mut buffer = Buffer::new(Rope::from_reader(BufReader::new(File::open(path)?))?);
+            let view_idx = buffer.add_mark_set();
+            let cursors_idx = buffer.add_mark_set();
+
+            buffer.mark_sets[view_idx].add_mark(Mark::new(0, 0));
+            buffer.mark_sets[cursors_idx].add_mark(Mark::new(0, 0));
+
+            (buffer, view_idx, cursors_idx)
         };
 
         let mut ed = Editor {
-            buffer: buf,
+            buffer: buffer,
             formatter: formatter,
             file_path: path.to_path_buf(),
             line_ending_type: LineEnding::LF,
             soft_tabs: false,
             soft_tab_width: 4,
-            dirty: false,
             editor_dim: (0, 0),
             view_dim: (0, 0),
-            view_pos: (0, 0),
-            cursors: CursorSet::new(),
+            v_msi: v_msi,
+            c_msi: c_msi,
         };
-
-        // For multiple-cursor testing
-        // let mut cur = Cursor::new();
-        // cur.range.0 = 30;
-        // cur.range.1 = 30;
-        // cur.update_vis_start(&(ed.buffer), &(ed.formatter));
-        // ed.cursors.add_cursor(cur);
 
         ed.auto_detect_line_ending();
         ed.auto_detect_indentation_style();
 
-        return ed;
+        Ok(ed)
     }
 
-    pub fn save_if_dirty(&mut self) {
-        if self.dirty && self.file_path != PathBuf::new() {
-            let _ = self.buffer.save_to_file(&self.file_path);
-            self.dirty = false;
+    pub fn save_if_dirty(&mut self) -> io::Result<()> {
+        if self.buffer.is_dirty && self.file_path != PathBuf::new() {
+            let mut f = BufWriter::new(File::create(&self.file_path)?);
+
+            for c in self.buffer.text.chunks() {
+                f.write(c.as_bytes())?;
+            }
+
+            self.buffer.is_dirty = false;
         }
+
+        Ok(())
     }
 
     pub fn auto_detect_line_ending(&mut self) {
         let mut line_ending_histogram: [usize; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 
         // Collect statistics on the first 100 lines
-        for line in self.buffer.line_iter().take(100) {
+        for line in self.buffer.text.lines().take(100) {
             // Get the line ending
             let ending = if line.len_chars() == 1 {
                 let g = RopeGraphemes::new(&line.slice((line.len_chars() - 1)..))
@@ -181,7 +198,7 @@ impl Editor {
         let mut last_indent = (false, 0usize); // (was_tabs, indent_count)
 
         // Collect statistics on the first 1000 lines
-        for line in self.buffer.line_iter().take(1000) {
+        for line in self.buffer.text.lines().take(1000) {
             let mut c_iter = line.chars();
             match c_iter.next() {
                 Some('\t') => {
@@ -254,7 +271,7 @@ impl Editor {
 
     /// Updates the view dimensions.
     pub fn update_dim(&mut self, h: usize, w: usize) {
-        let line_count_digits = digit_count(self.buffer.line_count() as u32, 10) as usize;
+        let line_count_digits = digit_count(self.buffer.text.len_lines() as u32, 10) as usize;
         self.editor_dim = (h, w);
 
         // Minus 1 vertically for the header, minus two more than the digits in
@@ -267,332 +284,258 @@ impl Editor {
 
     pub fn undo(&mut self) {
         // TODO: handle multiple cursors properly
-        if let Some(pos) = self.buffer.undo() {
-            self.cursors.truncate(1);
-            self.cursors[0].range.0 = pos;
-            self.cursors[0].range.1 = pos;
-            self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
+        if let Some((_start, end)) = self.buffer.undo() {
+            self.buffer.mark_sets[self.c_msi].reduce_to_main();
+            self.buffer.mark_sets[self.c_msi][0].head = end;
+            self.buffer.mark_sets[self.c_msi][0].tail = end;
+            self.buffer.mark_sets[self.c_msi][0].hh_pos = None;
 
             self.move_view_to_cursor();
-
-            self.dirty = true;
-
-            self.cursors.make_consistent();
         }
     }
 
     pub fn redo(&mut self) {
         // TODO: handle multiple cursors properly
-        if let Some(pos) = self.buffer.redo() {
-            self.cursors.truncate(1);
-            self.cursors[0].range.0 = pos;
-            self.cursors[0].range.1 = pos;
-            self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
+        if let Some((_start, end)) = self.buffer.redo() {
+            self.buffer.mark_sets[self.c_msi].reduce_to_main();
+            self.buffer.mark_sets[self.c_msi][0].head = end;
+            self.buffer.mark_sets[self.c_msi][0].tail = end;
+            self.buffer.mark_sets[self.c_msi][0].hh_pos = None;
 
             self.move_view_to_cursor();
-
-            self.dirty = true;
-
-            self.cursors.make_consistent();
         }
     }
 
     /// Moves the editor's view the minimum amount to show the cursor
     pub fn move_view_to_cursor(&mut self) {
         // Find the first and last char index visible within the editor.
-        let c_first = self
-            .formatter
-            .set_horizontal(&self.buffer, self.view_pos.0, 0);
-        let mut c_last =
-            self.formatter
-                .offset_vertical(&self.buffer, c_first, self.view_dim.0 as isize - 1);
+        let c_first = self.formatter.set_horizontal(
+            &self.buffer.text,
+            self.buffer.mark_sets[self.v_msi][0].head,
+            0,
+        );
+        let mut c_last = self.formatter.offset_vertical(
+            &self.buffer.text,
+            c_first,
+            self.view_dim.0 as isize - 1,
+        );
         c_last = self
             .formatter
-            .set_horizontal(&self.buffer, c_last, self.view_dim.1);
+            .set_horizontal(&self.buffer.text, c_last, self.view_dim.1);
 
         // Adjust the view depending on where the cursor is
-        if self.cursors[0].range.0 < c_first {
-            self.view_pos.0 = self.cursors[0].range.0;
-        } else if self.cursors[0].range.0 > c_last {
-            self.view_pos.0 = self.formatter.offset_vertical(
-                &self.buffer,
-                self.cursors[0].range.0,
+        let cursor_head = self.buffer.mark_sets[self.c_msi].main().unwrap().head;
+        if cursor_head < c_first {
+            self.buffer.mark_sets[self.v_msi][0].head = cursor_head;
+        } else if cursor_head > c_last {
+            self.buffer.mark_sets[self.v_msi][0].head = self.formatter.offset_vertical(
+                &self.buffer.text,
+                cursor_head,
                 -(self.view_dim.0 as isize),
             );
         }
     }
 
     pub fn insert_text_at_cursor(&mut self, text: &str) {
-        self.cursors.make_consistent();
+        // TODO: handle multiple cursors.
+        let mark = self.buffer.mark_sets[self.c_msi].main().unwrap();
+        let range = mark.range();
 
-        let str_len = char_count(text);
-        let mut offset = 0;
-
-        for c in self.cursors.iter_mut() {
-            // Insert text
-            self.buffer.insert_text(text, c.range.0 + offset);
-            self.dirty = true;
-
-            // Move cursor
-            c.range.0 += str_len + offset;
-            c.range.1 += str_len + offset;
-            c.update_vis_start(&(self.buffer), &(self.formatter));
-
-            // Update offset
-            offset += str_len;
-        }
+        self.buffer.edit((range.start, range.end), text);
 
         // Adjust view
         self.move_view_to_cursor();
     }
 
     pub fn insert_tab_at_cursor(&mut self) {
-        self.cursors.make_consistent();
+        // TODO: handle multiple cursors.
+        let mark = self.buffer.mark_sets[self.c_msi].main().unwrap();
+        let range = mark.range();
 
         if self.soft_tabs {
-            let mut offset = 0;
+            // Figure out how many spaces to insert
+            let vis_pos = self
+                .formatter
+                .get_horizontal(&self.buffer.text, range.start);
+            // TODO: handle tab settings
+            let next_tab_stop =
+                ((vis_pos / self.soft_tab_width as usize) + 1) * self.soft_tab_width as usize;
+            let space_count = min(next_tab_stop - vis_pos, 8);
 
-            for c in self.cursors.iter_mut() {
-                // Update cursor with offset
-                c.range.0 += offset;
-                c.range.1 += offset;
-
-                // Figure out how many spaces to insert
-                let vis_pos = self.formatter.get_horizontal(&self.buffer, c.range.0);
-                // TODO: handle tab settings
-                let next_tab_stop =
-                    ((vis_pos / self.soft_tab_width as usize) + 1) * self.soft_tab_width as usize;
-                let space_count = min(next_tab_stop - vis_pos, 8);
-
-                // Insert spaces
-                let space_strs = [
-                    "", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        ",
-                ];
-                self.buffer.insert_text(space_strs[space_count], c.range.0);
-                self.dirty = true;
-
-                // Move cursor
-                c.range.0 += space_count;
-                c.range.1 += space_count;
-                c.update_vis_start(&(self.buffer), &(self.formatter));
-
-                // Update offset
-                offset += space_count;
-            }
-
-            // Adjust view
-            self.move_view_to_cursor();
+            // Insert spaces
+            let space_strs = [
+                "", " ", "  ", "   ", "    ", "     ", "      ", "       ", "        ",
+            ];
+            self.buffer
+                .edit((range.start, range.end), space_strs[space_count]);
         } else {
-            self.insert_text_at_cursor("\t");
+            self.buffer.edit((range.start, range.end), "\t");
         }
-    }
 
-    pub fn backspace_at_cursor(&mut self) {
-        self.remove_text_behind_cursor(1);
+        // Adjust view
+        self.move_view_to_cursor();
     }
 
     pub fn remove_text_behind_cursor(&mut self, grapheme_count: usize) {
-        self.cursors.make_consistent();
+        // TODO: handle multiple cursors.
+        let mark = self.buffer.mark_sets[self.c_msi].main().unwrap();
+        let range = mark.range();
 
-        let mut offset = 0;
-
-        for c in self.cursors.iter_mut() {
-            // Update cursor with offset
-            c.range.0 -= offset;
-            c.range.1 -= offset;
-
-            // Do nothing if there's nothing to delete.
-            if c.range.0 == 0 {
-                continue;
-            }
-
-            let len = c.range.0 - self.buffer.nth_prev_grapheme(c.range.0, grapheme_count);
-
-            // Remove text
-            self.buffer.remove_text_before(c.range.0, len);
-            self.dirty = true;
-
-            // Move cursor
-            c.range.0 -= len;
-            c.range.1 -= len;
-            c.update_vis_start(&(self.buffer), &(self.formatter));
-
-            // Update offset
-            offset += len;
+        // Do nothing if there's nothing to delete.
+        if range.start == 0 {
+            return;
         }
 
-        self.cursors.make_consistent();
+        let pre =
+            nth_prev_grapheme_boundary(&self.buffer.text.slice(..), range.start, grapheme_count);
+
+        // Remove text
+        self.buffer.edit((pre, range.start), "");
 
         // Adjust view
         self.move_view_to_cursor();
     }
 
     pub fn remove_text_in_front_of_cursor(&mut self, grapheme_count: usize) {
-        self.cursors.make_consistent();
+        // TODO: handle multiple cursors.
+        let mark = self.buffer.mark_sets[self.c_msi].main().unwrap();
+        let range = mark.range();
 
-        let mut offset = 0;
-
-        for c in self.cursors.iter_mut() {
-            // Update cursor with offset
-            c.range.0 -= min(c.range.0, offset);
-            c.range.1 -= min(c.range.1, offset);
-
-            // Do nothing if there's nothing to delete.
-            if c.range.1 == self.buffer.char_count() {
-                return;
-            }
-
-            let len = self.buffer.nth_next_grapheme(c.range.1, grapheme_count) - c.range.1;
-
-            // Remove text
-            self.buffer.remove_text_after(c.range.1, len);
-            self.dirty = true;
-
-            // Move cursor
-            c.update_vis_start(&(self.buffer), &(self.formatter));
-
-            // Update offset
-            offset += len;
+        // Do nothing if there's nothing to delete.
+        if range.end == self.buffer.text.len_chars() {
+            return;
         }
 
-        self.cursors.make_consistent();
+        let post =
+            nth_next_grapheme_boundary(&self.buffer.text.slice(..), range.end, grapheme_count);
+
+        // Remove text
+        self.buffer.edit((range.end, post), "");
 
         // Adjust view
         self.move_view_to_cursor();
     }
 
     pub fn remove_text_inside_cursor(&mut self) {
-        self.cursors.make_consistent();
+        // TODO: handle multiple cursors.
+        let mark = self.buffer.mark_sets[self.c_msi].main().unwrap();
+        let range = mark.range();
 
-        let mut offset = 0;
-
-        for c in self.cursors.iter_mut() {
-            // Update cursor with offset
-            c.range.0 -= min(c.range.0, offset);
-            c.range.1 -= min(c.range.1, offset);
-
-            // If selection, remove text
-            if c.range.0 < c.range.1 {
-                let len = c.range.1 - c.range.0;
-
-                self.buffer
-                    .remove_text_before(c.range.0, c.range.1 - c.range.0);
-                self.dirty = true;
-
-                // Move cursor
-                c.range.1 = c.range.0;
-
-                // Update offset
-                offset += len;
-            }
-
-            c.update_vis_start(&(self.buffer), &(self.formatter));
+        if range.start < range.end {
+            self.buffer.edit((range.start, range.end), "");
         }
-
-        self.cursors.make_consistent();
 
         // Adjust view
         self.move_view_to_cursor();
     }
 
     pub fn cursor_to_beginning_of_buffer(&mut self) {
-        self.cursors = CursorSet::new();
+        self.buffer.mark_sets[self.c_msi].clear();
+        self.buffer.mark_sets[self.c_msi].add_mark(Mark::new(0, 0));
 
-        self.cursors[0].range = (0, 0);
-        self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
-
-        // Adjust view
+        // Adjust view.
         self.move_view_to_cursor();
     }
 
     pub fn cursor_to_end_of_buffer(&mut self) {
-        let end = self.buffer.char_count();
+        let end = self.buffer.text.len_chars();
 
-        self.cursors = CursorSet::new();
-        self.cursors[0].range = (end, end);
-        self.cursors[0].update_vis_start(&(self.buffer), &(self.formatter));
+        self.buffer.mark_sets[self.c_msi].clear();
+        self.buffer.mark_sets[self.c_msi].add_mark(Mark::new(end, end));
 
-        // Adjust view
+        // Adjust view.
         self.move_view_to_cursor();
     }
 
     pub fn cursor_left(&mut self, n: usize) {
-        for c in self.cursors.iter_mut() {
-            c.range.0 = self.buffer.nth_prev_grapheme(c.range.0, n);
-            c.range.1 = c.range.0;
-            c.update_vis_start(&(self.buffer), &(self.formatter));
+        for mark in self.buffer.mark_sets[self.c_msi].iter_mut() {
+            mark.head = nth_prev_grapheme_boundary(&self.buffer.text.slice(..), mark.head, n);
+            mark.tail = mark.head;
+            mark.hh_pos = None;
         }
+        self.buffer.mark_sets[self.c_msi].make_consistent();
 
         // Adjust view
         self.move_view_to_cursor();
     }
 
     pub fn cursor_right(&mut self, n: usize) {
-        for c in self.cursors.iter_mut() {
-            c.range.1 = self.buffer.nth_next_grapheme(c.range.1, n);
-            c.range.0 = c.range.1;
-            c.update_vis_start(&(self.buffer), &(self.formatter));
+        for mark in self.buffer.mark_sets[self.c_msi].iter_mut() {
+            mark.head = nth_next_grapheme_boundary(&self.buffer.text.slice(..), mark.head, n);
+            mark.tail = mark.head;
+            mark.hh_pos = None;
         }
+        self.buffer.mark_sets[self.c_msi].make_consistent();
 
         // Adjust view
         self.move_view_to_cursor();
     }
 
     pub fn cursor_up(&mut self, n: usize) {
-        for c in self.cursors.iter_mut() {
+        for mark in self.buffer.mark_sets[self.c_msi].iter_mut() {
+            if mark.hh_pos == None {
+                mark.hh_pos = Some(self.formatter.get_horizontal(&self.buffer.text, mark.head));
+            }
+
             let vmove = -1 * n as isize;
 
-            let mut temp_index = self
-                .formatter
-                .offset_vertical(&self.buffer, c.range.0, vmove);
-            temp_index = self
-                .formatter
-                .set_horizontal(&self.buffer, temp_index, c.vis_start);
+            let mut temp_index =
+                self.formatter
+                    .offset_vertical(&self.buffer.text, mark.head, vmove);
+            temp_index =
+                self.formatter
+                    .set_horizontal(&self.buffer.text, temp_index, mark.hh_pos.unwrap());
 
-            if !self.buffer.is_grapheme(temp_index) {
-                temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
+            if !is_grapheme_boundary(&self.buffer.text.slice(..), temp_index) {
+                temp_index = nth_prev_grapheme_boundary(&self.buffer.text.slice(..), temp_index, 1);
             }
 
-            if temp_index == c.range.0 {
+            if temp_index == mark.head {
                 // We were already at the top.
-                c.range.0 = 0;
-                c.range.1 = 0;
-                c.update_vis_start(&(self.buffer), &(self.formatter));
+                mark.head = 0;
+                mark.tail = 0;
+                mark.hh_pos = None;
             } else {
-                c.range.0 = temp_index;
-                c.range.1 = temp_index;
+                mark.head = temp_index;
+                mark.tail = temp_index;
             }
         }
+        self.buffer.mark_sets[self.c_msi].make_consistent();
 
         // Adjust view
         self.move_view_to_cursor();
     }
 
     pub fn cursor_down(&mut self, n: usize) {
-        for c in self.cursors.iter_mut() {
+        for mark in self.buffer.mark_sets[self.c_msi].iter_mut() {
+            if mark.hh_pos == None {
+                mark.hh_pos = Some(self.formatter.get_horizontal(&self.buffer.text, mark.head));
+            }
+
             let vmove = n as isize;
 
-            let mut temp_index = self
-                .formatter
-                .offset_vertical(&self.buffer, c.range.0, vmove);
-            temp_index = self
-                .formatter
-                .set_horizontal(&self.buffer, temp_index, c.vis_start);
+            let mut temp_index =
+                self.formatter
+                    .offset_vertical(&self.buffer.text, mark.head, vmove);
+            temp_index =
+                self.formatter
+                    .set_horizontal(&self.buffer.text, temp_index, mark.hh_pos.unwrap());
 
-            if !self.buffer.is_grapheme(temp_index) {
-                temp_index = self.buffer.nth_prev_grapheme(temp_index, 1);
+            if !is_grapheme_boundary(&self.buffer.text.slice(..), temp_index) {
+                temp_index = nth_prev_grapheme_boundary(&self.buffer.text.slice(..), temp_index, 1);
             }
 
-            if temp_index == c.range.0 {
+            if temp_index == mark.head {
                 // We were already at the bottom.
-                c.range.0 = self.buffer.char_count();
-                c.range.1 = self.buffer.char_count();
-                c.update_vis_start(&(self.buffer), &(self.formatter));
+                mark.head = self.buffer.text.len_chars();
+                mark.tail = self.buffer.text.len_chars();
+                mark.hh_pos = None;
             } else {
-                c.range.0 = temp_index;
-                c.range.1 = temp_index;
+                mark.head = temp_index;
+                mark.tail = temp_index;
             }
         }
+        self.buffer.mark_sets[self.c_msi].make_consistent();
 
         // Adjust view
         self.move_view_to_cursor();
@@ -600,9 +543,9 @@ impl Editor {
 
     pub fn page_up(&mut self) {
         let move_amount = self.view_dim.0 - max(self.view_dim.0 / 8, 1);
-        self.view_pos.0 = self.formatter.offset_vertical(
-            &self.buffer,
-            self.view_pos.0,
+        self.buffer.mark_sets[self.v_msi][0].head = self.formatter.offset_vertical(
+            &self.buffer.text,
+            self.buffer.mark_sets[self.v_msi][0].head,
             -1 * move_amount as isize,
         );
 
@@ -614,9 +557,11 @@ impl Editor {
 
     pub fn page_down(&mut self) {
         let move_amount = self.view_dim.0 - max(self.view_dim.0 / 8, 1);
-        self.view_pos.0 =
-            self.formatter
-                .offset_vertical(&self.buffer, self.view_pos.0, move_amount as isize);
+        self.buffer.mark_sets[self.v_msi][0].head = self.formatter.offset_vertical(
+            &self.buffer.text,
+            self.buffer.mark_sets[self.v_msi][0].head,
+            move_amount as isize,
+        );
 
         self.cursor_down(move_amount);
 
@@ -625,12 +570,23 @@ impl Editor {
     }
 
     pub fn jump_to_line(&mut self, n: usize) {
-        let pos = self.buffer.line_col_to_index((n, 0));
-        self.cursors.truncate(1);
-        self.cursors[0].range.0 =
-            self.formatter
-                .set_horizontal(&self.buffer, pos, self.cursors[0].vis_start);
-        self.cursors[0].range.1 = self.cursors[0].range.0;
+        self.buffer.mark_sets[self.c_msi].reduce_to_main();
+        if self.buffer.mark_sets[self.c_msi][0].hh_pos == None {
+            self.buffer.mark_sets[self.c_msi][0].hh_pos = Some(
+                self.formatter
+                    .get_horizontal(&self.buffer.text, self.buffer.mark_sets[self.c_msi][0].head),
+            );
+        }
+
+        let pos = self.buffer.text.line_to_char(n);
+        let pos = self.formatter.set_horizontal(
+            &self.buffer.text,
+            pos,
+            self.buffer.mark_sets[self.c_msi][0].hh_pos.unwrap(),
+        );
+
+        self.buffer.mark_sets[self.c_msi][0].head = pos;
+        self.buffer.mark_sets[self.c_msi][0].tail = pos;
 
         // Adjust view
         self.move_view_to_cursor();

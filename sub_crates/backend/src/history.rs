@@ -15,6 +15,7 @@ impl History {
     pub fn push_edit(&mut self, edit: Edit) {
         self.edits.truncate(self.position);
         self.edits.push(edit);
+        self.position += 1;
     }
 
     pub fn undo(&mut self) -> Option<&Edit> {

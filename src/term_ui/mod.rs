@@ -243,7 +243,7 @@ impl TermUI {
                         code: KeyCode::Char('s'),
                         modifiers: KeyModifiers::CONTROL,
                     } => {
-                        self.editor.save_if_dirty();
+                        self.editor.save_if_dirty().expect("For some reason the file couldn't be saved.  Also, TODO: this code path shouldn't panic.");
                     }
 
                     KeyEvent {
@@ -342,7 +342,7 @@ impl TermUI {
                         code: KeyCode::Backspace,
                         modifiers: EMPTY_MOD,
                     } => {
-                        self.editor.backspace_at_cursor();
+                        self.editor.remove_text_behind_cursor(1);
                     }
 
                     KeyEvent {
@@ -464,16 +464,17 @@ impl TermUI {
 
         // Filename and dirty marker
         let filename = editor.file_path.display();
-        let dirty_char = if editor.dirty { "*" } else { "" };
+        let dirty_char = if editor.buffer.is_dirty { "*" } else { "" };
         let name = format!("{}{}", filename, dirty_char);
         self.screen.draw(c1.1 + 1, c1.0, &name[..], STYLE_INFO);
 
         // Percentage position in document
         // TODO: use view instead of cursor for calculation if there is more
         // than one cursor.
-        let percentage: usize = if editor.buffer.char_count() > 0 {
-            (((editor.cursors[0].range.0 as f32) / (editor.buffer.char_count() as f32)) * 100.0)
-                as usize
+        let percentage: usize = if editor.buffer.text.len_chars() > 0 {
+            (((editor.buffer.mark_sets[editor.c_msi].main().unwrap().head as f32)
+                / (editor.buffer.text.len_chars() as f32))
+                * 100.0) as usize
         } else {
             100
         };
@@ -510,12 +511,15 @@ impl TermUI {
     }
 
     fn draw_editor_text(&self, editor: &Editor, c1: (usize, usize), c2: (usize, usize)) {
+        let view_pos = editor.buffer.mark_sets[editor.v_msi][0].head;
+        let cursors = &editor.buffer.mark_sets[editor.c_msi];
+
         // Calculate all the starting info
         let gutter_width = editor.editor_dim.1 - editor.view_dim.1;
         let blank_gutter = &"                "[..gutter_width - 1];
-        let line_index = editor.buffer.text.char_to_line(editor.view_pos.0);
+        let line_index = editor.buffer.text.char_to_line(view_pos);
 
-        let (blocks_iter, char_offset) = editor.formatter.iter(&editor.buffer, editor.view_pos.0);
+        let (blocks_iter, char_offset) = editor.formatter.iter(&editor.buffer.text, view_pos);
 
         let vis_line_offset = blocks_iter.clone().next().unwrap().0.vpos(char_offset);
 
@@ -537,7 +541,7 @@ impl TermUI {
         // Loop through the blocks, printing them to the screen.
         let mut is_first_loop = true;
         let mut line_num = line_index + 1;
-        let mut char_index = editor.view_pos.0 - char_offset;
+        let mut char_index = view_pos - char_offset;
         for (block_vis_iter, is_line_start) in blocks_iter {
             if is_line_start && !is_first_loop {
                 line_num += 1;
@@ -578,7 +582,7 @@ impl TermUI {
                     screen_line += 1;
                     last_pos_y = pos_y;
                 }
-                let px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
+                let px = pos_x as isize + screen_col;
                 let py = screen_line;
 
                 // If we're off the bottom, we're done
@@ -590,8 +594,8 @@ impl TermUI {
                 if (px >= c1.1 as isize) && (py >= c1.0 as isize) && (px <= c2.1 as isize) {
                     // Check if the character is within a cursor
                     let mut at_cursor = false;
-                    for c in editor.cursors.iter() {
-                        if char_index >= c.range.0 && char_index <= c.range.1 {
+                    for c in cursors.iter() {
+                        if char_index >= c.range().start && char_index <= c.range().end {
                             at_cursor = true;
                             self.screen.set_cursor(px as usize, py as usize);
                         }
@@ -636,18 +640,19 @@ impl TermUI {
 
         // Check if the character is within a cursor
         let mut at_cursor = false;
-        for c in editor.cursors.iter() {
-            if char_index >= c.range.0 && char_index <= c.range.1 {
+        for c in cursors.iter() {
+            if char_index >= c.range().start && char_index <= c.range().end {
                 at_cursor = true;
             }
         }
 
         if at_cursor {
             // Calculate the cell coordinates at which to draw the cursor
-            let pos_x = editor
-                .formatter
-                .get_horizontal(&self.editor.buffer, self.editor.buffer.char_count());
-            let mut px = pos_x as isize + screen_col - editor.view_pos.1 as isize;
+            let pos_x = editor.formatter.get_horizontal(
+                &self.editor.buffer.text,
+                self.editor.buffer.text.len_chars(),
+            );
+            let mut px = pos_x as isize + screen_col;
             let mut py = screen_line - 1;
             if px > c2.1 as isize {
                 px = c1.1 as isize + screen_col;

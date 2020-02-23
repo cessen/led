@@ -61,7 +61,7 @@ impl Buffer {
                 *mark = mark.edit((start, end), post_len);
             }
 
-            mark_set.merge_touching();
+            mark_set.make_consistent();
         }
 
         // Do removal if needed.
@@ -92,7 +92,7 @@ impl Buffer {
                     *mark = mark.edit((start, end), post_len);
                 }
 
-                mark_set.merge_touching();
+                mark_set.make_consistent();
             }
 
             // Do removal if needed.
@@ -128,7 +128,7 @@ impl Buffer {
                     *mark = mark.edit((start, end), post_len);
                 }
 
-                mark_set.merge_touching();
+                mark_set.make_consistent();
             }
 
             // Do removal if needed.
