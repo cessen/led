@@ -82,6 +82,8 @@ impl Buffer {
     /// Returns None if there is no edit to undo.
     pub fn undo(&mut self) -> Option<(usize, usize)> {
         if let Some(ed) = self.history.undo() {
+            self.is_dirty = true;
+
             let pre_len = ed.to.chars().count();
             let post_len = ed.from.chars().count();
             let (start, end) = (ed.char_idx, ed.char_idx + pre_len);
@@ -118,6 +120,8 @@ impl Buffer {
     /// Returns None if there is no edit to redo.
     pub fn redo(&mut self) -> Option<(usize, usize)> {
         if let Some(ed) = self.history.redo() {
+            self.is_dirty = true;
+
             let pre_len = ed.from.chars().count();
             let post_len = ed.to.chars().count();
             let (start, end) = (ed.char_idx, ed.char_idx + pre_len);
