@@ -1,13 +1,16 @@
 /// A 256-bit non-cryptographic hash function for data identification.
 ///
-/// This is essentially "Skein Lite".  It pulls many ideas from
-/// Skein v1.3, and uses its constants, but strips out everything
-/// related to security, and changes a few things for performance.
+/// This uses the MIX function, constants, and permutation patterns
+/// from Skein v1.3, but is otherwise largely unrelated--in particular
+/// it does not use sub-keys, tweak values, or UBI from Skein.
 ///
-/// This implementation assumes little endian byte order and support
-/// for 64-bit unsigned integers.
+/// This implementation assumes support for 64-bit unsigned integers.
+///
+/// This implementation should work on platforms of any endianness,
+/// but has only been tested on little endian platforms.  Running the
+/// unit tests on a big-endian platform can verify.
 
-const BLOCK_SIZE: usize = 32; // Block size of the hash, in bytes
+const BLOCK_SIZE: usize = 256 / 8; // Block size of the hash, in bytes
 
 /// Convenience function to generate a hash for a block of data.
 pub fn hash(data: &[u8]) -> [u8; BLOCK_SIZE] {
@@ -71,9 +74,12 @@ impl LedHash256 {
     pub fn finish(mut self) -> [u8; BLOCK_SIZE] {
         // Hash the remaining bytes if there are any.
         if self.buf_length > 0 {
+            // Pad with zero.
             for i in (&mut self.buf[self.buf_length..]).iter_mut() {
                 *i = 0;
             }
+
+            // Process.
             let (a, b, c) = unsafe { self.buf.align_to::<u64>() };
             debug_assert!(a.is_empty());
             debug_assert!(c.is_empty());
@@ -83,6 +89,12 @@ impl LedHash256 {
 
         // Hash the message length, in bits.
         mix(&mut self.state[..], &[self.message_length * 8, 0, 0, 0]);
+
+        // Convert to little endian.
+        self.state[0] = self.state[0].to_le();
+        self.state[1] = self.state[1].to_le();
+        self.state[2] = self.state[2].to_le();
+        self.state[3] = self.state[3].to_le();
 
         // Return the result.
         unsafe { std::mem::transmute(self.state) }
@@ -94,8 +106,6 @@ impl LedHash256 {
 /// Inspired by Skein 1.3, and using the constants from its 256-bit
 /// variant.  It does 9 rounds of mixing, as that produces full
 /// diffusion for 256-bit keys according to the Skein 1.3 paper.
-/// There are, of course, many meaningful differences from Skein, this
-/// being far, far simpler and not tweakable at all.
 ///
 /// The mix rotation constants, as taken from Skein 1.3 256-bit variant:
 /// 14 16
@@ -112,110 +122,39 @@ impl LedHash256 {
 /// Indices: 0 1 2 3
 /// Become:  0 3 2 1
 fn mix(state: &mut [u64], block: &[u64]) {
-    /// The MIX function from ThreeFish (which is in turn from Skein).
-    fn umix(a: &mut u64, b: &mut u64, r: u64) {
-        *a = a.wrapping_add(*b);
-        *b = (*b << r) | (*b >> (64 - r));
-        *b ^= *a;
+    /// The MIX function from Skein.
+    fn umix(pair: &mut [u64], r: u32) {
+        pair[0] = pair[0].wrapping_add(pair[1]);
+        pair[1] = pair[1].rotate_left(r) ^ pair[0];
     }
 
-    // xor the block into the hash state
-    state[0] ^= block[0];
-    state[1] ^= block[1];
-    state[2] ^= block[2];
-    state[3] ^= block[3];
+    // Convert the block to native endianness and xor into the hash state.
+    state[0] ^= u64::from_le(block[0]);
+    state[1] ^= u64::from_le(block[1]);
+    state[2] ^= u64::from_le(block[2]);
+    state[3] ^= u64::from_le(block[3]);
 
-    // Mix the hash state
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        14,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        16,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        52,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        57,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        23,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        40,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        5,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        37,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        25,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        33,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        46,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        12,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        58,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        22,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        32,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        32,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[0]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[1]) as *mut u64) },
-        14,
-    );
-    umix(
-        unsafe { std::mem::transmute((&mut state[2]) as *mut u64) },
-        unsafe { std::mem::transmute((&mut state[3]) as *mut u64) },
-        16,
-    );
+    // Mixing constants.
+    const ROUNDS: usize = 9;
+    const ROTATION_TABLE: [(u32, u32); 8] = [
+        (14, 16),
+        (52, 57),
+        (23, 40),
+        (5, 37),
+        (25, 33),
+        (46, 12),
+        (58, 22),
+        (32, 32),
+    ];
+
+    // Do the mixing.
+    for (rot_1, rot_2) in ROTATION_TABLE.iter().cycle().take(ROUNDS) {
+        umix(&mut state[..2], *rot_1);
+        umix(&mut state[2..], *rot_2);
+        state.swap(1, 3);
+    }
+
+    state.swap(1, 3);
 }
 
 #[cfg(test)]
@@ -335,6 +274,25 @@ mod test {
         let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
         let correct_digest = "5fbe85a0a525f3b648542492751e6ae3c05113a3c46dd48aa690ac720126f476";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
+    }
+
+    #[test]
+    fn hash_length() {
+        // We're testing here to make sure the length of the data properly
+        // affects the hash.  The last block of data is padded with zeros
+        // if less than the block size, so here we're forcing that last
+        // block to be all zeros, and only changing the length of input.
+        let len_0 = &[];
+        let len_1 = &[0u8];
+        let len_2 = &[0u8, 0];
+
+        let len_0_hash = digest_to_string(hash(len_0));
+        let len_1_hash = digest_to_string(hash(len_1));
+        let len_2_hash = digest_to_string(hash(len_2));
+
+        assert!(len_0_hash != len_1_hash);
+        assert!(len_0_hash != len_2_hash);
+        assert!(len_1_hash != len_2_hash);
     }
 
     #[test]
