@@ -191,84 +191,46 @@ mod test {
     }
 
     #[test]
-    fn hash_string_01() {
-        let s = "";
+    fn hash_empty() {
         let correct_digest = "4c0995f905f4e502606dfbaadac265ac4de79d68a61d2ad6431432b0e88cacdb";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
+        assert_eq!(digest_to_string(hash(&[])), correct_digest);
     }
 
     #[test]
-    fn hash_string_02() {
-        let s = "a";
-        let correct_digest = "84cf9b8e69b96c1a69257ffffc6b505cd96504ec3ddb97bbff2fffffc161f717";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
+    fn hash_zero() {
+        let correct_digest = "9061db6180de3b2193eca59ada3d00472d0bb25ecced849b55586b367d8e10bd";
+        assert_eq!(digest_to_string(hash(&[0u8])), correct_digest);
     }
 
     #[test]
-    fn hash_string_03() {
-        let s = "aaa";
-        let correct_digest = "a514838ef2fc8394cdd87a34fb8794ad9e74154d73c5a9ca1d920fb3aa187c6e";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
+    fn hash_one() {
+        let correct_digest = "a781e5d5375ece4306b8406e25132be4b50a0af93d544a280dc67cde890235a8";
+        assert_eq!(digest_to_string(hash(&[1u8])), correct_digest);
     }
 
     #[test]
-    fn hash_string_04() {
+    fn hash_string_01() {
         let s = "abc";
         let correct_digest = "08c83bd40744cd323890d1d1ca72274c4ec4a0e1de0b68761248b1bdd70a845a";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
-    fn hash_string_05() {
-        let s = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-        let correct_digest = "a0f15439308087ab8f0063d69d22d0b7f046e8c0754c1959a14478378c3b4725";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
-    }
-
-    #[test]
-    fn hash_string_06() {
-        let s = "The quick brown fox jumps over the lazy dog";
-        let correct_digest = "1b409dc9bd517b1bab7ad44ab2d11917d5f24d090bd766024a2cd54a5aa28ce8";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
-    }
-
-    #[test]
-    fn hash_string_07() {
+    fn hash_string_02() {
         let s = "The quick brown fox jumps over the lazy dog.";
         let correct_digest = "f94bd8c035958bb27c5a733ad7efd21286da12b9cf33a6496d9b9e35813720b7";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
-    fn hash_string_08() {
-        let s = "message digest";
-        let correct_digest = "e2f2ff2e0ecd3336f9f12f45628e9dea63c02933619759d89a1974f5bb5072a7";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
-    }
-
-    #[test]
-    fn hash_string_09() {
-        let s = "abcdefghijklmnopqrstuvwxyz";
-        let correct_digest = "e9828ae4d285bce25c652954ffbf9d5e292c920220f84e2983a7bf6911e59206";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
-    }
-
-    #[test]
-    fn hash_string_10() {
+    fn hash_string_03() {
         let s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         let correct_digest = "9e54edbe1611f9c5e0a306240537df41d2ca1d584a125119cbf09fdb2f6ab880";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
-    fn hash_string_11() {
-        let s = "12345678901234567890123456789012345678901234567890123456789012345678901234567890";
-        let correct_digest = "f1b7e4cca7c926b20520a7513043e0dda8b398b4d77613b1d7cc2464e9d8061f";
-        assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
-    }
-
-    #[test]
-    fn hash_string_12() {
+    fn hash_string_04() {
         let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
         let correct_digest = "5e4a25a709236e55995eee313495ae1d43c09d4acfec69a107b65be20b6c3863";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
