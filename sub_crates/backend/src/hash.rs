@@ -55,10 +55,7 @@ impl LedHash256 {
         while !data.is_empty() {
             if self.buf_length >= BLOCK_SIZE {
                 // Process the filled buffer
-                let (a, b, c) = unsafe { self.buf.align_to::<u64>() };
-                debug_assert!(a.is_empty());
-                debug_assert!(c.is_empty());
-                mix(&mut self.state[..], b);
+                self.mix_buffer_into_state();
                 self.buf_length = 0;
             } else {
                 // Fill the buffer.
@@ -74,30 +71,30 @@ impl LedHash256 {
     pub fn finish(mut self) -> [u8; BLOCK_SIZE] {
         // Hash the remaining bytes if there are any.
         if self.buf_length > 0 {
-            // Pad with zero.
             for i in (&mut self.buf[self.buf_length..]).iter_mut() {
                 *i = 0;
             }
-
-            // Process.
-            let (a, b, c) = unsafe { self.buf.align_to::<u64>() };
-            debug_assert!(a.is_empty());
-            debug_assert!(c.is_empty());
-            mix(&mut self.state[..], b);
+            self.mix_buffer_into_state();
             self.buf_length = 0;
         }
 
         // Hash the message length, in bits.
         mix(&mut self.state[..], &[self.message_length * 8, 0, 0, 0]);
 
-        // Convert to little endian.
-        self.state[0] = self.state[0].to_le();
-        self.state[1] = self.state[1].to_le();
-        self.state[2] = self.state[2].to_le();
-        self.state[3] = self.state[3].to_le();
+        // Get the digest as a byte array and return it.
+        let mut result = [0u8; BLOCK_SIZE];
+        result[0..8].copy_from_slice(&self.state[0].to_le_bytes());
+        result[8..16].copy_from_slice(&self.state[1].to_le_bytes());
+        result[16..24].copy_from_slice(&self.state[2].to_le_bytes());
+        result[24..32].copy_from_slice(&self.state[3].to_le_bytes());
+        return result;
+    }
 
-        // Return the result.
-        unsafe { std::mem::transmute(self.state) }
+    fn mix_buffer_into_state(&mut self) {
+        let (a, b, c) = unsafe { self.buf.align_to::<u64>() };
+        debug_assert!(a.is_empty());
+        debug_assert!(c.is_empty());
+        mix(&mut self.state[..], b);
     }
 }
 
