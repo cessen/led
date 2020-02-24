@@ -79,7 +79,11 @@ impl LedHash256 {
         }
 
         // Hash the message length, in bits.
-        mix(&mut self.state[..], &[self.message_length * 8, 0, 0, 0]);
+        self.buf[..8].copy_from_slice(&(self.message_length * 8).to_le_bytes());
+        for i in (&mut self.buf[8..]).iter_mut() {
+            *i = 0;
+        }
+        self.mix_buffer_into_state();
 
         // Get the digest as a byte array and return it.
         let mut digest = [0u8; BLOCK_SIZE];
@@ -90,66 +94,63 @@ impl LedHash256 {
         return digest;
     }
 
+    /// The main mix function.  Mixes the buffer into the hash state.
+    ///
+    /// Inspired by Skein 1.3, and using its MIX function and its constants.
+    /// This does 9 rounds of mixing, as that produces full diffusion for
+    /// 256-bit state according to the Skein 1.3 paper.
+    ///
+    /// The mix rotation constants, as taken from Skein 1.3 256-bit variant:
+    /// 14 16
+    /// 52 57
+    /// 23 40
+    ///  5 37
+    /// 25 33
+    /// 46 12
+    /// 58 22
+    /// 32 32
+    /// repeat
+    ///
+    /// The permute table, as taken from Skein 1.3 256-bit variant:
+    /// Indices: 0 1 2 3
+    /// Become:  0 3 2 1
     fn mix_buffer_into_state(&mut self) {
+        // Convert the buffer to native endian u64's and xor into the
+        // hash state.
         let (a, b, c) = unsafe { self.buf.align_to::<u64>() };
         debug_assert!(a.is_empty());
         debug_assert!(c.is_empty());
-        mix(&mut self.state[..], b);
-    }
-}
+        self.state[0] ^= u64::from_le(b[0]);
+        self.state[1] ^= u64::from_le(b[1]);
+        self.state[2] ^= u64::from_le(b[2]);
+        self.state[3] ^= u64::from_le(b[3]);
 
-/// The main mix function.  Mixes a block into the hash state.
-///
-/// Inspired by Skein 1.3, and using its MIX function and its constants.
-/// This does 9 rounds of mixing, as that produces full diffusion for
-/// 256-bit state according to the Skein 1.3 paper.
-///
-/// The mix rotation constants, as taken from Skein 1.3 256-bit variant:
-/// 14 16
-/// 52 57
-/// 23 40
-///  5 37
-/// 25 33
-/// 46 12
-/// 58 22
-/// 32 32
-/// repeat
-///
-/// The permute table, as taken from Skein 1.3 256-bit variant:
-/// Indices: 0 1 2 3
-/// Become:  0 3 2 1
-fn mix(state: &mut [u64], block: &[u64]) {
-    // Convert the block to native endianness and xor into the hash state.
-    state[0] ^= u64::from_le(block[0]);
-    state[1] ^= u64::from_le(block[1]);
-    state[2] ^= u64::from_le(block[2]);
-    state[3] ^= u64::from_le(block[3]);
+        // Mixing constants.
+        const ROUNDS: usize = 9;
+        const ROTATION_TABLE: [(u32, u32); 8] = [
+            (14, 16),
+            (52, 57),
+            (23, 40),
+            (5, 37),
+            (25, 33),
+            (46, 12),
+            (58, 22),
+            (32, 32),
+        ];
 
-    // Mixing constants.
-    const ROUNDS: usize = 9;
-    const ROTATION_TABLE: [(u32, u32); 8] = [
-        (14, 16),
-        (52, 57),
-        (23, 40),
-        (5, 37),
-        (25, 33),
-        (46, 12),
-        (58, 22),
-        (32, 32),
-    ];
+        // Do the mixing.
+        for &(rot_1, rot_2) in ROTATION_TABLE.iter().cycle().take(ROUNDS) {
+            // Skein MIX function.
+            self.state[0] = self.state[0].wrapping_add(self.state[1]);
+            self.state[1] = self.state[1].rotate_left(rot_1) ^ self.state[0];
 
-    // Do the mixing.
-    for &(rot_1, rot_2) in ROTATION_TABLE.iter().cycle().take(ROUNDS) {
-        // Skein MIX function.
-        state[0] = state[0].wrapping_add(state[1]);
-        state[1] = state[1].rotate_left(rot_1) ^ state[0];
+            // Skein MIX function.
+            self.state[2] = self.state[2].wrapping_add(self.state[3]);
+            self.state[3] = self.state[3].rotate_left(rot_2) ^ self.state[2];
 
-        // Skein MIX function.
-        state[2] = state[2].wrapping_add(state[3]);
-        state[3] = state[3].rotate_left(rot_2) ^ state[2];
-
-        // Permute.
-        state.swap(1, 3);
+            // Permute.
+            self.state.swap(1, 3);
+        }
     }
 }
 
