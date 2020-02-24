@@ -82,12 +82,12 @@ impl LedHash256 {
         mix(&mut self.state[..], &[self.message_length * 8, 0, 0, 0]);
 
         // Get the digest as a byte array and return it.
-        let mut result = [0u8; BLOCK_SIZE];
-        result[0..8].copy_from_slice(&self.state[0].to_le_bytes());
-        result[8..16].copy_from_slice(&self.state[1].to_le_bytes());
-        result[16..24].copy_from_slice(&self.state[2].to_le_bytes());
-        result[24..32].copy_from_slice(&self.state[3].to_le_bytes());
-        return result;
+        let mut digest = [0u8; BLOCK_SIZE];
+        digest[0..8].copy_from_slice(&self.state[0].to_le_bytes());
+        digest[8..16].copy_from_slice(&self.state[1].to_le_bytes());
+        digest[16..24].copy_from_slice(&self.state[2].to_le_bytes());
+        digest[24..32].copy_from_slice(&self.state[3].to_le_bytes());
+        return digest;
     }
 
     fn mix_buffer_into_state(&mut self) {
@@ -100,9 +100,9 @@ impl LedHash256 {
 
 /// The main mix function.  Mixes a block into the hash state.
 ///
-/// Inspired by Skein 1.3, and using the constants from its 256-bit
-/// variant.  It does 9 rounds of mixing, as that produces full
-/// diffusion for 256-bit keys according to the Skein 1.3 paper.
+/// Inspired by Skein 1.3, and using its MIX function and its constants.
+/// This does 9 rounds of mixing, as that produces full diffusion for
+/// 256-bit state according to the Skein 1.3 paper.
 ///
 /// The mix rotation constants, as taken from Skein 1.3 256-bit variant:
 /// 14 16
@@ -119,12 +119,6 @@ impl LedHash256 {
 /// Indices: 0 1 2 3
 /// Become:  0 3 2 1
 fn mix(state: &mut [u64], block: &[u64]) {
-    /// The MIX function from Skein.
-    fn umix(pair: &mut [u64], r: u32) {
-        pair[0] = pair[0].wrapping_add(pair[1]);
-        pair[1] = pair[1].rotate_left(r) ^ pair[0];
-    }
-
     // Convert the block to native endianness and xor into the hash state.
     state[0] ^= u64::from_le(block[0]);
     state[1] ^= u64::from_le(block[1]);
@@ -145,9 +139,16 @@ fn mix(state: &mut [u64], block: &[u64]) {
     ];
 
     // Do the mixing.
-    for (rot_1, rot_2) in ROTATION_TABLE.iter().cycle().take(ROUNDS) {
-        umix(&mut state[..2], *rot_1);
-        umix(&mut state[2..], *rot_2);
+    for &(rot_1, rot_2) in ROTATION_TABLE.iter().cycle().take(ROUNDS) {
+        // Skein MIX function.
+        state[0] = state[0].wrapping_add(state[1]);
+        state[1] = state[1].rotate_left(rot_1) ^ state[0];
+
+        // Skein MIX function.
+        state[2] = state[2].wrapping_add(state[3]);
+        state[3] = state[3].rotate_left(rot_2) ^ state[2];
+
+        // Permute.
         state.swap(1, 3);
     }
 }
