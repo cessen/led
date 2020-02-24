@@ -153,8 +153,6 @@ fn mix(state: &mut [u64], block: &[u64]) {
         umix(&mut state[2..], *rot_2);
         state.swap(1, 3);
     }
-
-    state.swap(1, 3);
 }
 
 #[cfg(test)]
@@ -195,104 +193,85 @@ mod test {
     #[test]
     fn hash_string_01() {
         let s = "";
-        let correct_digest = "4c0995f905f4e502431432b0e88cacdb4de79d68a61d2ad6606dfbaadac265ac";
+        let correct_digest = "4c0995f905f4e502606dfbaadac265ac4de79d68a61d2ad6431432b0e88cacdb";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_02() {
         let s = "a";
-        let correct_digest = "53278d6f86ce2f4948b908b18db874966c755abb662ca5ef71598bebb615b4b7";
+        let correct_digest = "84cf9b8e69b96c1a69257ffffc6b505cd96504ec3ddb97bbff2fffffc161f717";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_03() {
         let s = "aaa";
-        let correct_digest = "57026c6accb4eb5cfd2423481945f752705085407dddfaf170537943aa3b184d";
+        let correct_digest = "a514838ef2fc8394cdd87a34fb8794ad9e74154d73c5a9ca1d920fb3aa187c6e";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_04() {
         let s = "abc";
-        let correct_digest = "924ab7415342ded68e5e16d9a0bac734b9a0652b81aaef2566415f3ef95294c1";
+        let correct_digest = "08c83bd40744cd323890d1d1ca72274c4ec4a0e1de0b68761248b1bdd70a845a";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_05() {
         let s = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-        let correct_digest = "5a277cb9e6085ee07b22ccc6159d67678643fb85f83997b58d2d8e7d8ca176c9";
+        let correct_digest = "a0f15439308087ab8f0063d69d22d0b7f046e8c0754c1959a14478378c3b4725";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_06() {
         let s = "The quick brown fox jumps over the lazy dog";
-        let correct_digest = "f3eba2aee55207c45839d3e5250943a32cbd85477f383e136d7bfc8e9bf737b6";
+        let correct_digest = "1b409dc9bd517b1bab7ad44ab2d11917d5f24d090bd766024a2cd54a5aa28ce8";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_07() {
         let s = "The quick brown fox jumps over the lazy dog.";
-        let correct_digest = "b39d81bb4eec906cbaf516c29de4c31069fcc32ffd388d63f683ba323eedd759";
+        let correct_digest = "f94bd8c035958bb27c5a733ad7efd21286da12b9cf33a6496d9b9e35813720b7";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_08() {
         let s = "message digest";
-        let correct_digest = "18e021a1b1fb654d1bcf7aa73eeebe0d271f5595a450e8d437c9a609f89f086d";
+        let correct_digest = "e2f2ff2e0ecd3336f9f12f45628e9dea63c02933619759d89a1974f5bb5072a7";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_09() {
         let s = "abcdefghijklmnopqrstuvwxyz";
-        let correct_digest = "1c65e9cdfae2fd10ebd2b7da4dc5b99fad4fc3b9cf76bafdc67a770b5e797c98";
+        let correct_digest = "e9828ae4d285bce25c652954ffbf9d5e292c920220f84e2983a7bf6911e59206";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_10() {
         let s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        let correct_digest = "834da12435130ae02ced77541a96815099ebdfc43bfa7ee277c3b4f64c2243cf";
+        let correct_digest = "9e54edbe1611f9c5e0a306240537df41d2ca1d584a125119cbf09fdb2f6ab880";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_11() {
         let s = "12345678901234567890123456789012345678901234567890123456789012345678901234567890";
-        let correct_digest = "141b3cc6f5cb6e756dcf1a16ebc975ac702994ddee7b1a2293072a3c2c11b51d";
+        let correct_digest = "f1b7e4cca7c926b20520a7513043e0dda8b398b4d77613b1d7cc2464e9d8061f";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
     }
 
     #[test]
     fn hash_string_12() {
         let s = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
-        let correct_digest = "5fbe85a0a525f3b648542492751e6ae3c05113a3c46dd48aa690ac720126f476";
+        let correct_digest = "5e4a25a709236e55995eee313495ae1d43c09d4acfec69a107b65be20b6c3863";
         assert_eq!(digest_to_string(hash(s.as_bytes())), correct_digest);
-    }
-
-    #[test]
-    fn hash_length() {
-        // We're testing here to make sure the length of the data properly
-        // affects the hash.  The last block of data is padded with zeros
-        // if less than the block size, so here we're forcing that last
-        // block to be all zeros, and only changing the length of input.
-        let len_0 = &[];
-        let len_1 = &[0u8];
-        let len_2 = &[0u8, 0];
-
-        let len_0_hash = digest_to_string(hash(len_0));
-        let len_1_hash = digest_to_string(hash(len_1));
-        let len_2_hash = digest_to_string(hash(len_2));
-
-        assert!(len_0_hash != len_1_hash);
-        assert!(len_0_hash != len_2_hash);
-        assert!(len_1_hash != len_2_hash);
     }
 
     #[test]
@@ -304,7 +283,7 @@ mod test {
         let test_string4 = "cup";
         let test_string5 =
             "idatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
-        let correct_digest = "5fbe85a0a525f3b648542492751e6ae3c05113a3c46dd48aa690ac720126f476";
+        let correct_digest = "5e4a25a709236e55995eee313495ae1d43c09d4acfec69a107b65be20b6c3863";
 
         let mut hasher = LedHash256::new();
         hasher.update(test_string1.as_bytes());
@@ -315,5 +294,29 @@ mod test {
         let digest = hasher.finish();
 
         assert_eq!(digest_to_string(digest), correct_digest);
+    }
+
+    #[test]
+    fn hash_length() {
+        // We're testing here to make sure the length of the data properly
+        // affects the hash.  Internally in the hash, the last block of data
+        // is padded with zeros, so here we're forcing that last block to be
+        // all zeros, and only changing the length of input.
+        let len_0 = &[];
+        let len_1 = &[0u8];
+        let len_2 = &[0u8, 0];
+
+        assert_eq!(
+            digest_to_string(hash(len_0)),
+            "4c0995f905f4e502606dfbaadac265ac4de79d68a61d2ad6431432b0e88cacdb",
+        );
+        assert_eq!(
+            digest_to_string(hash(len_1)),
+            "9061db6180de3b2193eca59ada3d00472d0bb25ecced849b55586b367d8e10bd",
+        );
+        assert_eq!(
+            digest_to_string(hash(len_2)),
+            "054c0440b479e206a28923f5924b7bc0d3f0ead1eaff3360aa56750b98fd5645",
+        );
     }
 }
