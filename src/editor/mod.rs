@@ -564,7 +564,10 @@ impl Editor {
             );
         }
 
-        let pos = self.buffer.text.line_to_char(n);
+        let pos = self
+            .buffer
+            .text
+            .line_to_char(n.min(self.buffer.text.len_lines()));
         let pos = self.formatter.set_horizontal(
             &self.buffer.text,
             pos,
