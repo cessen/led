@@ -20,13 +20,12 @@ debug = true
 [dependencies]
 ropey = "1"
 # ropey = { git = "https://github.com/cessen/ropey", branch = "master" }
-# unicode-segmentation = "1"
-unicode-segmentation = { git = "https://github.com/unicode-rs/unicode-segmentation.git", branch = "master" }
+unicode-segmentation = "1.7"
 unicode-width = "0.1"
 clap = "2"
 smallvec = "1"
-crossterm = "0.14"
-gag = "0.1.10"
+crossterm = "0.20"
+gag = "1"
 time = "0.2"
 
 # Local crate dependencies

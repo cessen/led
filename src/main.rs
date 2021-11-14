@@ -1,7 +1,4 @@
-use std::{
-    fs::File,
-    io::{BufReader, Write},
-};
+use std::{fs::File, io::BufReader};
 
 use backend::buffer::{Buffer, BufferPath};
 use clap::{App, Arg};
