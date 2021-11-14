@@ -33,26 +33,67 @@ impl Transaction {
         }
     }
 
-    /// Adds another edit to the Transaction.
-    ///
-    /// This composes as if the edits already in the Transaction were
-    /// performed first, and then the new edit was performed after.
-    pub fn push_edit(&mut self, byte_idx: usize, old: &str, new: &str) {
-        if self.ops.is_empty() {
-            // The easy case.
-            self.buffer.push_str(old);
-            self.buffer.push_str(new);
-            self.ops.push(Op::Retain {
+    /// Creates a Transaction from a single edit.
+    pub fn from_edit(byte_idx: usize, old: &str, new: &str) -> Transaction {
+        let mut buffer = String::new();
+        buffer.push_str(old);
+        buffer.push_str(new);
+
+        let ops = vec![
+            Op::Retain {
                 byte_count: byte_idx,
-            });
-            self.ops.push(Op::Replace {
+            },
+            Op::Replace {
                 old: 0..old.len(),
                 new: old.len()..(old.len() + new.len()),
-            });
-        } else {
-            // The complex case.
-            todo!()
+            },
+        ];
+
+        Transaction {
+            ops: ops,
+            buffer: buffer,
         }
+    }
+
+    /// Creates a Transaction from a sorted, non-overlapping set of
+    /// simultaneous edits.
+    ///
+    /// Takes an iterator that yields `(byte_index, old_text, replacement_text)`
+    /// tuples, representing the edits.  The items are expected to be
+    /// yielded in byte-index order, and the byte indices are relative to
+    /// the original text--this function does _not_ treat them as a
+    /// sequence of progressively applied edits, but rather as a set of
+    /// edits applied simultaneously.
+    pub fn from_ordered_edit_set<'a, I>(edit_iter: I) -> Transaction
+    where
+        I: Iterator<Item = (usize, &'a str, &'a str)> + 'a,
+    {
+        let mut trans = Transaction::new();
+        let mut i = 0;
+        let mut len_delta = 0isize;
+        for (byte_idx, old, new) in edit_iter {
+            let adjusted_byte_idx = (byte_idx as isize + len_delta) as usize;
+            let retained = adjusted_byte_idx - i;
+
+            let old_range = trans.buffer.len()..(trans.buffer.len() + old.len());
+            trans.buffer.push_str(old);
+            let new_range = trans.buffer.len()..(trans.buffer.len() + new.len());
+            trans.buffer.push_str(new);
+
+            if retained > 0 {
+                trans.ops.push(Op::Retain {
+                    byte_count: retained,
+                });
+            }
+            trans.ops.push(Op::Replace {
+                old: old_range,
+                new: new_range,
+            });
+
+            i += retained + new.len();
+            len_delta += new.len() as isize - old.len() as isize;
+        }
+        trans
     }
 
     /// Build a Transaction that is functionally identical to applying
