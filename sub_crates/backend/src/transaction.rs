@@ -1,10 +1,8 @@
-use std::ops::Range;
-
 use ropey::Rope;
 
 use crate::marks::MarkSet;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum Op {
     Retain {
         byte_count: usize,
@@ -12,9 +10,9 @@ enum Op {
     Replace {
         // These both represent strings, and are byte-index ranges into
         // the Transaction's `buffer` where their actual string data is
-        // stored.  `0..0` can be used to indicate no string data.
-        old: Range<usize>,
-        new: Range<usize>,
+        // stored.  `(0, 0)` can be used to indicate no string data.
+        old: (usize, usize),
+        new: (usize, usize),
     },
 }
 
@@ -44,8 +42,8 @@ impl Transaction {
                 byte_count: byte_idx,
             },
             Op::Replace {
-                old: 0..old.len(),
-                new: old.len()..(old.len() + new.len()),
+                old: (0, old.len()),
+                new: (old.len(), old.len() + new.len()),
             },
         ];
 
@@ -75,9 +73,9 @@ impl Transaction {
             let adjusted_byte_idx = (byte_idx as isize + len_delta) as usize;
             let retained = adjusted_byte_idx - i;
 
-            let old_range = trans.buffer.len()..(trans.buffer.len() + old.len());
+            let old_range = (trans.buffer.len(), trans.buffer.len() + old.len());
             trans.buffer.push_str(old);
-            let new_range = trans.buffer.len()..(trans.buffer.len() + new.len());
+            let new_range = (trans.buffer.len(), trans.buffer.len() + new.len());
             trans.buffer.push_str(new);
 
             if retained > 0 {
@@ -99,8 +97,108 @@ impl Transaction {
     /// Build a Transaction that is functionally identical to applying
     /// first `self` and then `other` sequentially.
     #[must_use]
-    pub fn compose(&self, _other: &Transaction) -> Transaction {
-        todo!()
+    pub fn compose(&self, other: &Transaction) -> Transaction {
+        use Op::*;
+
+        let mut trans = Transaction::new();
+        let mut ops1 = self.ops.iter();
+        let mut ops2 = other.ops.iter();
+        let mut op1 = ops1.next();
+        let mut op2 = ops2.next();
+        let mut range1 = (0, 0);
+        let mut range2 = (0, 0);
+
+        loop {
+            match (op1, op2) {
+                //-------------------------------
+                // Move past the unchanged bits.
+                (Some(Retain { byte_count: bc }), _) => {
+                    range1.1 += bc;
+                    op1 = ops1.next();
+                }
+
+                (_, Some(Retain { byte_count: bc })) => {
+                    range2.1 += bc;
+                    op2 = ops2.next();
+                }
+
+                //-----------------------------------------------------
+                // Handle changes when there are still changes in both
+                // source transactions.
+                (
+                    Some(Replace {
+                        old: old1,
+                        new: new1,
+                    }),
+                    Some(Replace {
+                        old: old2,
+                        new: new2,
+                    }),
+                ) => {
+                    // This is the complex case.
+                    todo!()
+                }
+
+                //------------------------------------------------------
+                // Handle changes when there are only changes remaining
+                // in one of the source transactions.
+                (Some(Replace { old, new }), None) => {
+                    if range1.0 < range1.1 {
+                        trans.ops.push(Retain {
+                            byte_count: range1.1 - range1.0,
+                        });
+                        range1.0 = range1.1;
+                    }
+
+                    let ti = trans.buffer.len();
+                    trans.buffer.push_str(&self.buffer[old.0..old.1]);
+                    let old_range = (ti, ti + (old.1 - old.0));
+
+                    let ti = trans.buffer.len();
+                    trans.buffer.push_str(&self.buffer[new.0..new.1]);
+                    let new_range = (ti, ti + (new.1 - new.0));
+
+                    trans.ops.push(Replace {
+                        old: old_range,
+                        new: new_range,
+                    });
+
+                    op1 = ops1.next();
+                }
+
+                (None, Some(Replace { old, new })) => {
+                    if range2.0 < range2.1 {
+                        trans.ops.push(Retain {
+                            byte_count: range2.1 - range2.0,
+                        });
+                        range2.0 = range2.1;
+                    }
+
+                    let ti = trans.buffer.len();
+                    trans.buffer.push_str(&other.buffer[old.0..old.1]);
+                    let old_range = (ti, ti + (old.1 - old.0));
+
+                    let ti = trans.buffer.len();
+                    trans.buffer.push_str(&other.buffer[new.0..new.1]);
+                    let new_range = (ti, ti + (new.1 - new.0));
+
+                    trans.ops.push(Replace {
+                        old: old_range,
+                        new: new_range,
+                    });
+
+                    op2 = ops2.next();
+                }
+
+                //-------
+                // Done.
+                (None, None) => {
+                    break;
+                }
+            }
+        }
+
+        trans
     }
 
     /// Build a Transaction that is functionally identical to undoing
@@ -135,14 +233,18 @@ impl Transaction {
                     i += byte_count;
                 }
                 Op::Replace { old, new } => {
-                    let old = &self.buffer[old.clone()];
-                    let new = &self.buffer[new.clone()];
+                    let old = &self.buffer[old.0..old.1];
+                    let new = &self.buffer[new.0..new.1];
                     let char_i = text.byte_to_char(i);
-                    let old_char_len = old.chars().count();
 
-                    debug_assert_eq!(text.slice(char_i..(char_i + old_char_len)), old);
-                    text.remove(char_i..(char_i + old_char_len));
-                    text.insert(char_i, new);
+                    if !old.is_empty() {
+                        let old_char_len = old.chars().count();
+                        debug_assert_eq!(text.slice(char_i..(char_i + old_char_len)), old);
+                        text.remove(char_i..(char_i + old_char_len));
+                    }
+                    if !new.is_empty() {
+                        text.insert(char_i, new);
+                    }
 
                     i = i + new.len();
                 }
